@@ -1,0 +1,86 @@
+# Created by Antigravity for ai-chess-rivals project
+
+### Spring Boot / Maven (Backend) ###
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Node / Frontend ###
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.eslintcache
+.parcel-cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+### OS / System Files ###
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+### Editor / IDE Specific ###
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+### Environment & Secrets ###
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+
+### Logs ###
+logs/
+*.log
+
+### Stockfish / Executables ###
+stockfish/stockfish
+stockfish/stockfish.exe
+stockfish/stockfish-*
+stockfish/*.exe
+stockfish/*.bin
+
+docs/superpowers/
