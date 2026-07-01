@@ -10,7 +10,7 @@ This document provides an inventory and explanation of all libraries, tools, and
 | **Language & Runtime** | Java, Node.js, TypeScript | Java 25, Node.js 22+, TypeScript ~6.0.2 |
 | **Client-Side (Frontend)** | React, Vite, Tailwind CSS, shadcn/ui | React 19.2.7, Vite 8.1.0, Tailwind CSS 4.3.1 |
 | **Server-Side (Backend)** | Spring Boot, Spring Modulith, Hibernate | Spring Boot 4.1.0, Spring Modulith 2.1.0 |
-| **Database** | PostgreSQL | PostgreSQL (latest container via Docker Compose) |
+| **Database** | PostgreSQL | PostgreSQL 17 (via Docker Compose / Neon in production) |
 | **Chess Logic Engine** | Stockfish, chess.js | Stockfish 17.1 (native executable), chess.js 1.4.0 |
 
 ---
@@ -105,7 +105,6 @@ The backend is a **Spring Boot** application targeting **Java 25**, configured a
 *   **Lombok**: Reduces boilerplate code (e.g., automatically generating getters/setters, constructors, and builders via annotations).
 *   **Spring Boot Actuator**: Exposes operational endpoints (health, environment, metrics) and works with Spring Modulith to expose module diagrams.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
-*   **Spring Boot Docker Compose**: Automatically starts the PostgreSQL service defined in `compose.yaml` upon executing the local Spring application.
 
 ### Dependency Reference Table (`server/pom.xml`)
 
@@ -123,7 +122,6 @@ The backend is a **Spring Boot** application targeting **Java 25**, configured a
 | `spring-modulith-starter-core` | `org.springframework.modulith` | Compile | `2.1.0` | Core Modulith tooling and verification |
 | `spring-modulith-starter-jpa` | `org.springframework.modulith` | Compile | `2.1.0` | Modulith persistence utilities |
 | `spring-boot-devtools` | `org.springframework.boot` | Runtime (Opt) | Inherited (`4.1.0`) | Rapid development helpers / restart |
-| `spring-boot-docker-compose` | `org.springframework.boot` | Runtime (Opt) | Inherited (`4.1.0`) | Automatic Docker Compose orchestration |
 | `postgresql` | `org.postgresql` | Runtime | Inherited (`4.1.0`) | JDBC connector |
 | `spring-modulith-actuator` | `org.springframework.modulith` | Runtime | `2.1.0` | Modulith metrics endpoints |
 | `spring-modulith-observability-core` | `org.springframework.modulith` | Runtime | `2.1.0` | Modulith tracing / spans core engine |
@@ -139,11 +137,11 @@ The backend is a **Spring Boot** application targeting **Java 25**, configured a
 To support locally running developers and showcase targets, the codebase incorporates automation around local orchestration and binary acquisition.
 
 ### 1. PostgreSQL Database
-Orchestrated locally via Docker Compose (`server/compose.yaml`).
-*   **Image**: `postgres:latest`
-*   **Port Mapping**: `5433:5432`
-*   **Configured Database**: `mydatabase`
-*   **Developer Credentials**: `myuser` / `secret`
+Orchestrated locally via Docker Compose (`server/docker-compose.yml`) and connected via environment variables.
+*   **Image**: `postgres:17-alpine`
+*   **Port Mapping**: `5432:5432`
+*   **Configured Database**: `aichessrivals`
+*   **Developer Credentials**: `postgres` / `secretpassword`
 
 ### 2. Stockfish Chess Engine
 Stockfish is used as a local executable process communicating over UCI (stdin/stdout) via the `StockfishClient`.
