@@ -349,13 +349,18 @@
 								</goals>
 								<configuration>
 									<target>
-										<!-- Move to canonical name and make executable -->
+										<!-- Move to a temp file, delete the nested directory, then rename to canonical name -->
 										<move file="${project.basedir}/stockfish/stockfish/stockfish-ubuntu-x86-64-avx2"
-											  tofile="${project.basedir}/stockfish/stockfish"
+											  tofile="${project.basedir}/stockfish/stockfish_tmp"
 											  overwrite="true"
 											  failonerror="true"/>
 										<!-- Clean up nested directory structure -->
 										<delete dir="${project.basedir}/stockfish/stockfish"/>
+										<!-- Move to canonical name -->
+										<move file="${project.basedir}/stockfish/stockfish_tmp"
+											  tofile="${project.basedir}/stockfish/stockfish"
+											  overwrite="true"
+											  failonerror="true"/>
 										<chmod file="${project.basedir}/stockfish/stockfish" perm="755"/>
 									</target>
 								</configuration>
