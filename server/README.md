@@ -159,3 +159,93 @@ STOCKFISH_PATH=stockfish/stockfish
 Do not mix profiles. If you previously ran `-Pwindows` and are now on Linux,
 delete the contents of `server/stockfish/` (except `.gitkeep`) and re-run
 `mvn generate-resources -Plinux`.
+
+---
+
+## Docker Compose Development Workflow
+
+The recommended development workflow utilizes Docker Compose to orchestrate both the backend application and the PostgreSQL database.
+
+### 1. Prerequisites
+
+- **Docker Desktop** (with Docker Compose v2+) installed and running.
+
+### 2. Configuration Setup
+
+Before launching, copy the `.env.example` template into a `.env` file in the same directory:
+```bash
+cp .env.example .env
+```
+Ensure the environment variables are set correctly for your local development environment.
+
+### 3. Build & Run
+
+**Build the image:**
+```bash
+docker compose build
+```
+
+**Start services in background:**
+```bash
+docker compose up -d
+```
+
+**Stop services:**
+```bash
+docker compose down
+```
+
+**Stop services and destroy database volumes (starts with a fresh database):**
+```bash
+docker compose down -v
+```
+
+### 4. Monitoring & Diagnostics
+
+**View all logs:**
+```bash
+docker compose logs -f
+```
+
+**View only backend logs:**
+```bash
+docker compose logs -f backend
+```
+
+**Rebuild the backend container and restart services:**
+```bash
+docker compose up -d --build
+```
+
+### 5. Connecting to the Database
+
+Connect to the PostgreSQL instance using any database client (such as DBeaver, pgAdmin, or IntelliJ Database Tools):
+- **Host**: `localhost`
+- **Port**: `5432` (mapped from standard container port)
+- **Database**: `aichessrivals` (or value of `POSTGRES_DB` in `.env`)
+- **Username**: `postgres` (or value of `POSTGRES_USER` in `.env`)
+- **Password**: `secretpassword` (or value of `POSTGRES_PASSWORD` in `.env`)
+
+---
+
+## Production Deployment Differences
+
+### Environment Differences
+- **Local Development**:
+  - The PostgreSQL database runs as a container (`postgres:17-alpine`) inside the same Docker Compose network.
+  - Flyway migrations are run against the local container database.
+- **Production (Render + Neon)**:
+  - The backend runs as a single Docker container on **Render** (built using the same `Dockerfile`).
+  - The database is hosted on **Neon PostgreSQL** as a serverless instance.
+  - The PostgreSQL service container is **not** deployed to Render.
+  - Transitioning from local development to production requires **only configuration changes** (no code changes or Spring profile changes).
+
+### Production Configuration
+In Render, set the following environment variables in your web service dashboard to point to Neon:
+- `SPRING_DATASOURCE_URL`: (Your Neon JDBC connection string)
+- `SPRING_DATASOURCE_USERNAME`: (Your Neon database username)
+- `SPRING_DATASOURCE_PASSWORD`: (Your Neon database password)
+- `SPRING_FLYWAY_URL`: (Same as `SPRING_DATASOURCE_URL`)
+- `SPRING_FLYWAY_USER`: (Same as `SPRING_DATASOURCE_USERNAME`)
+- `SPRING_FLYWAY_PASSWORD`: (Same as `SPRING_DATASOURCE_PASSWORD`)
+
