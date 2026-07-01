@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>25</java.version>
 		<spring-modulith.version>2.1.0</spring-modulith.version>
+		<!-- Stockfish version pin — change here to upgrade everywhere -->
+		<stockfish.version>17.1</stockfish.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -111,6 +113,11 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
 			<optional>true</optional>
 		</dependency>
 		<dependency>
@@ -239,5 +246,130 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!--
+			Windows profile — downloads the official Stockfish Windows executable.
+			Usage: mvn package -Pwindows
+			Result: server/stockfish/stockfish.exe
+		-->
+		<profile>
+			<id>windows</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>io.github.download-maven-plugin</groupId>
+						<artifactId>download-maven-plugin</artifactId>
+						<version>2.1.0</version>
+						<executions>
+							<execution>
+								<id>download-stockfish-windows</id>
+								<phase>generate-resources</phase>
+								<goals>
+									<goal>wget</goal>
+								</goals>
+								<configuration>
+									<!-- Official Stockfish release on GitHub -->
+									<url>https://github.com/official-stockfish/Stockfish/releases/download/sf_${stockfish.version}/stockfish-windows-x86-64-avx2.zip</url>
+									<outputDirectory>${project.basedir}/stockfish</outputDirectory>
+									<unpack>true</unpack>
+									<!-- Cache the zip; re-download only when version changes -->
+									<overwrite>false</overwrite>
+									<readTimeOut>300000</readTimeOut>
+									<connectTimeOut>300000</connectTimeOut>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-antrun-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>rename-stockfish-windows</id>
+								<phase>generate-resources</phase>
+								<goals>
+									<goal>run</goal>
+								</goals>
+								<configuration>
+									<target>
+										<!-- Move the exe from the extracted nested directory to stockfish/stockfish.exe -->
+										<move file="${project.basedir}/stockfish/stockfish/stockfish-windows-x86-64-avx2.exe"
+											  tofile="${project.basedir}/stockfish/stockfish.exe"
+											  overwrite="true"
+											  failonerror="true"/>
+										<!-- Clean up the nested directory structure -->
+										<delete dir="${project.basedir}/stockfish/stockfish"/>
+									</target>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+
+		<!--
+			Linux profile — downloads the official Stockfish Linux executable.
+			Usage: mvn package -Plinux
+			Result: server/stockfish/stockfish  (executable bit set)
+		-->
+		<profile>
+			<id>linux</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>io.github.download-maven-plugin</groupId>
+						<artifactId>download-maven-plugin</artifactId>
+						<version>2.1.0</version>
+						<executions>
+							<execution>
+								<id>download-stockfish-linux</id>
+								<phase>generate-resources</phase>
+								<goals>
+									<goal>wget</goal>
+								</goals>
+								<configuration>
+									<!-- Official Stockfish release on GitHub -->
+									<url>https://github.com/official-stockfish/Stockfish/releases/download/sf_${stockfish.version}/stockfish-ubuntu-x86-64-avx2.tar</url>
+									<outputDirectory>${project.basedir}/stockfish</outputDirectory>
+									<unpack>true</unpack>
+									<!-- Cache the tar; re-download only when version changes -->
+									<overwrite>false</overwrite>
+									<readTimeOut>300000</readTimeOut>
+									<connectTimeOut>300000</connectTimeOut>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-antrun-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>rename-chmod-stockfish-linux</id>
+								<phase>generate-resources</phase>
+								<goals>
+									<goal>run</goal>
+								</goals>
+								<configuration>
+									<target>
+										<!-- Move to canonical name and make executable -->
+										<move file="${project.basedir}/stockfish/stockfish/stockfish-ubuntu-x86-64-avx2"
+											  tofile="${project.basedir}/stockfish/stockfish"
+											  overwrite="true"
+											  failonerror="true"/>
+										<!-- Clean up nested directory structure -->
+										<delete dir="${project.basedir}/stockfish/stockfish"/>
+										<chmod file="${project.basedir}/stockfish/stockfish" perm="755"/>
+									</target>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

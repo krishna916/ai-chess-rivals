@@ -1,6 +1,6 @@
 # Created by Antigravity for ai-chess-rivals project
 
-### Spring Boot / Maven (Backend) ###
+### Spring Boot / Maven (Server) ###
 HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
@@ -26,7 +26,7 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### Node / Frontend ###
+### Node / Client ###
 node_modules/
 dist/
 dist-ssr/
@@ -77,10 +77,14 @@ logs/
 *.log
 
 ### Stockfish / Executables ###
-stockfish/stockfish
-stockfish/stockfish.exe
-stockfish/stockfish-*
-stockfish/*.exe
-stockfish/*.bin
+# Binaries are downloaded by Maven profiles (mvn package -Pwindows or -Plinux)
+# Never commit binary files to the repository
+server/stockfish/stockfish
+server/stockfish/stockfish.exe
+server/stockfish/stockfish-*
+server/stockfish/*.exe
+server/stockfish/*.bin
+# Keep the directory tracked by git
+!server/stockfish/.gitkeep
 
 docs/superpowers/

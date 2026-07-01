@@ -1,0 +1,2 @@
+# This directory holds the Stockfish binary, which is downloaded by Maven profiles.
+# The binary is NOT committed to git. See server/README.md for download instructions.

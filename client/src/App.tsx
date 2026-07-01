@@ -12,7 +12,7 @@ function App() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Frontend setup is complete. Tailwind CSS v4, shadcn/ui components, and structure are verified.
+            Client setup is complete. Tailwind CSS v4, shadcn/ui components, and structure are verified.
           </p>
           <div className="flex gap-2">
             <Button className="w-full">Get Started</Button>

@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: ai-chess-rivals
+
+app:
+  chess:
+    stockfish:
+      path: ${STOCKFISH_PATH:stockfish/stockfish}
