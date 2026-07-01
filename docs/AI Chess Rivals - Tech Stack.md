@@ -139,7 +139,7 @@ To support locally running developers and showcase targets, the codebase incorpo
 ### 1. PostgreSQL Database
 Orchestrated locally via Docker Compose (`server/docker-compose.yml`) and connected via environment variables.
 *   **Image**: `postgres:17-alpine`
-*   **Port Mapping**: `5432:5432`
+*   **Port Mapping**: `5433:5432`
 *   **Configured Database**: `aichessrivals`
 *   **Developer Credentials**: `postgres` / `secretpassword`
 
