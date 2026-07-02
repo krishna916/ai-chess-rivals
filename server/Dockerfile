@@ -14,7 +14,7 @@ RUN ./mvnw dependency:go-offline -B -Plinux -Pnative
 COPY src/ ./src/
 
 # Package application as native image & download linux stockfish binary
-RUN rm -rf ./stockfish && ./mvnw clean package native:compile -B -DskipTests -Pnative -Plinux
+RUN ./mvnw clean native:compile -B -DskipTests -Plinux
 
 # --- Runtime Stage ---
 FROM debian:bookworm-slim
