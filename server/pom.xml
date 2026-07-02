@@ -186,6 +186,9 @@
 			<plugin>
 				<groupId>org.graalvm.buildtools</groupId>
 				<artifactId>native-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>dev.krishnamurti.ai_chess_rivals.AiChessRivalsApplication</mainClass>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
