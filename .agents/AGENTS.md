@@ -41,3 +41,15 @@ To preserve the simplicity and focus of this showcase project (as outlined in th
 - **Out of Scope (MVP constraints)**: Do **not** implement vector databases, user registration/accounts, multiplayer matches, complex multi-agent orchestrators, or microservices. Keep code explicitly modular-monolithic (using Spring Modulith).
 - **Database Migrations**: In local development, `spring.jpa.hibernate.ddl-auto` defaults to `update` for rapid prototyping. For production (Render + Neon), all database schemas must be driven strictly through **Flyway migration scripts** under `server/src/main/resources/db/migration/`. Developers must set `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` in production environments.
 
+---
+
+## 4. Windows Environment Command Chaining
+
+- **PowerShell Constraint**: When running terminal commands on Windows (powershell), do not use `&&` to chain multiple commands. Instead, propose them as separate sequential tool calls or use `;` as the statement separator.
+
+## 5. Spring Modulith and Schema Validation
+
+- **Event Publication Table**: When `spring.jpa.hibernate.ddl-auto` is set to `validate` or `none` and Flyway is managing migrations, Modulith's internal `event_publication` table must be explicitly created via a Flyway migration script (e.g. under `server/src/main/resources/db/migration/`).
+- **DDL Extraction**: To extract the correct table columns for the Modulith version on the classpath, temporarily boot the application once with `ddl-auto=update` on a clean local database, extract the schema using pg_dump, and restore the validation mode.
+
+
