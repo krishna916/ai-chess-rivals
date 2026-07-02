@@ -5,6 +5,7 @@ WORKDIR /opt/app
 # Copy maven wrapper & dependencies definition
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
+RUN chmod +x mvnw
 
 # Pre-fetch maven dependencies to cache layer
 RUN ./mvnw dependency:go-offline -B -Plinux
