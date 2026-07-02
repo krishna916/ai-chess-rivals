@@ -11,12 +11,8 @@ The tech stack document [docs/AI Chess Rivals - Tech Stack.md](file:///D:/projec
 ## Core Rule
 Any modification, addition, or removal of libraries or configurations in the project (including but not limited to [client/package.json](file:///D:/projects/ai-chess-rivals/client/package.json), [server/pom.xml](file:///D:/projects/ai-chess-rivals/server/pom.xml), and [server/compose.yaml](file:///D:/projects/ai-chess-rivals/server/compose.yaml)) **MUST** immediately be accompanied by a corresponding update to [docs/AI Chess Rivals - Tech Stack.md](file:///D:/projects/ai-chess-rivals/docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md).
 
-Both changes must be staged and committed together.
-
 ## Loophole Controls
-*   **No Deferral**: Do not defer the documentation update to a future commit, task, or day.
 *   **No Version Exemption**: Do not skip updating the document for "minor," "patch," or "security hotfix" dependency updates. All version changes must be tracked.
-*   **Atomic Updates**: The configuration change and the documentation update must reside in the same commit.
 
 ## Rationalization Table
 
@@ -25,10 +21,10 @@ Both changes must be staged and committed together.
 | "This is a critical security hotfix; we must deploy immediately and update the docs tomorrow." | A documentation update is a simple text change that takes less than 30 seconds. Deferring it guarantees documentation drift. Update it now. |
 | "Updating the documentation introduces risk of missing our deploy window." | Updating a markdown file carries zero execution risk. Forgetting it creates immediate technical debt. |
 | "It's just a minor/patch version bump, so it's not worth updating." | The tech stack document lists exact versions. Any bump is a mismatch if not documented. |
-| "I will create a separate pull request for documentation updates." | Separate documentation PRs are frequently forgotten. Documentation changes must be atomic with code changes. |
+
 
 ## Red Flags - STOP and Correct
 *   Thinking: *"I'll update the tech stack doc later."*
 *   Thinking: *"It's just a minor patch, so it doesn't matter."*
 *   Thinking: *"We are in a rush, so documentation is secondary."*
-*   Staging [package.json](file:///D:/projects/ai-chess-rivals/client/package.json) or [pom.xml](file:///D:/projects/ai-chess-rivals/server/pom.xml) without staging [AI Chess Rivals - Tech Stack.md](file:///D:/projects/ai-chess-rivals/docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md).
+
