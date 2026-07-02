@@ -7,9 +7,9 @@ This document provides an inventory and explanation of all libraries, tools, and
 
 | Layer | Key Technologies | Version / Environment |
 |---|---|---|
-| **Language & Runtime** | Java, Node.js, TypeScript | Java 25, Node.js 22+, TypeScript ~6.0.2 |
+| **Language & Runtime** | Java (GraalVM AOT), Node.js, TypeScript | Java 25, Node.js 22+, TypeScript ~6.0.2 |
 | **Client-Side (Frontend)** | React, Vite, Tailwind CSS, shadcn/ui | React 19.2.7, Vite 8.1.0, Tailwind CSS 4.3.1 |
-| **Server-Side (Backend)** | Spring Boot, Spring Modulith, Hibernate | Spring Boot 4.1.0, Spring Modulith 2.1.0 |
+| **Server-Side (Backend)** | Spring Boot, Spring Modulith, Hibernate | Spring Boot 4.1.0 (GraalVM Native Image), Spring Modulith 2.1.0 |
 | **Database** | PostgreSQL | PostgreSQL 17 (via Docker Compose / Neon in production) |
 | **Chess Logic Engine** | Stockfish, chess.js | Stockfish 17.1 (native executable), chess.js 1.4.0 |
 
@@ -83,7 +83,7 @@ The frontend is built using **React** with **TypeScript** and bundled with **Vit
 ---
 
 ## Server-Side (Backend) Stack
-The backend is a **Spring Boot** application targeting **Java 25**, configured as a modular monolith using **Spring Modulith**.
+The backend is a **Spring Boot** application targeting **Java 25**, compiled to a **GraalVM Native Image** executable for production, and configured as a modular monolith using **Spring Modulith**.
 
 ### Framework Core
 *   **Java** (`v25`): Modern LTS version of Java used for execution.
