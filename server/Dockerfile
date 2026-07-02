@@ -1,5 +1,5 @@
 # --- Builder Stage ---
-FROM eclipse-temurin:25-jdk-noble AS builder
+FROM ghcr.io/graalvm/native-image-community:25 AS builder
 WORKDIR /opt/app
 
 # Copy maven wrapper & dependencies definition
@@ -7,26 +7,26 @@ COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw
 
-# Pre-fetch maven dependencies to cache layer
-RUN ./mvnw dependency:go-offline -B -Plinux
+# Pre-fetch maven dependencies & native plugins to cache layer
+RUN ./mvnw dependency:go-offline -B -Plinux -Pnative
 
 # Copy source code
 COPY src/ ./src/
 
-# Package application & download linux stockfish binary
-RUN ./mvnw clean package -B -DskipTests -Plinux
+# Package application as native image & download linux stockfish binary
+RUN ./mvnw clean package -B -DskipTests -Pnative -Plinux
 
 # --- Runtime Stage ---
-FROM eclipse-temurin:25-jre-noble
+FROM debian:bookworm-slim
 WORKDIR /opt/app
 
-# Install curl and run as non-root user
+# Install curl (for health checks) and run as non-root user
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
     && useradd -u 1001 -ms /bin/bash spring && chown -R spring:spring /opt/app
 USER spring
 
-# Copy compiled artifacts from builder stage
-COPY --chown=spring:spring --from=builder /opt/app/target/*.jar app.jar
+# Copy compiled native binary and Stockfish from builder stage
+COPY --chown=spring:spring --from=builder /opt/app/target/ai-chess-rivals ai-chess-rivals
 COPY --chown=spring:spring --from=builder /opt/app/stockfish/stockfish ./stockfish/stockfish
 
 # Expose ports
@@ -40,5 +40,5 @@ ENV STOCKFISH_PATH=stockfish/stockfish
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
   CMD curl -f http://localhost:8081/actuator/health || exit 1
 
-# Start the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Start the application using the native binary
+ENTRYPOINT ["./ai-chess-rivals"]
