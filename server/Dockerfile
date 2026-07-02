@@ -20,7 +20,7 @@ FROM eclipse-temurin:25-jre-noble
 WORKDIR /opt/app
 
 # Install curl and run as non-root user
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
     && useradd -u 1001 -ms /bin/bash spring && chown -R spring:spring /opt/app
 USER spring
 
