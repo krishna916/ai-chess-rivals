@@ -152,7 +152,7 @@ The application should support configurable AI providers and models. The choice 
 
 # Technology Stack
 
-## Backend
+## Server
 
 - Java 21
 - Spring Boot
@@ -165,7 +165,7 @@ The application should support configurable AI providers and models. The choice 
 - Chesslib
 - Stockfish
 
-## Frontend
+## Client
 
 - React
 - Vite
