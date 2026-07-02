@@ -34,6 +34,12 @@ services:
       SPRING_FLYWAY_USER: ${SPRING_FLYWAY_USER}
       SPRING_FLYWAY_PASSWORD: ${SPRING_FLYWAY_PASSWORD}
       STOCKFISH_PATH: stockfish/stockfish
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   postgres_data:

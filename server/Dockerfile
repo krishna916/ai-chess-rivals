@@ -7,7 +7,7 @@ COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
 # Pre-fetch maven dependencies to cache layer
-RUN ./mvnw dependency:go-offline -B
+RUN ./mvnw dependency:go-offline -B -Plinux
 
 # Copy source code
 COPY src/ ./src/
@@ -19,19 +19,25 @@ RUN ./mvnw clean package -B -DskipTests -Plinux
 FROM eclipse-temurin:25-jre-noble
 WORKDIR /opt/app
 
-# Run as non-root user
-RUN useradd -u 1001 -ms /bin/bash spring && chown -R spring:spring /opt/app
+# Install curl and run as non-root user
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* \
+    && useradd -u 1001 -ms /bin/bash spring && chown -R spring:spring /opt/app
 USER spring
 
 # Copy compiled artifacts from builder stage
 COPY --chown=spring:spring --from=builder /opt/app/target/*.jar app.jar
 COPY --chown=spring:spring --from=builder /opt/app/stockfish/stockfish ./stockfish/stockfish
 
-# Expose port
+# Expose ports
 EXPOSE 8080
+EXPOSE 8081
 
 # Default environment variables for stockfish
 ENV STOCKFISH_PATH=stockfish/stockfish
+
+# Health check using separate management port
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:8081/actuator/health || exit 1
 
 # Start the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
