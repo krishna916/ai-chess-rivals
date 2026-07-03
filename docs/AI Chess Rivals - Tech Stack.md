@@ -121,7 +121,7 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 | `spring-modulith-observability-api` | `org.springframework.modulith` | Compile | `2.1.0` | Architectural observability API |
 | `spring-modulith-starter-core` | `org.springframework.modulith` | Compile | `2.1.0` | Core Modulith tooling and verification |
 | `spring-modulith-starter-jpa` | `org.springframework.modulith` | Compile | `2.1.0` | Modulith persistence utilities |
-| `joda-time` | `joda-time` | Compile | Managed | Joda-Time validation helper required for Hibernate Validator GraalVM analysis |
+| `joda-time` | `joda-time` | Compile | `2.12.7` | Joda-Time validation helper required for Hibernate Validator GraalVM analysis |
 | `spring-boot-devtools` | `org.springframework.boot` | Runtime (Opt) | Inherited (`4.1.0`) | Rapid development helpers / restart |
 | `postgresql` | `org.postgresql` | Runtime | Inherited (`4.1.0`) | JDBC connector |
 | `spring-modulith-actuator` | `org.springframework.modulith` | Runtime | `2.1.0` | Modulith metrics endpoints |
