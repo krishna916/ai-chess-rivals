@@ -67,15 +67,16 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-observability-api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-starter-core</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-starter-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>joda-time</groupId>
+			<artifactId>joda-time</artifactId>
+			<version>2.12.7</version>
 		</dependency>
 
 		<dependency>
@@ -88,21 +89,6 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-actuator</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-observability-core</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-runtime</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
@@ -186,6 +172,9 @@
 			<plugin>
 				<groupId>org.graalvm.buildtools</groupId>
 				<artifactId>native-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>dev.krishnamurti.ai_chess_rivals.AiChessRivalsApplication</mainClass>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -327,7 +316,7 @@
 								<configuration>
 									<!-- Official Stockfish release on GitHub -->
 									<url>https://github.com/official-stockfish/Stockfish/releases/download/sf_${stockfish.version}/stockfish-ubuntu-x86-64-avx2.tar</url>
-									<outputDirectory>${project.basedir}/stockfish</outputDirectory>
+									<outputDirectory>${project.basedir}/stockfish_temp_extract</outputDirectory>
 									<unpack>true</unpack>
 									<!-- Cache the tar; re-download only when version changes -->
 									<overwrite>false</overwrite>
@@ -349,18 +338,18 @@
 								</goals>
 								<configuration>
 									<target>
-										<!-- Move to a temp file, delete the nested directory, then rename to canonical name -->
-										<move file="${project.basedir}/stockfish/stockfish/stockfish-ubuntu-x86-64-avx2"
-											  tofile="${project.basedir}/stockfish/stockfish_tmp"
-											  overwrite="true"
-											  failonerror="true"/>
-										<!-- Clean up nested directory structure -->
-										<delete dir="${project.basedir}/stockfish/stockfish"/>
-										<!-- Move to canonical name -->
-										<move file="${project.basedir}/stockfish/stockfish_tmp"
+										<!-- Delete target file/directory to prevent collision -->
+										<delete file="${project.basedir}/stockfish/stockfish" failonerror="false"/>
+										<delete dir="${project.basedir}/stockfish/stockfish" failonerror="false"/>
+										<!-- Ensure target directory exists -->
+										<mkdir dir="${project.basedir}/stockfish"/>
+										<!-- Move the binary to canonical name -->
+										<move file="${project.basedir}/stockfish_temp_extract/stockfish/stockfish-ubuntu-x86-64-avx2"
 											  tofile="${project.basedir}/stockfish/stockfish"
 											  overwrite="true"
 											  failonerror="true"/>
+										<!-- Clean up temporary extraction directory -->
+										<delete dir="${project.basedir}/stockfish_temp_extract"/>
 										<chmod file="${project.basedir}/stockfish/stockfish" perm="755"/>
 									</target>
 								</configuration>
