@@ -1,8 +1,6 @@
 spring:
   application:
     name: ai-chess-rivals
-  autoconfigure:
-    exclude: org.springframework.modulith.runtime.autoconfigure.SpringModulithRuntimeAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/aichessrivals}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
