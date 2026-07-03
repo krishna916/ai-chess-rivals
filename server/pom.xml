@@ -335,7 +335,7 @@
 								<configuration>
 									<!-- Official Stockfish release on GitHub -->
 									<url>https://github.com/official-stockfish/Stockfish/releases/download/sf_${stockfish.version}/stockfish-ubuntu-x86-64-avx2.tar</url>
-									<outputDirectory>${project.basedir}/stockfish</outputDirectory>
+									<outputDirectory>${project.basedir}/stockfish_temp_extract</outputDirectory>
 									<unpack>true</unpack>
 									<!-- Cache the tar; re-download only when version changes -->
 									<overwrite>false</overwrite>
@@ -357,18 +357,18 @@
 								</goals>
 								<configuration>
 									<target>
-										<!-- Move to a temp file, delete the nested directory, then rename to canonical name -->
-										<move file="${project.basedir}/stockfish/stockfish/stockfish-ubuntu-x86-64-avx2"
-											  tofile="${project.basedir}/stockfish/stockfish_tmp"
-											  overwrite="true"
-											  failonerror="true"/>
-										<!-- Clean up nested directory structure -->
-										<delete dir="${project.basedir}/stockfish/stockfish"/>
-										<!-- Move to canonical name -->
-										<move file="${project.basedir}/stockfish/stockfish_tmp"
+										<!-- Delete target file/directory to prevent collision -->
+										<delete file="${project.basedir}/stockfish/stockfish" failonerror="false"/>
+										<delete dir="${project.basedir}/stockfish/stockfish" failonerror="false"/>
+										<!-- Ensure target directory exists -->
+										<mkdir dir="${project.basedir}/stockfish"/>
+										<!-- Move the binary to canonical name -->
+										<move file="${project.basedir}/stockfish_temp_extract/stockfish/stockfish-ubuntu-x86-64-avx2"
 											  tofile="${project.basedir}/stockfish/stockfish"
 											  overwrite="true"
 											  failonerror="true"/>
+										<!-- Clean up temporary extraction directory -->
+										<delete dir="${project.basedir}/stockfish_temp_extract"/>
 										<chmod file="${project.basedir}/stockfish/stockfish" perm="755"/>
 									</target>
 								</configuration>
