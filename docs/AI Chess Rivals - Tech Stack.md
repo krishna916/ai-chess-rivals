@@ -118,15 +118,11 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 | `spring-boot-starter-webmvc` | `org.springframework.boot` | Compile | Inherited (`4.1.0`) | REST API engine (Spring MVC) |
 | `spring-boot-starter-websocket` | `org.springframework.boot` | Compile | Inherited (`4.1.0`) | Real-time websocket capabilities |
 | `flyway-database-postgresql` | `org.flywaydb` | Compile | Inherited (`4.1.0`) | PostgreSQL-specific Flyway module |
-| `spring-modulith-observability-api` | `org.springframework.modulith` | Compile | `2.1.0` | Architectural observability API |
 | `spring-modulith-starter-core` | `org.springframework.modulith` | Compile | `2.1.0` | Core Modulith tooling and verification |
 | `spring-modulith-starter-jpa` | `org.springframework.modulith` | Compile | `2.1.0` | Modulith persistence utilities |
 | `joda-time` | `joda-time` | Compile | `2.12.7` | Joda-Time validation helper required for Hibernate Validator GraalVM analysis |
 | `spring-boot-devtools` | `org.springframework.boot` | Runtime (Opt) | Inherited (`4.1.0`) | Rapid development helpers / restart |
 | `postgresql` | `org.postgresql` | Runtime | Inherited (`4.1.0`) | JDBC connector |
-| `spring-modulith-actuator` | `org.springframework.modulith` | Runtime | `2.1.0` | Modulith metrics endpoints |
-| `spring-modulith-observability-core` | `org.springframework.modulith` | Runtime | `2.1.0` | Modulith tracing / spans core engine |
-| `spring-modulith-runtime` | `org.springframework.modulith` | Runtime | `2.1.0` | Enforces Modulith transactional event registry |
 | `lombok` | `org.projectlombok` | Compile (Opt) | Inherited (`4.1.0`) | Boilerplate reducer annotations |
 | `spring-boot-configuration-processor` | `org.springframework.boot` | Compile (Opt) | Inherited (`4.1.0`) | Metadata generator for configuration settings |
 
