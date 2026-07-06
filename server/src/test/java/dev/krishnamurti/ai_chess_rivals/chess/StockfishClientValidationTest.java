@@ -17,7 +17,7 @@ class StockfishClientValidationTest {
 
     @Test
     void stockfishStartsAndPassesReadinessCheck() {
-        String path = resolveStockfishPath();
+        String path = StockfishTestHelper.resolveStockfishPath();
         log.info("=== StockfishClientValidationTest: using executable at '{}' ===", path);
 
         ChessProperties props = new ChessProperties(new ChessProperties.Stockfish(path, 1, 16, 10, 30));
@@ -30,7 +30,4 @@ class StockfishClientValidationTest {
         }
     }
 
-    private static String resolveStockfishPath() {
-        return StockfishTestHelper.resolveStockfishPath();
-    }
 }

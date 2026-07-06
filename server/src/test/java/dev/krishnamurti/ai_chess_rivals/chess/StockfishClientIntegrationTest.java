@@ -21,7 +21,7 @@ class StockfishClientIntegrationTest {
 
     @BeforeEach
     void startEngine() {
-        String path = resolveStockfishPath();
+        String path = StockfishTestHelper.resolveStockfishPath();
         ChessProperties props = new ChessProperties(new ChessProperties.Stockfish(path, 1, 16, 10, 30));
         client = new StockfishEngine(props);
     }
@@ -101,7 +101,4 @@ class StockfishClientIntegrationTest {
         client.close(); // must not throw
     }
 
-    private static String resolveStockfishPath() {
-        return StockfishTestHelper.resolveStockfishPath();
-    }
 }
