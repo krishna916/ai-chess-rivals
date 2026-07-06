@@ -1,6 +1,12 @@
 package dev.krishnamurti.ai_chess_rivals.chess.config;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Strongly-typed configuration properties for the chess module.
@@ -21,7 +27,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param stockfish Stockfish engine settings.
  */
 @ConfigurationProperties(prefix = "app.chess")
-public record ChessProperties(Stockfish stockfish) {
+@Validated
+public record ChessProperties(@NotNull @Valid Stockfish stockfish) {
 
     /**
      * Stockfish engine settings.
@@ -32,9 +39,9 @@ public record ChessProperties(Stockfish stockfish) {
      * @param startupTimeoutSeconds  Reserved for future timeout enforcement. Not enforced in this version.
      */
     public record Stockfish(
-            String path,
-            int threads,
-            int hashMb,
-            int startupTimeoutSeconds
+            @NotBlank String path,
+            @Min(1) @Max(1024) int threads,
+            @Min(1) @Max(33554432) int hashMb,
+            @Min(1) @Max(300) int startupTimeoutSeconds
     ) {}
 }
