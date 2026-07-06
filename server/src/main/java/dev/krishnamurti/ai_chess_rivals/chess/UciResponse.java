@@ -38,13 +38,20 @@ record UciResponse(String raw) {
     /**
      * Extracts the best move token from a {@code "bestmove <move> ..."} response.
      *
-     * @return the move in UCI notation (e.g. {@code "e2e4"}), or empty if this is not a bestmove line
+     * <p>Returns {@link Optional#empty()} for the Stockfish sentinel {@code "(none)"},
+     * which is emitted when no legal move exists (e.g. checkmate or stalemate).
+     *
+     * @return the move in UCI notation (e.g. {@code "e2e4"}), or empty if this is not a
+     *         bestmove line or the engine has no legal move to report
      */
     Optional<String> extractBestMove() {
         if (!raw.startsWith("bestmove")) {
             return Optional.empty();
         }
         String[] parts = raw.split("\\s+");
-        return parts.length >= 2 ? Optional.of(parts[1]) : Optional.empty();
+        if (parts.length < 2 || "(none)".equals(parts[1])) {
+            return Optional.empty();
+        }
+        return Optional.of(parts[1]);
     }
 }

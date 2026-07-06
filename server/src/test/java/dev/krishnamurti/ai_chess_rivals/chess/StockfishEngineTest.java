@@ -17,7 +17,7 @@ class StockfishEngineTest {
     void whenExecutableDoesNotExist_thenThrowsStockfishExceptionWithFormattedMessage(@TempDir Path tempDir) {
         Path nonExistentPath = tempDir.resolve("non-existent-stockfish");
         ChessProperties props = new ChessProperties(
-                new ChessProperties.Stockfish(nonExistentPath.toString(), 1, 16, 10)
+                new ChessProperties.Stockfish(nonExistentPath.toString(), 1, 16, 10, 30)
         );
 
         assertThatThrownBy(() -> new StockfishEngine(props))
@@ -47,7 +47,7 @@ class StockfishEngineTest {
 
         final Path finalPath = targetPath;
         ChessProperties props = new ChessProperties(
-                new ChessProperties.Stockfish(finalPath.toString(), 1, 16, 10)
+                new ChessProperties.Stockfish(finalPath.toString(), 1, 16, 10, 30)
         );
 
         assertThatThrownBy(() -> new StockfishEngine(props))

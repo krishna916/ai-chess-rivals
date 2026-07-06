@@ -25,7 +25,7 @@ class StockfishClientValidationTest {
         String path = resolveStockfishPath();
         log.info("=== StockfishClientValidationTest: using executable at '{}' ===", path);
 
-        ChessProperties props = new ChessProperties(new ChessProperties.Stockfish(path, 1, 16, 10));
+        ChessProperties props = new ChessProperties(new ChessProperties.Stockfish(path, 1, 16, 10, 30));
         StockfishClient client = new StockfishEngine(props);
         try {
             // Validation happened in constructor: uci → uciok → setoptions → isready → readyok

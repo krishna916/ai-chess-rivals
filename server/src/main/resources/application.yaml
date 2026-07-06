@@ -37,3 +37,4 @@ app:
       threads: ${STOCKFISH_THREADS:1}
       hash-mb: ${STOCKFISH_HASH_MB:16}
       startup-timeout-seconds: ${STOCKFISH_STARTUP_TIMEOUT_SECONDS:10}
+      move-timeout-seconds: ${STOCKFISH_MOVE_TIMEOUT_SECONDS:30}
