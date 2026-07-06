@@ -5,12 +5,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Integration tests for {@link StockfishClient}.
@@ -105,14 +102,6 @@ class StockfishClientIntegrationTest {
     }
 
     private static String resolveStockfishPath() {
-        String path = System.getenv("STOCKFISH_PATH");
-        if (path == null || path.isBlank()) {
-            path = "stockfish/stockfish.exe";
-        }
-        if (!Files.exists(Paths.get(path))) {
-            fail("Stockfish binary not found at '" + path + "'. "
-                    + "Run: mvn generate-resources -Pwindows  (or -Plinux)");
-        }
-        return path;
+        return StockfishTestHelper.resolveStockfishPath();
     }
 }

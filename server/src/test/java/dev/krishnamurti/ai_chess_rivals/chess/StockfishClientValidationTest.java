@@ -5,11 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
-
-import static org.junit.jupiter.api.Assertions.fail;
-
 /**
  * Proves that Stockfish starts, identifies itself correctly, and responds
  * to the UCI readiness check. Standalone — no Spring context, no database.
@@ -36,14 +31,6 @@ class StockfishClientValidationTest {
     }
 
     private static String resolveStockfishPath() {
-        String path = System.getenv("STOCKFISH_PATH");
-        if (path == null || path.isBlank()) {
-            path = "stockfish/stockfish.exe";
-        }
-        if (!Files.exists(Paths.get(path))) {
-            fail("Stockfish binary not found at '" + path + "'. "
-                    + "Run: mvn generate-resources -Pwindows  (or -Plinux)");
-        }
-        return path;
+        return StockfishTestHelper.resolveStockfishPath();
     }
 }
