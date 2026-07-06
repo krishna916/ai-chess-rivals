@@ -61,8 +61,7 @@ class StockfishEngine implements StockfishClient {
 
         if (!Files.isExecutable(executablePath)) {
             throw new StockfishException(
-                    "Stockfish file exists at '%s' but is not executable. "
-                    + "On Linux, run: chmod +x %s"
+                    "Stockfish file exists at '%s' but is not executable. On Linux, run: chmod +x %s"
                             .formatted(executablePath.toAbsolutePath(), executablePath.toAbsolutePath())
             );
         }
