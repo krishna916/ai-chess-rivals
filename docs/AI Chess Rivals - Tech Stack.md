@@ -79,6 +79,7 @@ The frontend is built using **React** with **TypeScript** and bundled with **Vit
 | `@types/react` | `^19.2.17` | React type definitions |
 | `@types/react-dom` | `^19.2.3` | React DOM type definitions |
 | `globals` | `^17.6.0` | Environment globals definition |
+| `prettier` | `^3.9.4` | Frontend code formatter and formatting gate |
 
 ---
 
@@ -105,6 +106,11 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 *   **Lombok**: Reduces boilerplate code (e.g., automatically generating getters/setters, constructors, and builders via annotations).
 *   **Spring Boot Actuator**: Exposes operational endpoints (health, environment, metrics) and works with Spring Modulith to expose module diagrams.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
+*   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
+*   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
+*   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`.
+*   **Maven Enforcer Plugin** (`v3.6.3`): Requires Java 25 and Maven 3.9 or newer.
+*   **Spring Modulith verification**: A focused test validates module cycles and dependency boundaries.
 
 ### Dependency Reference Table (`server/pom.xml`)
 
