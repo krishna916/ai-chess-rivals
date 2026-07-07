@@ -28,6 +28,10 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
+		<error-prone.version>2.50.0</error-prone.version>
+		<maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+		<spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
+		<spotless-maven-plugin.version>3.8.0</spotless-maven-plugin.version>
 		<spring-modulith.version>2.1.0</spring-modulith.version>
 		<!-- Stockfish version pin — change here to upgrade everywhere -->
 		<stockfish.version>17.1</stockfish.version>
@@ -157,6 +161,65 @@
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<version>${spotless-maven-plugin.version}</version>
+				<configuration>
+					<java>
+						<googleJavaFormat/>
+						<removeUnusedImports/>
+						<trimTrailingWhitespace/>
+						<endWithNewline/>
+					</java>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>${spotbugs-maven-plugin.version}</version>
+				<configuration>
+					<effort>Max</effort>
+					<threshold>Medium</threshold>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<version>${maven-enforcer-plugin.version}</version>
+				<executions>
+					<execution>
+						<id>enforce-build-environment</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireJavaVersion>
+									<version>[25,26)</version>
+								</requireJavaVersion>
+								<requireMavenVersion>
+									<version>[3.9,)</version>
+								</requireMavenVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>org.hibernate.orm</groupId>
 				<artifactId>hibernate-maven-plugin</artifactId>
 				<version>${hibernate.version}</version>
@@ -199,7 +262,30 @@
 							<goal>compile</goal>
 						</goals>
 						<configuration>
+							<fork>true</fork>
+							<compilerArgs>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+								<arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+								<arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+								<arg>-XDcompilePolicy=simple</arg>
+								<arg>--should-stop=ifError=FLOW</arg>
+								<arg>-Xplugin:ErrorProne</arg>
+							</compilerArgs>
 							<annotationProcessorPaths>
+								<path>
+									<groupId>com.google.errorprone</groupId>
+									<artifactId>error_prone_core</artifactId>
+									<version>${error-prone.version}</version>
+								</path>
 								<path>
 									<groupId>org.projectlombok</groupId>
 									<artifactId>lombok</artifactId>
