@@ -14,7 +14,7 @@ root verifier before opening a pull request.
 From any working directory, use the script appropriate for your shell:
 
 ```powershell
-D:\projects\ai-chess-rivals\scripts\verify.ps1
+.\scripts\verify.ps1
 ```
 
 ```sh
