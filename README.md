@@ -1,316 +1,252 @@
-<div align="center">
+# AI Chess Rivals
 
-# ♟️ AI Chess Rivals
+Two AI personalities. One chessboard. Infinite trash talk.
 
-**Two AI personalities. One chessboard. Infinite trash talk.**
+AI Chess Rivals is a hobby showcase project for building an entertaining AI-vs-AI chess experience. The goal is not to build the strongest chess engine. The goal is to showcase practical AI engineering through personalities, reactions, match drama, and a complete product built end to end.
 
-An AI-vs-AI chess experience where the entertainment isn't the chess — it's the personalities playing it.
+The current repository is still in the foundation phase:
 
-Built to showcase practical AI engineering: LLM integration, prompt engineering, personality design, and end-to-end product development.
+- The backend already contains the Stockfish integration and a small `game` domain model.
+- The frontend is scaffolded with the intended app structure and base UI tooling.
+- The personality and LLM-driven entertainment layer is planned, but it is not implemented on `master` yet.
 
-[![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Stockfish](https://img.shields.io/badge/Stockfish-17.1-4A90D9?logo=lichess&logoColor=white)](https://stockfishchess.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+## Principles
 
-</div>
+- Entertainment first: the personalities are the product.
+- AI showcase first: prefer practical LLM integration over theoretical architecture.
+- Simplicity over abstraction: use the simplest solution that works.
+- Shipping over perfection: optimize for momentum and readability.
 
----
+## Current Architecture
 
-## 🎯 What is this?
+Today the codebase is a modular monolith with a React client:
 
-AI Chess Rivals is a **hobby showcase project** where two AI-driven chess personalities compete against each other — complete with trash talk, emotional reactions, and match commentary.
+- `server/`: Spring Boot 4 backend using Spring Modulith.
+- `client/`: React 19 + Vite 8 frontend.
+- `server/src/main/java/.../chess`: Stockfish process management and UCI integration.
+- `server/src/main/java/.../game/domain`: early chess match domain objects.
 
-> **The chessboard is the stage. The personalities are the product.**
+What exists now:
 
-The chess engine (Stockfish) handles the moves. The LLMs handle the drama.
+- Stockfish is the source of truth for chess operations.
+- PostgreSQL and Flyway are configured for persistence and schema management.
+- WebMVC, WebSocket, and RestClient dependencies are present in the backend stack.
+- The frontend has Tailwind CSS v4 and shadcn/ui primitives wired in.
 
-### Core Principles
+What does not exist yet on `master`:
 
-- **Entertainment First** — Personality, rivalries, and trash talk over stronger chess
-- **AI Showcase** — Demonstrating LLM integration, prompt engineering, and personality design
-- **Simplicity** — The simplest solution that creates an entertaining experience wins
-- **Ship Fast** — A working implementation beats a perfect one
+- No implemented AI personality module.
+- No LLM provider integration.
+- No completed match orchestration UI.
+- No production gameplay flow in the frontend yet.
 
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Client (React)                     │
-│  React 19 · Vite 8 · TypeScript · Tailwind CSS · shadcn │
-│  chess.js (move validation) · react-chessboard (board)  │
-├─────────────────────────────────────────────────────────┤
-│                  REST API / WebSocket                   │
-├─────────────────────────────────────────────────────────┤
-│               Server (Spring Boot 4.1.0)                │
-│          Spring Modulith · Modular Monolith             │
-│  ┌──────────────┐  ┌────────────┐  ┌──────────────┐    │
-│  │    Chess      │  │    Game    │  │     AI       │    │
-│  │   Module      │  │   Module   │  │   Module     │    │
-│  │ (Stockfish)   │  │  (Matches) │  │ (LLM/Talk)  │    │
-│  └──────────────┘  └────────────┘  └──────────────┘    │
-├─────────────────────────────────────────────────────────┤
-│  Stockfish 17.1        PostgreSQL 17        LLM APIs   │
-│  (Native Process)      (Docker / Neon)    (Phase 2)    │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Key Boundaries
-
-| Layer | Responsibility |
-|-------|---------------|
-| **Stockfish** | Legal moves, position evaluation, candidate move generation. Never handles personality. |
-| **Personality Layer** | Selects from Stockfish's candidate moves based on traits (aggression, risk, blunder chance). |
-| **LLMs** | Entertainment only — trash talk, reactions, celebrations, commentary. Never decide chess moves. |
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 
 | Technology | Version | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | Java | 25 | Language runtime |
 | Spring Boot | 4.1.0 | Application framework |
-| Spring Modulith | 2.1.0 | Modular monolith structure |
-| PostgreSQL | 17 | Persistence (Docker locally, Neon in production) |
-| Flyway | — | Database migrations |
-| Stockfish | 17.1 | Chess engine (native executable, UCI protocol) |
-| Lombok | — | Boilerplate reduction |
-| GraalVM Native Image | — | Production compilation target |
+| Spring Modulith | 2.1.0 | Modular monolith boundaries |
+| PostgreSQL | 17 | Local and production database |
+| Flyway | Managed by Spring Boot | Database migrations |
+| Stockfish | 17.1 | Chess engine via UCI |
+| Lombok | Current | Boilerplate reduction |
+| GraalVM Native Image | Current toolchain target | Production compilation target |
 
 ### Frontend
 
 | Technology | Version | Purpose |
-|---|---|---|
-| React | 19 | UI library |
-| Vite | 8 | Build tool & dev server |
-| TypeScript | ~6.0 | Type safety |
-| Tailwind CSS | 4 | Utility-first styling |
-| shadcn/ui | 4 | Radix-based UI components |
-| Zustand | 5 | State management |
-| React Router DOM | 7 | Client-side routing |
-| chess.js | 1.4 | Client-side move validation |
-| react-chessboard | 5 | Chessboard UI component |
-| Axios | 1 | HTTP client |
+| --- | --- | --- |
+| React | 19.2.x | UI library |
+| Vite | 8.1.x | Dev server and build tool |
+| TypeScript | 6.0.x | Type safety |
+| Tailwind CSS | 4.3.x | Styling |
+| shadcn/ui | 4.12.x | UI primitives |
+| Zustand | 5.0.x | State management |
+| React Router DOM | 7.18.x | Routing |
+| chess.js | 1.4.x | Client-side chess state helpers |
+| react-chessboard | 5.10.x | Board UI |
+| Axios | 1.18.x | HTTP client |
 
-> See [Tech Stack Document](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) for full version details and dependency tables.
+See [docs/AI Chess Rivals - Tech Stack.md](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) for the full dependency inventory.
 
----
+## Project Structure
 
-## 📁 Project Structure
+The previous structure summary was stale. This reflects the current repository layout on `master`.
 
-```
+```text
 ai-chess-rivals/
-├── client/                          # React frontend
-│   └── src/
-│       ├── components/              # Shared reusable UI components (shadcn/ui)
-│       ├── features/                # Feature-specific UI (self-contained)
-│       ├── pages/                   # Route-level page components
-│       ├── hooks/                   # Custom React hooks
-│       ├── store/                   # Zustand state stores
-│       ├── services/                # API service layer (Axios)
-│       ├── types/                   # TypeScript type definitions
-│       ├── lib/                     # Utility functions (cn() helper, etc.)
-│       └── assets/                  # Static assets
-│
-├── server/                          # Spring Boot backend
-│   ├── src/main/java/dev/krishnamurti/ai_chess_rivals/
-│   │   ├── config/                  # Cross-cutting config (GraalVM hints)
-│   │   └── chess/                   # Chess module (Stockfish integration)
-│   │       └── config/              # Module-specific configuration
-│   ├── src/main/resources/
-│   │   └── db/migration/            # Flyway migration scripts
-│   ├── stockfish/                   # Stockfish binary (downloaded, not committed)
-│   ├── docker-compose.yml           # Local PostgreSQL + backend
-│   ├── Dockerfile                   # GraalVM native image build
-│   └── pom.xml                      # Maven configuration
-│
-├── docs/                            # Project documentation
-│   ├── AI Chess Rivals - Constitution.md
-│   └── AI Chess Rivals - Tech Stack.md
-│
-├── AGENTS.md                        # AI agent guidelines
-└── README.md                        # You are here
+|-- client/
+|   |-- public/                     # Static frontend assets
+|   |-- scripts/                    # Frontend verification helpers
+|   |-- src/
+|   |   |-- assets/                 # Images and bundled assets
+|   |   |-- components/ui/          # Shared UI primitives
+|   |   |-- features/               # Feature area placeholders
+|   |   |-- hooks/                  # Custom React hooks
+|   |   |-- lib/                    # Utilities such as cn()
+|   |   |-- pages/                  # Route-level page placeholders
+|   |   |-- services/               # Client API layer placeholders
+|   |   |-- store/                  # Zustand store placeholders
+|   |   |-- types/                  # Shared TypeScript types
+|   |   |-- App.tsx                 # Current scaffold UI
+|   |   `-- main.tsx                # Frontend entrypoint
+|   |-- components.json             # shadcn/ui config
+|   |-- package.json
+|   `-- vite.config.ts
+|-- docs/
+|   |-- AI Chess Context.md
+|   |-- AI Chess Rivals - Constitution.md
+|   |-- AI Chess Rivals - Tech Stack.md
+|   `-- BUILD_AND_VERIFY.md
+|-- scripts/
+|   |-- verify.ps1                  # Root verification script for Windows
+|   `-- verify.sh                   # Root verification script for POSIX shells
+|-- server/
+|   |-- src/
+|   |   |-- main/
+|   |   |   |-- java/dev/krishnamurti/ai_chess_rivals/
+|   |   |   |   |-- chess/          # Stockfish client, engine, UCI support
+|   |   |   |   `-- game/domain/    # Match, move, board position domain model
+|   |   |   `-- resources/
+|   |   |       |-- application.yaml
+|   |   |       `-- db/migration/   # Flyway SQL migrations
+|   |   `-- test/java/...           # Modulith, Stockfish, and domain tests
+|   |-- stockfish/                  # Download target for local Stockfish binaries
+|   |-- docker-compose.yml          # Local Postgres and backend containers
+|   |-- Dockerfile
+|   |-- pom.xml
+|   `-- README.md
+|-- AGENTS.md
+`-- README.md
 ```
 
----
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-| Tool | Version | Notes |
-|---|---|---|
-| **JDK** | 25 | [GraalVM CE](https://www.graalvm.org/) recommended for native image support |
-| **Node.js** | 22+ | For the frontend dev server |
-| **Docker Desktop** | Latest | For the PostgreSQL container |
-| **Maven** | 3.9+ | Bundled via Maven Wrapper (`mvnw`) |
+| Tool | Version |
+| --- | --- |
+| JDK | 25 |
+| Maven | 3.9+ |
+| Node.js | 22+ |
+| Docker Desktop | Recent |
 
-### 1. Clone the Repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/your-username/ai-chess-rivals.git
+git clone https://github.com/krishna916/ai-chess-rivals.git
 cd ai-chess-rivals
 ```
 
-### 2. Start the Database
+### 2. Start PostgreSQL
+
+From `server/`:
 
 ```bash
-cd server
-cp .env.example .env
-docker compose up -d
+docker compose up -d postgres
 ```
 
-This starts PostgreSQL on **port 5433** (mapped from container port 5432 to avoid conflicts with local PostgreSQL installations).
+This exposes PostgreSQL on `localhost:5433`.
 
-### 3. Download Stockfish & Start the Backend
+### 3. Download Stockfish and run the backend
 
-```bash
-# From server/ directory
-
-# Windows
-mvn package -Pwindows -DskipTests
-
-# Linux / macOS
-mvn package -Plinux -DskipTests
-```
-
-Then run the Spring Boot application:
+From `server/`:
 
 ```bash
 # Windows
-set STOCKFISH_PATH=stockfish/stockfish.exe
-mvn spring-boot:run
+.\mvnw.cmd package -Pwindows -DskipTests
 
-# Linux / macOS
-STOCKFISH_PATH=stockfish/stockfish mvn spring-boot:run
+# Linux
+./mvnw package -Plinux -DskipTests
 ```
 
-Or run directly from your IDE (IntelliJ recommended) with the `STOCKFISH_PATH` environment variable set.
-
-The backend will be available at **`http://localhost:8082`**.
-
-### 4. Start the Frontend
+Then run the app:
 
 ```bash
-# From client/ directory
+# Windows PowerShell
+$env:STOCKFISH_PATH = "stockfish/stockfish.exe"
+.\mvnw.cmd spring-boot:run
+
+# Linux / macOS
+STOCKFISH_PATH=stockfish/stockfish ./mvnw spring-boot:run
+```
+
+Backend defaults:
+
+- App: `http://localhost:8080`
+- Actuator: `http://localhost:8081`
+- Docker-mapped backend port: `http://localhost:8082`
+
+### 4. Run the frontend
+
+From `client/`:
+
+```bash
 npm install
 npm run dev
 ```
 
-The frontend dev server will be available at **`http://localhost:5173`**.
+Frontend dev server: `http://localhost:5173`
 
----
+## Configuration
 
-## ⚙️ Configuration
+### Default local ports
 
-### Port Mappings
+| Service | Internal Port | Host Port |
+| --- | --- | --- |
+| PostgreSQL | 5432 | 5433 |
+| Spring Boot app in Docker | 8080 | 8082 |
+| Vite dev server | 5173 | 5173 |
 
-To avoid conflicts with native services on Windows:
+### Important backend environment variables
 
-| Service | Container Port | Host Port |
-|---------|---------------|-----------|
-| PostgreSQL | 5432 | **5433** |
-| Spring Boot | 8080 | **8082** |
+| Variable | Default |
+| --- | --- |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5433/aichessrivals` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres` |
+| `SPRING_DATASOURCE_PASSWORD` | `secretpassword` |
+| `SPRING_FLYWAY_URL` | Falls back to datasource URL |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `validate` |
+| `STOCKFISH_PATH` | `stockfish/stockfish` |
+| `STOCKFISH_THREADS` | `1` |
+| `STOCKFISH_HASH_MB` | `16` |
 
-### Environment Variables
+## Verification
 
-All backend configuration is driven through environment variables. See [`.env.example`](server/.env.example) for the complete list:
+Run the repository-level verifier before opening a PR:
 
-| Variable | Default | Description |
-|---|---|---|
-| `POSTGRES_DB` | `aichessrivals` | Database name |
-| `POSTGRES_USER` | `postgres` | Database user |
-| `POSTGRES_PASSWORD` | `secretpassword` | Database password |
-| `STOCKFISH_PATH` | `stockfish/stockfish` | Path to Stockfish binary |
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://...` | JDBC connection string |
+```powershell
+.\scripts\verify.ps1
+```
 
----
+```sh
+./scripts/verify.sh
+```
 
-## 🧪 Development Workflow
+This runs:
 
-### Database Migrations
+- Backend Maven `verify`
+- Frontend `npm run verify`
 
-- **Local**: `spring.jpa.hibernate.ddl-auto` defaults to `update` for rapid prototyping.
-- **Production**: All schemas driven through **Flyway** migration scripts under `server/src/main/resources/db/migration/`.
+See [docs/BUILD_AND_VERIFY.md](docs/BUILD_AND_VERIFY.md) for the full verification workflow.
 
-### Upgrading Stockfish
+## Documentation
 
-1. Update `<stockfish.version>` in `server/pom.xml`
-2. Re-run the download profile: `mvn generate-resources -Pwindows` (or `-Plinux`)
-3. No other files need to change
+- [AGENTS.md](AGENTS.md): contributor and agent rules
+- [docs/AI Chess Rivals - Constitution.md](docs/AI%20Chess%20Rivals%20-%20Constitution.md): project principles
+- [docs/AI Chess Rivals - Tech Stack.md](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md): dependency inventory
+- [server/README.md](server/README.md): backend-specific notes
 
-### Useful Commands
+## Status
 
-| Command | Location | Description |
-|---|---|---|
-| `docker compose up -d` | `server/` | Start PostgreSQL |
-| `docker compose down -v` | `server/` | Stop and reset database |
-| `mvn spring-boot:run` | `server/` | Run backend |
-| `npm run dev` | `client/` | Run frontend dev server |
-| `mvn package -Pwindows` | `server/` | Build + download Stockfish (Windows) |
-| `mvn package -Plinux` | `server/` | Build + download Stockfish (Linux) |
+`master` currently represents an early implementation baseline:
 
----
+- Backend chess engine integration is in place.
+- Core `game` domain types are in place.
+- Verification and code quality gates are configured.
+- Frontend foundation is set up, but product features are still mostly ahead.
 
-## 🏛️ Production Deployment
-
-The backend compiles to a **GraalVM Native Image** for minimal startup time and memory footprint.
-
-| Environment | Backend | Database | Stockfish |
-|---|---|---|---|
-| **Local** | Spring Boot (JVM) | Docker Compose (PostgreSQL 17) | Downloaded via Maven |
-| **Production** | GraalVM Native Image on [Render](https://render.com) | [Neon](https://neon.tech) (serverless PostgreSQL) | Bundled in Docker image |
-
-Production requires only configuration changes (environment variables) — no code or profile changes.
-
----
-
-## 📄 Documentation
-
-| Document | Description |
-|---|---|
-| [Constitution](docs/AI%20Chess%20Rivals%20-%20Constitution.md) | Project principles, north star, and decision framework |
-| [Tech Stack](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) | Complete dependency inventory with versions |
-| [AGENTS.md](AGENTS.md) | AI agent guidelines for contributing |
-| [Server README](server/README.md) | Backend setup, Stockfish config, Docker workflow |
-
----
-
-## 🤝 Contributing
-
-This is a personal showcase project, but contributions and suggestions are welcome!
-
-Before contributing, please read:
-
-1. **[AGENTS.md](AGENTS.md)** — Guidelines for AI agents and contributors
-2. **[Constitution](docs/AI%20Chess%20Rivals%20-%20Constitution.md)** — Project principles and decision framework
-
-### Key Guidelines
-
-- **Keep it simple** — the simplest solution that works is the best one
-- **Entertainment over elegance** — prioritize viewer experience over architectural purity
-- **Follow existing patterns** — consistency is more valuable than perfection
-- **Ask before adding complexity** — new dependencies, abstractions, or packages require justification
-
----
-
-## 📜 License
-
-This project is for demonstration and portfolio purposes.
-
----
-
-<div align="center">
-
-**Built with ☕ Java, ⚛️ React, and 🤖 AI**
-
-*The best solution is usually the simplest one that creates an entertaining AI chess experience.*
-
-</div>
+That is intentional. This project is being built in phases, with chess foundations first and AI entertainment layers added later.
