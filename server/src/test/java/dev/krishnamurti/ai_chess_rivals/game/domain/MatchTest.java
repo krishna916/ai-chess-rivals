@@ -66,6 +66,22 @@ class MatchTest {
   }
 
   @Test
+  void constructorRequiresResultWhenStatusIsFinished() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new Match(
+                    PlayerColor.WHITE,
+                    BoardPosition.STARTING_POSITION,
+                    List.of(),
+                    GameStatus.FINISHED,
+                    null));
+
+    assertEquals("result is required when status is FINISHED", error.getMessage());
+  }
+
+  @Test
   void moveHistoryIsDefensivelyCopiedAndExposedImmutably() {
     List<Move> history = new ArrayList<>();
     history.add(

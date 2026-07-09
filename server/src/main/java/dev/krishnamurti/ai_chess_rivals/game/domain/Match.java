@@ -23,6 +23,9 @@ public final class Match {
         Objects.requireNonNull(currentPosition, "currentPosition must not be null");
     this.moves = List.copyOf(Objects.requireNonNull(moves, "moves must not be null"));
     this.status = Objects.requireNonNull(status, "status must not be null");
+    if (status == GameStatus.FINISHED && result == null) {
+      throw new IllegalArgumentException("result is required when status is FINISHED");
+    }
     if (status != GameStatus.FINISHED && result != null) {
       throw new IllegalArgumentException("result is only allowed when status is FINISHED");
     }
