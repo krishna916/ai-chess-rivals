@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.chess;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;

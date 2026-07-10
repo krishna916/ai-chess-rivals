@@ -1,5 +1,6 @@
-package dev.krishnamurti.ai_chess_rivals.chess;
+package dev.krishnamurti.ai_chess_rivals.chess.api;
 
+import dev.krishnamurti.ai_chess_rivals.chess.StockfishException;
 import java.time.Duration;
 
 /**

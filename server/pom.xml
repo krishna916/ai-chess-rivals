@@ -35,6 +35,7 @@
 		<spring-modulith.version>2.1.0</spring-modulith.version>
 		<!-- Stockfish version pin — change here to upgrade everywhere -->
 		<stockfish.version>17.1</stockfish.version>
+		<chesslib.version>1.3.6</chesslib.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -81,6 +82,11 @@
 			<groupId>joda-time</groupId>
 			<artifactId>joda-time</artifactId>
 			<version>2.12.7</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.bhlangonijr</groupId>
+			<artifactId>chesslib</artifactId>
+			<version>${chesslib.version}</version>
 		</dependency>
 
 		<dependency>
@@ -157,6 +163,13 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
+
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
 
 	<build>
 		<plugins>

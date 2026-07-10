@@ -2,6 +2,7 @@ package dev.krishnamurti.ai_chess_rivals.chess;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;

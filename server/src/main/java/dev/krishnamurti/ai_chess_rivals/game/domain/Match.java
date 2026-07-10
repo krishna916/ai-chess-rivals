@@ -72,4 +72,26 @@ public final class Match {
   public Optional<GameResult> result() {
     return Optional.ofNullable(result);
   }
+
+  public Match recordMove(MoveNotation notation, BoardPosition positionAfterMove) {
+    requireInProgress("record a move");
+
+    Move move = new Move(moveCount() + 1, sideToMove, notation, positionAfterMove);
+    List<Move> updatedMoves = new java.util.ArrayList<>(moves);
+    updatedMoves.add(move);
+
+    return new Match(
+        sideToMove.opposite(), positionAfterMove, updatedMoves, GameStatus.IN_PROGRESS, null);
+  }
+
+  public Match finish(GameResult result) {
+    requireInProgress("finish a match");
+    return new Match(sideToMove, currentPosition, moves, GameStatus.FINISHED, result);
+  }
+
+  private void requireInProgress(String action) {
+    if (!isInProgress()) {
+      throw new IllegalStateException("Cannot " + action + " when match is not in progress");
+    }
+  }
 }
