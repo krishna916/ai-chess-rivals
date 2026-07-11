@@ -7,6 +7,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.Move;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.HashMap;
@@ -130,6 +131,8 @@ public final class MatchEngine {
   private Match finishMatch(Match match, GameResult result) {
     Match finishedMatch = match.finish(result);
     currentMatch.set(finishedMatch);
+    matchEventSink.publish(
+        new MatchFinished(result, finishedMatch.currentPosition(), finishedMatch.moveCount()));
     return finishedMatch;
   }
 

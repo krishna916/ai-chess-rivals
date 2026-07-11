@@ -13,6 +13,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEvent;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.ArrayDeque;
@@ -188,6 +189,66 @@ class MatchEngineTest {
     assertFalse(movePlayed.check());
     assertFalse(movePlayed.checkmate());
     assertFalse(movePlayed.promotion());
+  }
+
+  @Test
+  void playUntilFinishedEmitsOrderedLifecycleEvents() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+
+    Match finalMatch = matchEngine.playUntilFinished();
+
+    assertEquals(MatchStarted.class, eventSink.events.get(0).getClass());
+    assertEquals(MovePlayed.class, eventSink.events.get(1).getClass());
+    assertEquals(MovePlayed.class, eventSink.events.get(2).getClass());
+    MatchFinished finished = (MatchFinished) eventSink.events.get(3);
+    assertEquals(GameResult.DRAW, finished.result());
+    assertEquals(finalMatch.currentPosition(), finished.finalPosition());
+    assertEquals(2, finished.totalPlies());
+  }
+
+  @Test
+  void completedMatchEmitsExactlyOneMatchFinished() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+
+    matchEngine.playUntilFinished();
+
+    long finishEvents = eventSink.events.stream().filter(MatchFinished.class::isInstance).count();
+    assertEquals(1, finishEvents);
+  }
+
+  @Test
+  void stopCurrentMatchEmitsNoMatchFinished() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), eventSink);
+    chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
+
+    matchEngine.playUntilFinished();
+
+    assertTrue(eventSink.events.stream().noneMatch(MatchFinished.class::isInstance));
+  }
+
+  @Test
+  void resumingStoppedMatchDoesNotEmitAnotherMatchStarted() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+    chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
+
+    matchEngine.playUntilFinished();
+    matchEngine.playUntilFinished();
+
+    long startEvents = eventSink.events.stream().filter(MatchStarted.class::isInstance).count();
+    assertEquals(1, startEvents);
   }
 
   private static final class FakeChessPlayer implements ChessPlayer {
