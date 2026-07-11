@@ -67,9 +67,9 @@ public final class MatchEngine {
 
       try {
         MoveNotation moveNotation = chessPlayer.chooseMove(match);
-        match =
-            match.recordMove(
-                moveNotation, chessBoardService.applyMove(match.currentPosition(), moveNotation));
+        AppliedMove appliedMove =
+            chessBoardService.applyMove(match.currentPosition(), moveNotation);
+        match = match.recordMove(moveNotation, appliedMove.position());
         currentMatch.set(match);
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());

@@ -1,6 +1,8 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
 import com.github.bhlangonijr.chesslib.Board;
+import com.github.bhlangonijr.chesslib.Piece;
+import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.move.Move;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
@@ -15,15 +17,22 @@ import org.springframework.stereotype.Service;
 @Service
 public class ChessBoardService {
 
-  public BoardPosition applyMove(BoardPosition currentPosition, MoveNotation moveNotation) {
+  public AppliedMove applyMove(BoardPosition currentPosition, MoveNotation moveNotation) {
     Board board = loadBoard(currentPosition);
     Move move = parseMove(moveNotation, board.getSideToMove());
     if (!board.legalMoves().contains(move)) {
       throw new IllegalArgumentException(
           "Illegal move for current position: " + moveNotation.value());
     }
+    boolean capture = isCapture(board, move);
+    boolean promotion = move.getPromotion() != Piece.NONE;
     board.doMove(move);
-    return new BoardPosition(board.getFen());
+    return new AppliedMove(
+        new BoardPosition(board.getFen()),
+        capture,
+        board.isKingAttacked(),
+        board.isMated(),
+        promotion);
   }
 
   public Optional<GameResult> determineResult(
@@ -74,6 +83,16 @@ public class ChessBoardService {
     } catch (RuntimeException e) {
       throw new IllegalArgumentException("Invalid move notation: " + notation.value(), e);
     }
+  }
+
+  private boolean isCapture(Board board, Move move) {
+    if (board.getPiece(move.getTo()) != Piece.NONE) {
+      return true;
+    }
+    Piece movingPiece = board.getPiece(move.getFrom());
+    return movingPiece.getPieceType() == PieceType.PAWN
+        && move.getTo() == board.getEnPassant()
+        && move.getFrom().getFile() != move.getTo().getFile();
   }
 
   private void verifySideToMove(Board board, PlayerColor expectedSideToMove) {
