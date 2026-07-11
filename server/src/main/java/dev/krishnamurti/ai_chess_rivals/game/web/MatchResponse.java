@@ -11,4 +11,20 @@ public record MatchResponse(
     List<MoveResponse> moves,
     GameStatus status,
     GameResult result,
-    boolean running) {}
+    boolean running) {
+
+  public MatchResponse(
+      PlayerColor sideToMove,
+      String fen,
+      List<MoveResponse> moves,
+      GameStatus status,
+      GameResult result,
+      boolean running) {
+    this.sideToMove = sideToMove;
+    this.fen = fen;
+    this.moves = moves != null ? List.copyOf(moves) : List.of();
+    this.status = status;
+    this.result = result;
+    this.running = running;
+  }
+}
