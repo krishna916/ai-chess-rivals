@@ -105,6 +105,48 @@ class MatchTest {
     assertThrows(UnsupportedOperationException.class, () -> match.moves().add(historyMove()));
   }
 
+  @Test
+  void recordMoveAppendsMoveAndFlipsSideToMove() {
+    Match match = Match.newGame();
+    BoardPosition positionAfterMove =
+        new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+
+    Match updatedMatch = match.recordMove(new MoveNotation("e2e4"), positionAfterMove);
+
+    assertEquals(1, updatedMatch.moveCount());
+    assertEquals(PlayerColor.BLACK, updatedMatch.sideToMove());
+    assertEquals(positionAfterMove, updatedMatch.currentPosition());
+    assertEquals(1, updatedMatch.moves().getFirst().sequenceNumber());
+    assertEquals(PlayerColor.WHITE, updatedMatch.moves().getFirst().playedBy());
+    assertEquals("e2e4", updatedMatch.moves().getFirst().notation().value());
+  }
+
+  @Test
+  void recordMoveRejectsFinishedMatch() {
+    Match finishedMatch = Match.newGame().finish(GameResult.WHITE_WINS);
+
+    IllegalStateException error =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                finishedMatch.recordMove(
+                    new MoveNotation("e2e4"),
+                    new BoardPosition(
+                        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")));
+
+    assertEquals("Cannot record a move when match is not in progress", error.getMessage());
+  }
+
+  @Test
+  void finishSetsStatusAndResult() {
+    Match finishedMatch = Match.newGame().finish(GameResult.DRAW);
+
+    assertTrue(finishedMatch.isFinished());
+    assertFalse(finishedMatch.isInProgress());
+    assertEquals(GameStatus.FINISHED, finishedMatch.status());
+    assertEquals(GameResult.DRAW, finishedMatch.result().orElseThrow());
+  }
+
   private static Move historyMove() {
     return new Move(
         2,

@@ -127,6 +127,7 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 | `spring-modulith-starter-core` | `org.springframework.modulith` | Compile | `2.1.0` | Core Modulith tooling and verification |
 | `spring-modulith-starter-jpa` | `org.springframework.modulith` | Compile | `2.1.0` | Modulith persistence utilities |
 | `joda-time` | `joda-time` | Compile | `2.12.7` | Joda-Time validation helper required for Hibernate Validator GraalVM analysis |
+| `chesslib` | `com.github.bhlangonijr` | Compile | `1.3.6` | Backend board-state progression, legal move application, and terminal result detection |
 | `spring-boot-devtools` | `org.springframework.boot` | Runtime (Opt) | Inherited (`4.1.0`) | Rapid development helpers / restart |
 | `postgresql` | `org.postgresql` | Runtime | Inherited (`4.1.0`) | JDBC connector |
 | `lombok` | `org.projectlombok` | Compile (Opt) | Inherited (`4.1.0`) | Boilerplate reducer annotations |
@@ -164,5 +165,5 @@ During the codebase review, the following notes were compiled for reference:
 > The project's core constitution document (`docs/AI Chess Rivals - Constitution.md`) specifies **Java 21**, whereas the server build specification (`server/pom.xml`) uses **Java 25** (`<java.version>25</java.version>`). Make sure your development environments have JDK 25 installed to avoid compilation issues.
 
 > [!NOTE]
-> **Missing Chesslib Dependency**
-> The Constitution document lists `Chesslib` under the server-side stack. However, there is no Maven dependency declared for `chesslib` in `pom.xml`, and no Java files in the codebase currently import `chesslib`. Chess logic is currently handled on the client side using `chess.js` and on the backend via the low-level `StockfishClient` executing UCI commands directly.
+> **Chesslib Added For Backend Match Orchestration**
+> The server now declares `com.github.bhlangonijr:chesslib:1.3.6` in `server/pom.xml` and resolves it from `https://jitpack.io`, which is the installation source documented by the upstream project. It is used only inside the backend game module to apply legal moves, advance FEN state, and detect terminal outcomes for the synchronous match engine. Stockfish remains the move source; Chesslib is used only for deterministic board-state progression and result detection.

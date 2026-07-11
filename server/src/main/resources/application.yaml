@@ -38,3 +38,6 @@ app:
       hash-mb: ${STOCKFISH_HASH_MB:16}
       startup-timeout-seconds: ${STOCKFISH_STARTUP_TIMEOUT_SECONDS:10}
       move-timeout-seconds: ${STOCKFISH_MOVE_TIMEOUT_SECONDS:30}
+  game:
+    move-think-time-millis: ${GAME_MOVE_THINK_TIME_MILLIS:250}
+    max-plies: ${GAME_MAX_PLIES:300}
