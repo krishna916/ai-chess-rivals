@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
-import java.time.Duration;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
+import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -21,13 +21,13 @@ class MatchEngineTest {
 
   @Test
   void startNewMatchInitializesFreshState() {
-    FakeStockfishClient stockfishClient = new FakeStockfishClient();
+    FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 300));
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 300));
 
     Match match = matchEngine.startNewMatch();
 
-    assertEquals(1, stockfishClient.newGameCalls);
+    assertEquals(1, chessPlayer.startNewGameCalls);
     assertTrue(match.isInProgress());
     assertEquals(0, match.moveCount());
     assertEquals(match, matchEngine.currentMatch());
@@ -35,9 +35,9 @@ class MatchEngineTest {
 
   @Test
   void playUntilFinishedRecordsMovesAndStopsAtMaxPliesFallback() {
-    FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4", "e7e5");
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 2));
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2));
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -47,20 +47,25 @@ class MatchEngineTest {
     assertEquals(2, finalMatch.moveCount());
     assertEquals("e2e4", finalMatch.moves().get(0).notation().value());
     assertEquals("e7e5", finalMatch.moves().get(1).notation().value());
-    assertEquals(2, stockfishClient.bestMoveCalls.size());
+    assertEquals(2, chessPlayer.chooseMoveMatches.size());
     assertEquals(
         List.of(
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"),
-        stockfishClient.positions);
+        chessPlayer.chooseMoveMatches.stream()
+            .map(match -> match.currentPosition().fen())
+            .toList());
+    assertEquals(
+        List.of(PlayerColor.WHITE, PlayerColor.BLACK),
+        chessPlayer.chooseMoveMatches.stream().map(Match::sideToMove).toList());
   }
 
   @Test
   void playUntilFinishedStopsAfterCurrentIterationWhenStopIsRequested() {
-    FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4", "e7e5");
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 300));
-    stockfishClient.onBestMove = () -> matchEngine.stopCurrentMatch();
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 300));
+    chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match match = matchEngine.playUntilFinished();
 
@@ -72,10 +77,10 @@ class MatchEngineTest {
 
   @Test
   void playUntilFinishedResumesStoppedMatch() {
-    FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4", "e7e5");
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 2));
-    stockfishClient.onBestMove = () -> matchEngine.stopCurrentMatch();
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2));
+    chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match stoppedMatch = matchEngine.playUntilFinished();
     Match resumedMatch = matchEngine.playUntilFinished();
@@ -90,10 +95,10 @@ class MatchEngineTest {
 
   @Test
   void playUntilFinishedReturnsDrawOnThreefoldRepetition() {
-    FakeStockfishClient stockfishClient =
-        new FakeStockfishClient("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
+    FakeChessPlayer chessPlayer =
+        new FakeChessPlayer("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 20));
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 20));
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -104,9 +109,9 @@ class MatchEngineTest {
 
   @Test
   void startNewMatchRejectsReplacingActiveMatch() {
-    FakeStockfishClient stockfishClient = new FakeStockfishClient();
+    FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 300));
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 300));
     matchEngine.startNewMatch();
 
     IllegalStateException error =
@@ -117,9 +122,9 @@ class MatchEngineTest {
 
   @Test
   void currentMatchRejectsWhenNoMatchExists() {
-    FakeStockfishClient stockfishClient = new FakeStockfishClient();
+    FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine =
-        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 300));
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 300));
 
     IllegalStateException error =
         assertThrows(IllegalStateException.class, matchEngine::currentMatch);
@@ -127,46 +132,37 @@ class MatchEngineTest {
     assertEquals("No match has been started", error.getMessage());
   }
 
-  private static final class FakeStockfishClient implements StockfishClient {
+  private static final class FakeChessPlayer implements ChessPlayer {
 
-    private final Deque<String> moves = new ArrayDeque<>();
-    private final List<String> positions = new ArrayList<>();
-    private final List<Duration> bestMoveCalls = new ArrayList<>();
-    private int newGameCalls;
-    private Runnable onBestMove;
+    private final Deque<MoveNotation> moves = new ArrayDeque<>();
+    private final List<Match> chooseMoveMatches = new ArrayList<>();
+    private int startNewGameCalls;
+    private Runnable onChooseMove;
 
-    private FakeStockfishClient(String... moves) {
+    private FakeChessPlayer(String... moves) {
       for (String move : moves) {
-        this.moves.addLast(move);
+        this.moves.addLast(new MoveNotation(move));
       }
     }
 
     @Override
-    public void newGame() {
-      newGameCalls++;
+    public void startNewGame() {
+      startNewGameCalls++;
     }
 
     @Override
-    public void setPosition(String fen) {
-      positions.add(fen);
-    }
-
-    @Override
-    public String bestMove(Duration thinkTime) {
-      bestMoveCalls.add(thinkTime);
-      if (onBestMove != null) {
-        Runnable callback = onBestMove;
-        onBestMove = null;
+    public MoveNotation chooseMove(Match match) {
+      chooseMoveMatches.add(match);
+      if (onChooseMove != null) {
+        Runnable callback = onChooseMove;
+        onChooseMove = null;
         callback.run();
       }
-      String move = moves.pollFirst();
+      MoveNotation move = moves.pollFirst();
       if (move == null) {
         throw new IllegalStateException("No fake move configured");
       }
       return move;
     }
-
-    @Override
-    public void close() {}
   }
 }

@@ -88,6 +88,7 @@ class ChessBoardServiceTest {
         chessBoardService
             .determineResult(BoardPosition.STARTING_POSITION, PlayerColor.WHITE, 1)
             .isEmpty());
-    assertFalse(chessBoardService.isFinished(BoardPosition.STARTING_POSITION, PlayerColor.WHITE, 1));
+    assertFalse(
+        chessBoardService.isFinished(BoardPosition.STARTING_POSITION, PlayerColor.WHITE, 1));
   }
 }
