@@ -213,6 +213,14 @@ Frontend dev server: `http://localhost:5173`
 | `STOCKFISH_PATH` | `stockfish/stockfish` |
 | `STOCKFISH_THREADS` | `1` |
 | `STOCKFISH_HASH_MB` | `16` |
+| `APP_WEBSOCKET_ALLOWED_ORIGIN` | `http://localhost:5173` |
+
+## Live Match Stream
+
+- Endpoint: `ws://localhost:8080/ws/match` when the backend runs directly, or `ws://localhost:8082/ws/match` through Docker
+- Messages use a stable envelope: `{ "type": "...", "payload": ... }`
+- The first server message is `MATCH_STATE` when a match exists, otherwise `NO_MATCH`
+- The backend currently supports exactly one active match stream
 
 ## Verification
 

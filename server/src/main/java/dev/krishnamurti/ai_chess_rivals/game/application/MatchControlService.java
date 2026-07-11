@@ -66,8 +66,7 @@ public final class MatchControlService {
                     running.set(false);
                   }
                 }
-              }
-              );
+              });
       activeTask.set(submittedTask);
       if (submittedTask.isDone() && activeTaskId.get() == 0) {
         activeTask.compareAndSet(submittedTask, null);
