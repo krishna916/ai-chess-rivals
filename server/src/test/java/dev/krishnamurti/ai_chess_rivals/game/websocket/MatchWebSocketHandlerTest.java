@@ -92,6 +92,28 @@ class MatchWebSocketHandlerTest {
   }
 
   @Test
+  void illegalStateClientIsRemovedWithoutBlockingHealthyClients() throws Exception {
+    when(matchControlService.currentMatch()).thenThrow(new MatchNotFoundException("No match"));
+    StubWebSocketSession healthy = new StubWebSocketSession("healthy");
+    IllegalStateWebSocketSession failing = new IllegalStateWebSocketSession("illegal");
+
+    handler.afterConnectionEstablished(healthy);
+    handler.afterConnectionEstablished(failing);
+
+    assertDoesNotThrow(
+        () ->
+            handler.broadcast(
+                new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage())));
+    assertEquals(2, healthy.getSentMessages().size());
+    assertFalse(failing.isOpen());
+
+    handler.broadcast(
+        new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage()));
+
+    assertEquals(3, healthy.getSentMessages().size());
+  }
+
+  @Test
   void closedSessionIsRemovedFromFutureBroadcasts() throws Exception {
     when(matchControlService.currentMatch()).thenThrow(new MatchNotFoundException("No match"));
     StubWebSocketSession session = new StubWebSocketSession("gone");
@@ -244,6 +266,18 @@ class MatchWebSocketHandlerTest {
     @Override
     public void sendMessage(WebSocketMessage<?> message) throws IOException {
       throw new IOException("boom");
+    }
+  }
+
+  private static final class IllegalStateWebSocketSession extends StubWebSocketSession {
+
+    private IllegalStateWebSocketSession(String id) {
+      super(id);
+    }
+
+    @Override
+    public void sendMessage(WebSocketMessage<?> message) {
+      throw new IllegalStateException("boom");
     }
   }
 

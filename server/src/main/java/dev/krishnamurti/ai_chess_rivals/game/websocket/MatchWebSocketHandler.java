@@ -105,7 +105,7 @@ final class MatchWebSocketHandler extends TextWebSocketHandler {
   private void sendSafely(String sessionId, WebSocketSession session, String payload) {
     try {
       sendMessage(session, payload);
-    } catch (IOException e) {
+    } catch (IOException | IllegalStateException e) {
       sessions.remove(sessionId);
       closeQuietly(session);
       log.debug("Removed failed websocket client: {}", sessionId, e);
