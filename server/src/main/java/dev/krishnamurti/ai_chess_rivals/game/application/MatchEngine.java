@@ -3,7 +3,13 @@ package dev.krishnamurti.ai_chess_rivals.game.application;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
+import dev.krishnamurti.ai_chess_rivals.game.domain.Move;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
+import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
+import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +24,7 @@ public final class MatchEngine {
 
   private final ChessPlayer chessPlayer;
   private final ChessBoardService chessBoardService;
+  private final MatchEventSink matchEventSink;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
@@ -25,11 +32,13 @@ public final class MatchEngine {
   public MatchEngine(
       @Qualifier("stockfishPlayer") ChessPlayer chessPlayer,
       ChessBoardService chessBoardService,
-      GameProperties gameProperties) {
+      GameProperties gameProperties,
+      MatchEventSink matchEventSink) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
     Objects.requireNonNull(gameProperties, "gameProperties must not be null");
+    this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
     this.maxPlies = gameProperties.maxPlies();
   }
 
@@ -46,6 +55,11 @@ public final class MatchEngine {
       chessPlayer.startNewGame();
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to initialize a new match", e);
+    }
+    try {
+      matchEventSink.publish(new MatchStarted(match.sideToMove(), match.currentPosition()));
+    } catch (RuntimeException e) {
+      throw new MatchEngineException("Failed to publish match start event", e);
     }
     currentMatch.set(match);
     return match;
@@ -65,11 +79,25 @@ public final class MatchEngine {
         break;
       }
 
+      int ply = match.moveCount() + 1;
       try {
         MoveNotation moveNotation = chessPlayer.chooseMove(match);
-        match =
-            match.recordMove(
-                moveNotation, chessBoardService.applyMove(match.currentPosition(), moveNotation));
+        PlayerColor player = match.sideToMove();
+        AppliedMove appliedMove =
+            chessBoardService.applyMove(match.currentPosition(), moveNotation);
+        Match nextMatch = match.recordMove(moveNotation, appliedMove.position());
+        Move recordedMove = nextMatch.moves().getLast();
+        matchEventSink.publish(
+            new MovePlayed(
+                recordedMove.sequenceNumber(),
+                player,
+                recordedMove.notation(),
+                recordedMove.positionAfterMove(),
+                appliedMove.capture(),
+                appliedMove.check(),
+                appliedMove.checkmate(),
+                appliedMove.promotion()));
+        match = nextMatch;
         currentMatch.set(match);
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
@@ -82,8 +110,7 @@ public final class MatchEngine {
           match = finishMatch(match, result);
         }
       } catch (RuntimeException e) {
-        throw new MatchEngineException(
-            "Match execution failed while processing ply " + (match.moveCount() + 1), e);
+        throw new MatchEngineException("Match execution failed while processing ply " + ply, e);
       }
     }
 
@@ -104,6 +131,8 @@ public final class MatchEngine {
 
   private Match finishMatch(Match match, GameResult result) {
     Match finishedMatch = match.finish(result);
+    matchEventSink.publish(
+        new MatchFinished(result, finishedMatch.currentPosition(), finishedMatch.moveCount()));
     currentMatch.set(finishedMatch);
     return finishedMatch;
   }

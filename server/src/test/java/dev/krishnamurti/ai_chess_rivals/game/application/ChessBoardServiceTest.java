@@ -16,11 +16,70 @@ class ChessBoardServiceTest {
   private final ChessBoardService chessBoardService = new ChessBoardService();
 
   @Test
-  void applyMoveAdvancesStartingPosition() {
-    BoardPosition nextPosition =
+  void applyMoveReturnsMetadataForQuietMove() {
+    AppliedMove appliedMove =
         chessBoardService.applyMove(BoardPosition.STARTING_POSITION, new MoveNotation("e2e4"));
 
-    assertEquals("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", nextPosition.fen());
+    assertEquals(
+        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+        appliedMove.position().fen());
+    assertFalse(appliedMove.capture());
+    assertFalse(appliedMove.check());
+    assertFalse(appliedMove.checkmate());
+    assertFalse(appliedMove.promotion());
+  }
+
+  @Test
+  void applyMoveReturnsMetadataForStandardCapture() {
+    BoardPosition capturePosition =
+        new BoardPosition("rnbqkbnr/pppp1ppp/8/4p3/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 2");
+
+    AppliedMove appliedMove =
+        chessBoardService.applyMove(capturePosition, new MoveNotation("e5d4"));
+
+    assertEquals(
+        "rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3", appliedMove.position().fen());
+    assertTrue(appliedMove.capture());
+    assertFalse(appliedMove.check());
+    assertFalse(appliedMove.checkmate());
+    assertFalse(appliedMove.promotion());
+  }
+
+  @Test
+  void applyMoveReturnsMetadataForEnPassantCapture() {
+    BoardPosition enPassantPosition =
+        new BoardPosition("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3");
+
+    AppliedMove appliedMove =
+        chessBoardService.applyMove(enPassantPosition, new MoveNotation("e5d6"));
+
+    assertEquals(
+        "rnbqkbnr/ppp1pppp/3P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3", appliedMove.position().fen());
+    assertTrue(appliedMove.capture());
+    assertFalse(appliedMove.check());
+    assertFalse(appliedMove.checkmate());
+    assertFalse(appliedMove.promotion());
+  }
+
+  @Test
+  void applyMoveReturnsMetadataForCheck() {
+    BoardPosition checkPosition = new BoardPosition("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1");
+
+    AppliedMove appliedMove = chessBoardService.applyMove(checkPosition, new MoveNotation("e2e7"));
+
+    assertTrue(appliedMove.check());
+    assertFalse(appliedMove.checkmate());
+  }
+
+  @Test
+  void applyMoveReturnsMetadataForCheckmate() {
+    BoardPosition matePosition =
+        new BoardPosition("rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2");
+
+    AppliedMove appliedMove = chessBoardService.applyMove(matePosition, new MoveNotation("d8h4"));
+
+    assertTrue(appliedMove.check());
+    assertTrue(appliedMove.checkmate());
   }
 
   @Test
@@ -76,10 +135,14 @@ class ChessBoardServiceTest {
   void applyMoveSupportsPromotionNotation() {
     BoardPosition promotionPosition = new BoardPosition("7k/4P3/8/8/8/8/8/K7 w - - 0 1");
 
-    BoardPosition nextPosition =
+    AppliedMove appliedMove =
         chessBoardService.applyMove(promotionPosition, new MoveNotation("e7e8q"));
 
-    assertEquals("4Q2k/8/8/8/8/8/8/K7 b - - 0 1", nextPosition.fen());
+    assertEquals("4Q2k/8/8/8/8/8/8/K7 b - - 0 1", appliedMove.position().fen());
+    assertFalse(appliedMove.capture());
+    assertTrue(appliedMove.check());
+    assertFalse(appliedMove.checkmate());
+    assertTrue(appliedMove.promotion());
   }
 
   @Test
