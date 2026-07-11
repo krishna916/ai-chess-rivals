@@ -71,6 +71,24 @@ class MatchEngineTest {
   }
 
   @Test
+  void playUntilFinishedResumesStoppedMatch() {
+    FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4", "e7e5");
+    MatchEngine matchEngine =
+        new MatchEngine(stockfishClient, new ChessBoardService(), new GameProperties(250, 2));
+    stockfishClient.onBestMove = () -> matchEngine.stopCurrentMatch();
+
+    Match stoppedMatch = matchEngine.playUntilFinished();
+    Match resumedMatch = matchEngine.playUntilFinished();
+
+    assertTrue(stoppedMatch.isInProgress());
+    assertEquals(1, stoppedMatch.moveCount());
+    assertTrue(resumedMatch.isFinished());
+    assertEquals(GameResult.DRAW, resumedMatch.result().orElseThrow());
+    assertEquals(2, resumedMatch.moveCount());
+    assertEquals("e7e5", resumedMatch.moves().get(1).notation().value());
+  }
+
+  @Test
   void playUntilFinishedReturnsDrawOnThreefoldRepetition() {
     FakeStockfishClient stockfishClient =
         new FakeStockfishClient("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");

@@ -60,6 +60,7 @@ public final class MatchEngine {
     if (match == null) {
       match = startNewMatch();
     }
+    stopRequested.set(false);
     Map<String, Integer> positionOccurrences = buildPositionOccurrences(match);
 
     while (match.isInProgress() && !stopRequested.get()) {
