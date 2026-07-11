@@ -3,7 +3,12 @@ package dev.krishnamurti.ai_chess_rivals.game.application;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
+import dev.krishnamurti.ai_chess_rivals.game.domain.Move;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
+import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
+import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +23,7 @@ public final class MatchEngine {
 
   private final ChessPlayer chessPlayer;
   private final ChessBoardService chessBoardService;
+  private final MatchEventSink matchEventSink;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
@@ -25,11 +31,13 @@ public final class MatchEngine {
   public MatchEngine(
       @Qualifier("stockfishPlayer") ChessPlayer chessPlayer,
       ChessBoardService chessBoardService,
-      GameProperties gameProperties) {
+      GameProperties gameProperties,
+      MatchEventSink matchEventSink) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
     Objects.requireNonNull(gameProperties, "gameProperties must not be null");
+    this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
     this.maxPlies = gameProperties.maxPlies();
   }
 
@@ -48,6 +56,11 @@ public final class MatchEngine {
       throw new MatchEngineException("Failed to initialize a new match", e);
     }
     currentMatch.set(match);
+    try {
+      matchEventSink.publish(new MatchStarted(match.sideToMove(), match.currentPosition()));
+    } catch (RuntimeException e) {
+      throw new MatchEngineException("Failed to publish match start event", e);
+    }
     return match;
   }
 
@@ -67,10 +80,22 @@ public final class MatchEngine {
 
       try {
         MoveNotation moveNotation = chessPlayer.chooseMove(match);
+        PlayerColor player = match.sideToMove();
         AppliedMove appliedMove =
             chessBoardService.applyMove(match.currentPosition(), moveNotation);
         match = match.recordMove(moveNotation, appliedMove.position());
         currentMatch.set(match);
+        Move recordedMove = match.moves().getLast();
+        matchEventSink.publish(
+            new MovePlayed(
+                recordedMove.sequenceNumber(),
+                player,
+                recordedMove.notation(),
+                recordedMove.positionAfterMove(),
+                appliedMove.capture(),
+                appliedMove.check(),
+                appliedMove.checkmate(),
+                appliedMove.promotion()));
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         GameResult result =
