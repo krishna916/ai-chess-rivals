@@ -6,6 +6,8 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -58,6 +60,7 @@ public final class MatchEngine {
     if (match == null) {
       match = startNewMatch();
     }
+    Map<String, Integer> positionOccurrences = buildPositionOccurrences(match);
 
     while (match.isInProgress() && !stopRequested.get()) {
       if (match.moveCount() >= maxPlies) {
@@ -72,9 +75,12 @@ public final class MatchEngine {
             match.recordMove(
                 moveNotation, chessBoardService.applyMove(match.currentPosition(), moveNotation));
         currentMatch.set(match);
+        int currentPositionOccurrences =
+            recordPositionOccurrence(positionOccurrences, match.currentPosition());
         GameResult result =
             chessBoardService
-                .determineResult(match.currentPosition(), match.sideToMove())
+                .determineResult(
+                    match.currentPosition(), match.sideToMove(), currentPositionOccurrences)
                 .orElse(null);
         if (result != null) {
           match = finishMatch(match, result);
@@ -104,5 +110,20 @@ public final class MatchEngine {
     Match finishedMatch = match.finish(result);
     currentMatch.set(finishedMatch);
     return finishedMatch;
+  }
+
+  private Map<String, Integer> buildPositionOccurrences(Match match) {
+    Map<String, Integer> positionOccurrences = new HashMap<>();
+    recordPositionOccurrence(positionOccurrences, Match.newGame().currentPosition());
+    for (dev.krishnamurti.ai_chess_rivals.game.domain.Move move : match.moves()) {
+      recordPositionOccurrence(positionOccurrences, move.positionAfterMove());
+    }
+    return positionOccurrences;
+  }
+
+  private int recordPositionOccurrence(
+      Map<String, Integer> positionOccurrences,
+      dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition position) {
+    return positionOccurrences.merge(chessBoardService.normalizedPositionKey(position), 1, Integer::sum);
   }
 }

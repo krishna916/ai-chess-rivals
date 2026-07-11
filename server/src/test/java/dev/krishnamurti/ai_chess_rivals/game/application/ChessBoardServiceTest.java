@@ -41,8 +41,8 @@ class ChessBoardServiceTest {
 
     assertEquals(
         GameResult.WHITE_WINS,
-        chessBoardService.determineResult(checkmatePosition, PlayerColor.BLACK).orElseThrow());
-    assertTrue(chessBoardService.isFinished(checkmatePosition, PlayerColor.BLACK));
+        chessBoardService.determineResult(checkmatePosition, PlayerColor.BLACK, 1).orElseThrow());
+    assertTrue(chessBoardService.isFinished(checkmatePosition, PlayerColor.BLACK, 1));
   }
 
   @Test
@@ -51,7 +51,7 @@ class ChessBoardServiceTest {
 
     assertEquals(
         GameResult.DRAW,
-        chessBoardService.determineResult(stalematePosition, PlayerColor.BLACK).orElseThrow());
+        chessBoardService.determineResult(stalematePosition, PlayerColor.BLACK, 1).orElseThrow());
   }
 
   @Test
@@ -60,15 +60,34 @@ class ChessBoardServiceTest {
 
     assertEquals(
         GameResult.DRAW,
-        chessBoardService.determineResult(drawPosition, PlayerColor.WHITE).orElseThrow());
+        chessBoardService.determineResult(drawPosition, PlayerColor.WHITE, 1).orElseThrow());
+  }
+
+  @Test
+  void determineResultReturnsDrawForThreefoldRepetition() {
+    BoardPosition repeatedPosition = BoardPosition.STARTING_POSITION;
+
+    assertEquals(
+        GameResult.DRAW,
+        chessBoardService.determineResult(repeatedPosition, PlayerColor.WHITE, 3).orElseThrow());
+  }
+
+  @Test
+  void applyMoveSupportsPromotionNotation() {
+    BoardPosition promotionPosition = new BoardPosition("7k/4P3/8/8/8/8/8/K7 w - - 0 1");
+
+    BoardPosition nextPosition =
+        chessBoardService.applyMove(promotionPosition, new MoveNotation("e7e8q"));
+
+    assertEquals("4Q2k/8/8/8/8/8/8/K7 b - - 0 1", nextPosition.fen());
   }
 
   @Test
   void determineResultReturnsEmptyWhenGameIsNotFinished() {
     assertTrue(
         chessBoardService
-            .determineResult(BoardPosition.STARTING_POSITION, PlayerColor.WHITE)
+            .determineResult(BoardPosition.STARTING_POSITION, PlayerColor.WHITE, 1)
             .isEmpty());
-    assertFalse(chessBoardService.isFinished(BoardPosition.STARTING_POSITION, PlayerColor.WHITE));
+    assertFalse(chessBoardService.isFinished(BoardPosition.STARTING_POSITION, PlayerColor.WHITE, 1));
   }
 }

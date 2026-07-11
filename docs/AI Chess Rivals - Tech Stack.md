@@ -127,6 +127,7 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 | `spring-modulith-starter-core` | `org.springframework.modulith` | Compile | `2.1.0` | Core Modulith tooling and verification |
 | `spring-modulith-starter-jpa` | `org.springframework.modulith` | Compile | `2.1.0` | Modulith persistence utilities |
 | `joda-time` | `joda-time` | Compile | `2.12.7` | Joda-Time validation helper required for Hibernate Validator GraalVM analysis |
+| `chesslib` | `com.github.bhlangonijr` | Compile | `1.3.6` | Backend board-state progression, legal move application, and terminal result detection |
 | `spring-boot-devtools` | `org.springframework.boot` | Runtime (Opt) | Inherited (`4.1.0`) | Rapid development helpers / restart |
 | `postgresql` | `org.postgresql` | Runtime | Inherited (`4.1.0`) | JDBC connector |
 | `lombok` | `org.projectlombok` | Compile (Opt) | Inherited (`4.1.0`) | Boilerplate reducer annotations |
