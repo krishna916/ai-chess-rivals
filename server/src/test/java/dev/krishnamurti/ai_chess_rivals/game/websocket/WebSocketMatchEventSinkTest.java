@@ -26,5 +26,7 @@ class WebSocketMatchEventSinkTest {
     WebSocketMatchEventSink sink = new WebSocketMatchEventSink(mapper, handler);
 
     assertDoesNotThrow(() -> sink.publish(event));
+    verify(mapper).map(event);
+    verify(handler).broadcast(message);
   }
 }

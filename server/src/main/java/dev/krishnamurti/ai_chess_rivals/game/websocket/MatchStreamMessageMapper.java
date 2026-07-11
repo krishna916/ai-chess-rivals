@@ -7,7 +7,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class MatchStreamMessageMapper {
+final class MatchStreamMessageMapper {
 
   public MatchStreamMessage<?> map(MatchEvent event) {
     return switch (event) {

@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
 
 @Validated
 @ConfigurationProperties(prefix = "app.websocket")
-public record WebSocketProperties(@NotEmpty List<@NotBlank String> allowedOrigins) {
+record WebSocketProperties(@NotEmpty List<@NotBlank String> allowedOrigins) {
 
   public WebSocketProperties {
     allowedOrigins = List.copyOf(allowedOrigins);

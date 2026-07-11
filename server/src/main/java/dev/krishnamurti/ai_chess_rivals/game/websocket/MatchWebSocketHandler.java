@@ -58,8 +58,16 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
       return;
     }
 
+    String payload;
+    try {
+      payload = messageWriter.write(message);
+    } catch (JacksonException e) {
+      log.error("Failed to serialize websocket message {}", message.type(), e);
+      return;
+    }
+
     for (Map.Entry<String, WebSocketSession> entry : sessions.entrySet()) {
-      sendSafely(entry.getKey(), entry.getValue(), message);
+      sendSafely(entry.getKey(), entry.getValue(), payload);
     }
   }
 
@@ -68,21 +76,28 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
       sendSafely(
           session.getId(),
           session,
-          new MatchStreamMessage<>(
-              MatchStreamMessageType.MATCH_STATE,
-              MatchStateMessage.from(matchControlServiceProvider.getObject().currentMatch())));
+          messageWriter.write(
+              new MatchStreamMessage<>(
+                  MatchStreamMessageType.MATCH_STATE,
+                  MatchStateMessage.from(matchControlServiceProvider.getObject().currentMatch()))));
     } catch (MatchNotFoundException e) {
-      sendSafely(
-          session.getId(),
-          session,
-          new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage()));
+      try {
+        sendSafely(
+            session.getId(),
+            session,
+            messageWriter.write(
+                new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage())));
+      } catch (JacksonException serializationFailure) {
+        log.error("Failed to serialize websocket message {}", MatchStreamMessageType.NO_MATCH, serializationFailure);
+      }
+    } catch (JacksonException e) {
+      log.error("Failed to serialize websocket message {}", MatchStreamMessageType.MATCH_STATE, e);
     }
   }
 
-  private void sendSafely(
-      String sessionId, WebSocketSession session, MatchStreamMessage<?> message) {
+  private void sendSafely(String sessionId, WebSocketSession session, String payload) {
     try {
-      sendMessage(session, message);
+      sendMessage(session, payload);
     } catch (IOException e) {
       sessions.remove(sessionId);
       closeQuietly(session);
@@ -90,13 +105,8 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
     }
   }
 
-  private void sendMessage(WebSocketSession session, MatchStreamMessage<?> message)
-      throws IOException {
-    try {
-      session.sendMessage(new TextMessage(messageWriter.write(message)));
-    } catch (JacksonException e) {
-      log.error("Failed to serialize websocket message {}", message.type(), e);
-    }
+  private void sendMessage(WebSocketSession session, String payload) throws IOException {
+    session.sendMessage(new TextMessage(payload));
   }
 
   private void closeQuietly(WebSocketSession session) {

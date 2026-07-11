@@ -8,7 +8,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.web.MoveResponse;
 import java.util.List;
 
-public record MatchStateMessage(
+record MatchStateMessage(
     PlayerColor sideToMove,
     String fen,
     List<MoveResponse> moves,

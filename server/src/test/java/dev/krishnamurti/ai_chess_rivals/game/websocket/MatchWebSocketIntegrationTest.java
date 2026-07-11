@@ -60,14 +60,22 @@ class MatchWebSocketIntegrationTest {
                 "ws://localhost:" + port + "/ws/match")
             .get(5, TimeUnit.SECONDS);
 
-    assertTrue(messages.poll(5, TimeUnit.SECONDS).contains("\"type\":\"NO_MATCH\""));
+    String noMatchMessage = messages.poll(5, TimeUnit.SECONDS);
+    assertNotNull(noMatchMessage);
+    assertTrue(noMatchMessage.contains("\"type\":\"NO_MATCH\""));
 
     handler.broadcast(
         new MatchStreamMessage<>(
             MatchStreamMessageType.MATCH_STARTED,
             new MatchStartedMessage(PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen())));
 
-    assertTrue(messages.poll(5, TimeUnit.SECONDS).contains("\"type\":\"MATCH_STARTED\""));
+    String matchStartedMessage = messages.poll(5, TimeUnit.SECONDS);
+    assertNotNull(matchStartedMessage);
+    assertTrue(matchStartedMessage.contains("\"type\":\"MATCH_STARTED\""));
+    assertTrue(matchStartedMessage.contains("\"sideToMove\":\"WHITE\""));
+    assertTrue(
+        matchStartedMessage.contains(
+            "\"fen\":\"" + BoardPosition.STARTING_POSITION.fen() + "\""));
     assertTrue(session.isOpen());
     session.close();
   }
