@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /** Runs a single synchronous match from start to finish. */
@@ -22,7 +23,9 @@ public final class MatchEngine {
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
 
   public MatchEngine(
-      ChessPlayer chessPlayer, ChessBoardService chessBoardService, GameProperties gameProperties) {
+      @Qualifier("stockfishPlayer") ChessPlayer chessPlayer,
+      ChessBoardService chessBoardService,
+      GameProperties gameProperties) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");

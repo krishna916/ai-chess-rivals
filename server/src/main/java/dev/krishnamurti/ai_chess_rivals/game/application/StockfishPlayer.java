@@ -8,8 +8,8 @@ import java.time.Duration;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 
-@Service
-public final class StockfishPlayer implements ChessPlayer {
+@Service("stockfishPlayer")
+final class StockfishPlayer implements ChessPlayer {
 
   private final StockfishClient stockfishClient;
   private final Duration thinkTime;
