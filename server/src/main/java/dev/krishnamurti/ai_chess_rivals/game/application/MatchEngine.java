@@ -79,6 +79,7 @@ public final class MatchEngine {
         break;
       }
 
+      int ply = match.moveCount() + 1;
       try {
         MoveNotation moveNotation = chessPlayer.chooseMove(match);
         PlayerColor player = match.sideToMove();
@@ -109,7 +110,7 @@ public final class MatchEngine {
         }
       } catch (RuntimeException e) {
         throw new MatchEngineException(
-            "Match execution failed while processing ply " + (match.moveCount() + 1), e);
+            "Match execution failed while processing ply " + ply, e);
       }
     }
 

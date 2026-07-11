@@ -251,6 +251,52 @@ class MatchEngineTest {
     assertEquals(1, startEvents);
   }
 
+  @Test
+  void finalMovePlayedCarriesCheckmateMetadataBeforeMatchFinished() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("f2f3", "e7e5", "g2g4", "d8h4");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 10), eventSink);
+
+    matchEngine.playUntilFinished();
+
+    MovePlayed movePlayed = (MovePlayed) eventSink.events.get(4);
+    assertTrue(movePlayed.check());
+    assertTrue(movePlayed.checkmate());
+    assertEquals(MatchFinished.class, eventSink.events.get(5).getClass());
+  }
+
+  @Test
+  void startNewMatchWrapsMatchStartedSinkFailure() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer();
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    eventSink.failure = new IllegalStateException("sink failed");
+    MatchEngine matchEngine =
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), eventSink);
+
+    MatchEngineException error =
+        assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
+
+    assertEquals("Failed to publish match start event", error.getMessage());
+  }
+
+  @Test
+  void playUntilFinishedWrapsMoveSinkFailureWithPlyContext() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 10), eventSink);
+    matchEngine.startNewMatch();
+    eventSink.failure = new IllegalStateException("sink failed");
+
+    MatchEngineException error =
+        assertThrows(MatchEngineException.class, matchEngine::playUntilFinished);
+
+    assertEquals("Match execution failed while processing ply 1", error.getMessage());
+  }
+
   private static final class FakeChessPlayer implements ChessPlayer {
 
     private final Deque<MoveNotation> moves = new ArrayDeque<>();
