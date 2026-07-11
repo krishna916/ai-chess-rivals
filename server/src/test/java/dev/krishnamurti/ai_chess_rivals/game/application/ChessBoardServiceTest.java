@@ -38,8 +38,7 @@ class ChessBoardServiceTest {
         chessBoardService.applyMove(capturePosition, new MoveNotation("e5d4"));
 
     assertEquals(
-        "rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3",
-        appliedMove.position().fen());
+        "rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3", appliedMove.position().fen());
     assertTrue(appliedMove.capture());
     assertFalse(appliedMove.check());
     assertFalse(appliedMove.checkmate());
@@ -55,8 +54,7 @@ class ChessBoardServiceTest {
         chessBoardService.applyMove(enPassantPosition, new MoveNotation("e5d6"));
 
     assertEquals(
-        "rnbqkbnr/ppp1pppp/3P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3",
-        appliedMove.position().fen());
+        "rnbqkbnr/ppp1pppp/3P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3", appliedMove.position().fen());
     assertTrue(appliedMove.capture());
     assertFalse(appliedMove.check());
     assertFalse(appliedMove.checkmate());
@@ -76,8 +74,7 @@ class ChessBoardServiceTest {
   @Test
   void applyMoveReturnsMetadataForCheckmate() {
     BoardPosition matePosition =
-        new BoardPosition(
-            "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2");
+        new BoardPosition("rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2");
 
     AppliedMove appliedMove = chessBoardService.applyMove(matePosition, new MoveNotation("d8h4"));
 

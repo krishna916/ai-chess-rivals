@@ -47,14 +47,7 @@ class MatchEventTest {
         NullPointerException.class,
         () ->
             new MovePlayed(
-                1,
-                PlayerColor.WHITE,
-                new MoveNotation("e2e4"),
-                null,
-                false,
-                false,
-                false,
-                false));
+                1, PlayerColor.WHITE, new MoveNotation("e2e4"), null, false, false, false, false));
   }
 
   @Test

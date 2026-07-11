@@ -43,7 +43,8 @@ class MatchEngineTest {
   void playUntilFinishedRecordsMovesAndStopsAtMaxPliesFallback() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), event -> {});
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), event -> {});
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -86,7 +87,8 @@ class MatchEngineTest {
   void playUntilFinishedResumesStoppedMatch() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), event -> {});
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), event -> {});
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match stoppedMatch = matchEngine.playUntilFinished();
@@ -105,7 +107,8 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer =
         new FakeChessPlayer("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 20), event -> {});
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 20), event -> {});
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -176,7 +179,8 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 1), eventSink);
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 1), eventSink);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -196,7 +200,8 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -214,7 +219,8 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
 
     matchEngine.playUntilFinished();
 
@@ -241,7 +247,8 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -256,7 +263,8 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("f2f3", "e7e5", "g2g4", "d8h4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
-        new MatchEngine(chessPlayer, new ChessBoardService(), new GameProperties(250, 10), eventSink);
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 10), eventSink);
 
     matchEngine.playUntilFinished();
 

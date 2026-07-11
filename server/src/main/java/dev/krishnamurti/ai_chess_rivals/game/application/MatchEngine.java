@@ -109,8 +109,7 @@ public final class MatchEngine {
           match = finishMatch(match, result);
         }
       } catch (RuntimeException e) {
-        throw new MatchEngineException(
-            "Match execution failed while processing ply " + ply, e);
+        throw new MatchEngineException("Match execution failed while processing ply " + ply, e);
       }
     }
 
