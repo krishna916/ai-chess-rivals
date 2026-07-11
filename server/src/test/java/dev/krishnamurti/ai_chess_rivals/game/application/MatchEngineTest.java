@@ -287,6 +287,7 @@ class MatchEngineTest {
         assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
 
     assertEquals("Failed to publish match start event", error.getMessage());
+    assertThrows(IllegalStateException.class, matchEngine::currentMatch);
   }
 
   @Test
@@ -303,6 +304,26 @@ class MatchEngineTest {
         assertThrows(MatchEngineException.class, matchEngine::playUntilFinished);
 
     assertEquals("Match execution failed while processing ply 1", error.getMessage());
+    assertEquals(0, matchEngine.currentMatch().moveCount());
+    assertTrue(matchEngine.currentMatch().isInProgress());
+  }
+
+  @Test
+  void playUntilFinishedLeavesMatchUnfinishedWhenMatchFinishedSinkFails() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    MatchEngine matchEngine =
+        new MatchEngine(
+            chessPlayer, new ChessBoardService(), new GameProperties(250, 1), eventSink);
+    matchEngine.startNewMatch();
+    eventSink.failOnPublishNumber = 3;
+
+    IllegalStateException error =
+        assertThrows(IllegalStateException.class, matchEngine::playUntilFinished);
+
+    assertEquals("sink failed", error.getMessage());
+    assertEquals(1, matchEngine.currentMatch().moveCount());
+    assertTrue(matchEngine.currentMatch().isInProgress());
   }
 
   private static final class FakeChessPlayer implements ChessPlayer {
@@ -347,9 +368,13 @@ class MatchEngineTest {
 
     private final List<MatchEvent> events = new ArrayList<>();
     private RuntimeException failure;
+    private Integer failOnPublishNumber;
 
     @Override
     public void publish(MatchEvent event) {
+      if (failOnPublishNumber != null && events.size() + 1 == failOnPublishNumber) {
+        throw new IllegalStateException("sink failed");
+      }
       if (failure != null) {
         throw failure;
       }

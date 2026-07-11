@@ -56,12 +56,12 @@ public final class MatchEngine {
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to initialize a new match", e);
     }
-    currentMatch.set(match);
     try {
       matchEventSink.publish(new MatchStarted(match.sideToMove(), match.currentPosition()));
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to publish match start event", e);
     }
+    currentMatch.set(match);
     return match;
   }
 
@@ -85,9 +85,8 @@ public final class MatchEngine {
         PlayerColor player = match.sideToMove();
         AppliedMove appliedMove =
             chessBoardService.applyMove(match.currentPosition(), moveNotation);
-        match = match.recordMove(moveNotation, appliedMove.position());
-        currentMatch.set(match);
-        Move recordedMove = match.moves().getLast();
+        Match nextMatch = match.recordMove(moveNotation, appliedMove.position());
+        Move recordedMove = nextMatch.moves().getLast();
         matchEventSink.publish(
             new MovePlayed(
                 recordedMove.sequenceNumber(),
@@ -98,6 +97,8 @@ public final class MatchEngine {
                 appliedMove.check(),
                 appliedMove.checkmate(),
                 appliedMove.promotion()));
+        match = nextMatch;
+        currentMatch.set(match);
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         GameResult result =
@@ -130,9 +131,9 @@ public final class MatchEngine {
 
   private Match finishMatch(Match match, GameResult result) {
     Match finishedMatch = match.finish(result);
-    currentMatch.set(finishedMatch);
     matchEventSink.publish(
         new MatchFinished(result, finishedMatch.currentPosition(), finishedMatch.moveCount()));
+    currentMatch.set(finishedMatch);
     return finishedMatch;
   }
 
