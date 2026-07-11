@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
-public final class MatchWebSocketHandler extends TextWebSocketHandler {
+final class MatchWebSocketHandler extends TextWebSocketHandler {
 
   @FunctionalInterface
   private interface MessageWriter {
@@ -31,6 +31,7 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
   private final MessageWriter messageWriter;
   private final ObjectProvider<MatchControlService> matchControlServiceProvider;
   private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+  private final Object sessionLifecycleMonitor = new Object();
 
   public MatchWebSocketHandler(
       ObjectMapper objectMapper, ObjectProvider<MatchControlService> matchControlServiceProvider) {
@@ -43,8 +44,12 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
     WebSocketSession concurrentSession =
         new ConcurrentWebSocketSessionDecorator(
             session, SEND_TIME_LIMIT_MILLIS, BUFFER_SIZE_LIMIT_BYTES);
-    sessions.put(session.getId(), concurrentSession);
-    sendInitialMessage(concurrentSession);
+    synchronized (sessionLifecycleMonitor) {
+      sendInitialMessage(concurrentSession);
+      if (concurrentSession.isOpen()) {
+        sessions.put(session.getId(), concurrentSession);
+      }
+    }
   }
 
   @Override
@@ -54,20 +59,22 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
   }
 
   public void broadcast(MatchStreamMessage<?> message) {
-    if (sessions.isEmpty()) {
-      return;
-    }
+    synchronized (sessionLifecycleMonitor) {
+      if (sessions.isEmpty()) {
+        return;
+      }
 
-    String payload;
-    try {
-      payload = messageWriter.write(message);
-    } catch (JacksonException e) {
-      log.error("Failed to serialize websocket message {}", message.type(), e);
-      return;
-    }
+      String payload;
+      try {
+        payload = messageWriter.write(message);
+      } catch (JacksonException e) {
+        log.error("Failed to serialize websocket message {}", message.type(), e);
+        return;
+      }
 
-    for (Map.Entry<String, WebSocketSession> entry : sessions.entrySet()) {
-      sendSafely(entry.getKey(), entry.getValue(), payload);
+      for (Map.Entry<String, WebSocketSession> entry : sessions.entrySet()) {
+        sendSafely(entry.getKey(), entry.getValue(), payload);
+      }
     }
   }
 

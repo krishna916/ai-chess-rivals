@@ -14,6 +14,10 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -98,6 +102,35 @@ class MatchWebSocketHandlerTest {
         new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage()));
 
     assertEquals(1, session.getSentMessages().size());
+  }
+
+  @Test
+  void broadcastWaitsForInitialMessageBeforeRegisteringSession() throws Exception {
+    when(matchControlService.currentMatch()).thenThrow(new MatchNotFoundException("No match"));
+    BlockingInitialMessageSession session = new BlockingInitialMessageSession("blocked");
+
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      Future<?> connectFuture = executor.submit(() -> handler.afterConnectionEstablished(session));
+      assertTrue(session.awaitInitialSendStarted());
+
+      Future<?> broadcastFuture =
+          executor.submit(
+              () ->
+                  handler.broadcast(
+                      new MatchStreamMessage<>(
+                          MatchStreamMessageType.NO_MATCH, new NoMatchMessage())));
+
+      assertFalse(broadcastFuture.isDone());
+      assertEquals(0, session.getBroadcastMessageCount());
+
+      session.releaseInitialSend();
+
+      connectFuture.get(5, TimeUnit.SECONDS);
+      broadcastFuture.get(5, TimeUnit.SECONDS);
+    }
+
+    assertEquals(2, session.getSentMessages().size());
+    assertEquals(1, session.getBroadcastMessageCount());
   }
 
   private static class StubWebSocketSession implements WebSocketSession {
@@ -211,6 +244,44 @@ class MatchWebSocketHandlerTest {
     @Override
     public void sendMessage(WebSocketMessage<?> message) throws IOException {
       throw new IOException("boom");
+    }
+  }
+
+  private static final class BlockingInitialMessageSession extends StubWebSocketSession {
+
+    private final CountDownLatch initialSendStarted = new CountDownLatch(1);
+    private final CountDownLatch allowInitialSendToFinish = new CountDownLatch(1);
+    private int sendCount;
+
+    private BlockingInitialMessageSession(String id) {
+      super(id);
+    }
+
+    @Override
+    public synchronized void sendMessage(WebSocketMessage<?> message) throws IOException {
+      sendCount++;
+      if (sendCount == 1) {
+        initialSendStarted.countDown();
+        try {
+          assertTrue(allowInitialSendToFinish.await(5, TimeUnit.SECONDS));
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted while waiting to finish initial send", e);
+        }
+      }
+      super.sendMessage(message);
+    }
+
+    boolean awaitInitialSendStarted() throws InterruptedException {
+      return initialSendStarted.await(5, TimeUnit.SECONDS);
+    }
+
+    void releaseInitialSend() {
+      allowInitialSendToFinish.countDown();
+    }
+
+    int getBroadcastMessageCount() {
+      return Math.max(0, getSentMessages().size() - 1);
     }
   }
 }
