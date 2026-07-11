@@ -1,11 +1,9 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
-import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -13,27 +11,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.stereotype.Service;
 
-/** Runs a single synchronous Stockfish-vs-Stockfish match from start to finish. */
+/** Runs a single synchronous match from start to finish. */
 @Service
 public final class MatchEngine {
 
-  private final StockfishClient stockfishClient;
+  private final ChessPlayer chessPlayer;
   private final ChessBoardService chessBoardService;
-  private final Duration thinkTime;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
 
   public MatchEngine(
-      StockfishClient stockfishClient,
-      ChessBoardService chessBoardService,
-      GameProperties gameProperties) {
-    this.stockfishClient =
-        Objects.requireNonNull(stockfishClient, "stockfishClient must not be null");
+      ChessPlayer chessPlayer, ChessBoardService chessBoardService, GameProperties gameProperties) {
+    this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
     Objects.requireNonNull(gameProperties, "gameProperties must not be null");
-    this.thinkTime = Duration.ofMillis(gameProperties.moveThinkTimeMillis());
     this.maxPlies = gameProperties.maxPlies();
   }
 
@@ -47,9 +40,9 @@ public final class MatchEngine {
     stopRequested.set(false);
     Match match = Match.newGame();
     try {
-      stockfishClient.newGame();
+      chessPlayer.startNewGame();
     } catch (RuntimeException e) {
-      throw new MatchEngineException("Failed to initialize a new Stockfish match", e);
+      throw new MatchEngineException("Failed to initialize a new match", e);
     }
     currentMatch.set(match);
     return match;
@@ -70,8 +63,7 @@ public final class MatchEngine {
       }
 
       try {
-        stockfishClient.setPosition(match.currentPosition().fen());
-        MoveNotation moveNotation = new MoveNotation(stockfishClient.bestMove(thinkTime));
+        MoveNotation moveNotation = chessPlayer.chooseMove(match);
         match =
             match.recordMove(
                 moveNotation, chessBoardService.applyMove(match.currentPosition(), moveNotation));
@@ -125,6 +117,7 @@ public final class MatchEngine {
   private int recordPositionOccurrence(
       Map<String, Integer> positionOccurrences,
       dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition position) {
-    return positionOccurrences.merge(chessBoardService.normalizedPositionKey(position), 1, Integer::sum);
+    return positionOccurrences.merge(
+        chessBoardService.normalizedPositionKey(position), 1, Integer::sum);
   }
 }
