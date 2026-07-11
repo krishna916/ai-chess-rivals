@@ -1,6 +1,8 @@
 package dev.krishnamurti.ai_chess_rivals.game.web;
 
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,17 +19,20 @@ public class MatchController {
   }
 
   @PostMapping("/start")
-  public String startMatch() {
-    return "start";
+  public ResponseEntity<MatchResponse> startMatch() {
+    MatchSnapshot snapshot = matchControlService.startMatch();
+    return ResponseEntity.accepted().body(MatchResponseMapper.map(snapshot));
   }
 
   @PostMapping("/stop")
-  public String stopMatch() {
-    return "stop";
+  public ResponseEntity<MatchResponse> stopMatch() {
+    MatchSnapshot snapshot = matchControlService.stopMatch();
+    return ResponseEntity.accepted().body(MatchResponseMapper.map(snapshot));
   }
 
   @GetMapping
-  public String currentMatch() {
-    return "current";
+  public ResponseEntity<MatchResponse> currentMatch() {
+    MatchSnapshot snapshot = matchControlService.currentMatch();
+    return ResponseEntity.ok(MatchResponseMapper.map(snapshot));
   }
 }
