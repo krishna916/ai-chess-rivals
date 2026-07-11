@@ -29,8 +29,7 @@ class MatchResponseMapperTest {
         Match.newGame()
             .recordMove(
                 new MoveNotation("e2e4"),
-                new BoardPosition(
-                    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"));
+                new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"));
     MatchSnapshot snapshot = new MatchSnapshot(match, false);
 
     MatchResponse response = MatchResponseMapper.map(snapshot);

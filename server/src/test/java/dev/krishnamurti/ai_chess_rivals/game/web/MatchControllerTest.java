@@ -109,8 +109,7 @@ class MatchControllerTest {
   void unexpectedEngineFailureReturns500ProblemDetail() throws Exception {
     when(matchControlService.startMatch())
         .thenThrow(
-            new MatchEngineException(
-                "Failed to initialize a new match", new RuntimeException()));
+            new MatchEngineException("Failed to initialize a new match", new RuntimeException()));
 
     mockMvc
         .perform(post("/api/v1/match/start"))

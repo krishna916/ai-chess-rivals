@@ -97,8 +97,11 @@ class MatchControlServiceTest {
     service.startMatch();
 
     MatchSnapshot snapshot = service.stopMatch();
+    MatchSnapshot restartedSnapshot = assertDoesNotThrow(() -> service.startMatch());
 
     assertFalse(snapshot.running());
+    assertTrue(restartedSnapshot.running());
+    assertEquals(match, restartedSnapshot.match());
     verify(matchEngine).stopCurrentMatch();
   }
 
@@ -140,5 +143,23 @@ class MatchControlServiceTest {
     // Service should reset running flag despite exception
     MatchSnapshot snapshot = service.currentMatch();
     assertFalse(snapshot.running());
+  }
+
+  @Test
+  void staleBackgroundTaskDoesNotClearRunningStateForRestartedMatch() {
+    when(matchEngine.currentMatch()).thenReturn(match);
+
+    service.startMatch();
+    service.stopMatch();
+    service.startMatch();
+
+    ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+    verify(executorService, times(2)).submit(runnableCaptor.capture());
+
+    Runnable firstTask = runnableCaptor.getAllValues().getFirst();
+    firstTask.run();
+
+    MatchSnapshot snapshot = service.currentMatch();
+    assertTrue(snapshot.running());
   }
 }

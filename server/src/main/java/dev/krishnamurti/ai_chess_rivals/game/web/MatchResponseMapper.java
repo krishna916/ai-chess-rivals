@@ -11,8 +11,7 @@ public final class MatchResponseMapper {
 
   public static MatchResponse map(MatchSnapshot snapshot) {
     Match match = snapshot.match();
-    List<MoveResponse> moves =
-        match.moves().stream().map(MatchResponseMapper::mapMove).toList();
+    List<MoveResponse> moves = match.moves().stream().map(MatchResponseMapper::mapMove).toList();
 
     return new MatchResponse(
         match.sideToMove(),
