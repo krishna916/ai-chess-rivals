@@ -10,5 +10,12 @@ describe("matchViewer.messages", () => {
   it("should return null for invalid messages", () => {
     expect(parseMatchMessage(null)).toBeNull();
     expect(parseMatchMessage({ type: "UNKNOWN" })).toBeNull();
+    expect(parseMatchMessage({ type: "MATCH_STARTED", payload: {} })).toBeNull();
+    expect(
+      parseMatchMessage({
+        type: "MOVE_PLAYED",
+        payload: { fen: 42 },
+      }),
+    ).toBeNull();
   });
 });

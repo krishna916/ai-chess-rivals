@@ -24,4 +24,15 @@ describe("matchViewerStore", () => {
     expect(state.boardFen).toBe("newfen");
     expect(state.activeTurn).toBe("BLACK");
   });
+
+  it("should clear a stale error when connected", () => {
+    useMatchViewerStore.setState({ error: "Connection error occurred." });
+
+    useMatchViewerStore.getState().setConnectionStatus("CONNECTED");
+
+    expect(useMatchViewerStore.getState()).toMatchObject({
+      connectionStatus: "CONNECTED",
+      error: undefined,
+    });
+  });
 });

@@ -27,7 +27,11 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
   activeTurn: "WHITE",
   moveCount: 0,
 
-  setConnectionStatus: (status) => set({ connectionStatus: status }),
+  setConnectionStatus: (status) =>
+    set({
+      connectionStatus: status,
+      ...(status === "CONNECTED" ? { error: undefined } : {}),
+    }),
   setError: (error) => set({ error, connectionStatus: "ERROR" }),
 
   processMessage: (msg: MatchStreamMessage) => {
@@ -59,7 +63,6 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
         });
         break;
       case "MOVE_PLAYED":
-        console.log("MOVE_PLAYED received with fen:", msg.payload.fen);
         set({
           boardFen: msg.payload.fen,
           activeTurn: msg.payload.player === "WHITE" ? "BLACK" : "WHITE",

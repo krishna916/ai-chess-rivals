@@ -6,24 +6,19 @@ import { useMatchViewerStore } from "@/store/matchViewerStore";
 export function MatchControls() {
   const { matchStatus } = useMatchViewerStore();
   const [loading, setLoading] = useState(false);
+  const [requestError, setRequestError] = useState<string>();
 
-  const handleStart = async () => {
+  const handleMatchOperation = async (
+    operation: () => Promise<unknown>,
+    action: "start" | "stop",
+  ) => {
     try {
       setLoading(true);
-      await matchApi.startMatch();
+      setRequestError(undefined);
+      await operation();
     } catch (error) {
-      console.error("Failed to start match:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStop = async () => {
-    try {
-      setLoading(true);
-      await matchApi.stopMatch();
-    } catch (error) {
-      console.error("Failed to stop match:", error);
+      console.error(`Failed to ${action} match:`, error);
+      setRequestError(`Unable to ${action} the match. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -32,9 +27,9 @@ export function MatchControls() {
   const isRunning = matchStatus === "IN_PROGRESS";
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" aria-live="polite">
       <Button
-        onClick={handleStart}
+        onClick={() => handleMatchOperation(matchApi.startMatch, "start")}
         disabled={loading || isRunning}
         variant={isRunning ? "secondary" : "default"}
         size="sm"
@@ -42,13 +37,18 @@ export function MatchControls() {
         Start Match
       </Button>
       <Button
-        onClick={handleStop}
+        onClick={() => handleMatchOperation(matchApi.stopMatch, "stop")}
         disabled={loading || !isRunning}
         variant="destructive"
         size="sm"
       >
         Stop Match
       </Button>
+      {requestError && (
+        <p className="text-sm text-destructive" role="alert">
+          {requestError}
+        </p>
+      )}
     </div>
   );
 }

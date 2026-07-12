@@ -10,12 +10,13 @@ export function MatchBoard() {
   return (
     <div className="w-full aspect-square max-w-[600px] mx-auto">
       <Chessboard
-        key={fen}
-        position={fen}
-        arePiecesDraggable={false}
-        animationDuration={0}
-        customDarkSquareStyle={darkSquareStyle}
-        customLightSquareStyle={lightSquareStyle}
+        options={{
+          position: fen,
+          allowDragging: false,
+          showAnimations: false,
+          darkSquareStyle,
+          lightSquareStyle,
+        }}
       />
     </div>
   );
