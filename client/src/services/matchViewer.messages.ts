@@ -29,7 +29,8 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
     case "MATCH_STARTED":
       if (
         !hasFen(msg.payload) ||
-        (msg.payload.sideToMove !== "WHITE" && msg.payload.sideToMove !== "BLACK")
+        (msg.payload.sideToMove !== "WHITE" &&
+          msg.payload.sideToMove !== "BLACK")
       ) {
         return null;
       }
@@ -37,7 +38,8 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
     case "MATCH_STATE":
       if (
         !hasFen(msg.payload) ||
-        (msg.payload.sideToMove !== "WHITE" && msg.payload.sideToMove !== "BLACK") ||
+        (msg.payload.sideToMove !== "WHITE" &&
+          msg.payload.sideToMove !== "BLACK") ||
         !Array.isArray(msg.payload.moves) ||
         typeof msg.payload.status !== "string"
       ) {
