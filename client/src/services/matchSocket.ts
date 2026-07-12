@@ -12,7 +12,10 @@ export interface MatchSocketCallbacks {
   onError?(error: Event | Error): void;
 }
 
-export function createMatchSocket(baseHttpUrl: string, callbacks: MatchSocketCallbacks) {
+export function createMatchSocket(
+  baseHttpUrl: string,
+  callbacks: MatchSocketCallbacks,
+) {
   const socketUrl = new URL("/ws/match", baseHttpUrl);
   socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
 
@@ -20,7 +23,10 @@ export function createMatchSocket(baseHttpUrl: string, callbacks: MatchSocketCal
 
   return {
     connect() {
-      if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
+      if (
+        socket?.readyState === WebSocket.OPEN ||
+        socket?.readyState === WebSocket.CONNECTING
+      ) {
         return;
       }
       if (socket != null) {
@@ -34,7 +40,9 @@ export function createMatchSocket(baseHttpUrl: string, callbacks: MatchSocketCal
         try {
           callbacks.onMessage?.(JSON.parse(event.data) as unknown);
         } catch (error) {
-          callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
+          callbacks.onError?.(
+            error instanceof Error ? error : new Error(String(error)),
+          );
         }
       };
       socket.onclose = (event) => callbacks.onClose?.(event);
