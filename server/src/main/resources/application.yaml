@@ -1,6 +1,11 @@
+server:
+  port: ${SERVER_PORT:8082}
+
 spring:
   application:
     name: ai-chess-rivals
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/aichessrivals}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
