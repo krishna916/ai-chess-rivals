@@ -1,4 +1,5 @@
 import { useMatchViewerStore } from "@/store/matchViewerStore";
+import { cn } from "@/lib/utils";
 
 export function MatchStatusLabel() {
   const { matchStatus, result, moveCount } = useMatchViewerStore();
@@ -17,11 +18,10 @@ export function MatchStatusLabel() {
   return (
     <div className="flex gap-4 text-sm font-medium">
       <span
-        className={
-          matchStatus === "STOPPED"
-            ? "text-amber-600 uppercase tracking-wider"
-            : "text-green-600 uppercase tracking-wider"
-        }
+        className={cn(
+          "uppercase tracking-wider",
+          matchStatus === "STOPPED" ? "text-amber-600" : "text-green-600",
+        )}
       >
         {matchStatus === "STOPPED" ? "Stopped" : "Live"}
       </span>
