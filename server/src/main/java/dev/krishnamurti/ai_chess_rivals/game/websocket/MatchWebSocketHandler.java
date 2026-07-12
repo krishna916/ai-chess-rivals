@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
-final class MatchWebSocketHandler extends TextWebSocketHandler {
+public final class MatchWebSocketHandler extends TextWebSocketHandler {
 
   @FunctionalInterface
   private interface MessageWriter {

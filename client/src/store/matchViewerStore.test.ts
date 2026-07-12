@@ -17,7 +17,7 @@ describe("matchViewerStore", () => {
   it("should process MATCH_STARTED message", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STARTED",
-      state: { fen: "newfen", turn: "BLACK", moveCount: 1 }
+      payload: { fen: "newfen", sideToMove: "BLACK" },
     });
     const state = useMatchViewerStore.getState();
     expect(state.matchStatus).toBe("IN_PROGRESS");

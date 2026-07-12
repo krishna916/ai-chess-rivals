@@ -43,33 +43,34 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
       case "MATCH_STARTED":
         set({
           matchStatus: "IN_PROGRESS",
-          boardFen: msg.state.fen,
-          activeTurn: msg.state.turn,
-          moveCount: msg.state.moveCount,
+          boardFen: msg.payload.fen,
+          activeTurn: msg.payload.sideToMove,
+          moveCount: 0,
           result: undefined,
         });
         break;
       case "MATCH_STATE":
-        set((state) => ({
-          matchStatus: msg.status,
-          boardFen: msg.state?.fen ?? state.boardFen,
-          activeTurn: msg.state?.turn ?? state.activeTurn,
-          moveCount: msg.state?.moveCount ?? state.moveCount,
-          result: msg.state?.result,
-        }));
+        set({
+          matchStatus: msg.payload.status === "NOT_STARTED" ? "IDLE" : msg.payload.status,
+          boardFen: msg.payload.fen,
+          activeTurn: msg.payload.sideToMove,
+          moveCount: msg.payload.moves ? msg.payload.moves.length : 0,
+          result: msg.payload.result || undefined,
+        });
         break;
       case "MOVE_PLAYED":
+        console.log("MOVE_PLAYED received with fen:", msg.payload.fen);
         set({
-          boardFen: msg.state.fen,
-          activeTurn: msg.state.turn,
-          moveCount: msg.state.moveCount,
+          boardFen: msg.payload.fen,
+          activeTurn: msg.payload.player === "WHITE" ? "BLACK" : "WHITE",
+          moveCount: msg.payload.ply,
         });
         break;
       case "MATCH_FINISHED":
         set({
           matchStatus: "FINISHED",
-          boardFen: msg.state.fen,
-          result: msg.state.result,
+          boardFen: msg.payload.fen,
+          result: msg.payload.result,
         });
         break;
     }

@@ -6,7 +6,7 @@ describe("matchViewer.messages", () => {
     const msg = { type: "NO_MATCH" };
     expect(parseMatchMessage(msg)).toEqual(msg);
   });
-  
+
   it("should return null for invalid messages", () => {
     expect(parseMatchMessage(null)).toBeNull();
     expect(parseMatchMessage({ type: "UNKNOWN" })).toBeNull();

@@ -1,45 +1,69 @@
-export type MatchStatus = "IDLE" | "IN_PROGRESS" | "FINISHED";
-export type ConnectionStatus = "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ERROR";
+export type MatchStatus = "IDLE" | "NOT_STARTED" | "IN_PROGRESS" | "FINISHED";
+export type ConnectionStatus =
+  "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ERROR";
 
-export interface MatchStateData {
-  fen: string;
-  turn: "WHITE" | "BLACK";
-  moveCount: number;
-  result?: string;
-}
-
-// Map the messages coming from WebSocket
 export interface BaseMessage {
   type: string;
 }
 
+export interface MoveResponse {
+  sequenceNumber: number;
+  playedBy: "WHITE" | "BLACK";
+  notation: string;
+  fen: string;
+}
+
+export interface MatchResponse {
+  sideToMove: "WHITE" | "BLACK";
+  fen: string;
+  moves: MoveResponse[];
+  status: MatchStatus;
+  result: string | null;
+  running: boolean;
+}
+
 export interface MatchStateMessage extends BaseMessage {
   type: "MATCH_STATE";
-  status: MatchStatus;
-  state?: MatchStateData;
+  payload: MatchResponse;
 }
 
 export interface MatchStartedMessage extends BaseMessage {
   type: "MATCH_STARTED";
-  state: MatchStateData;
+  payload: {
+    sideToMove: "WHITE" | "BLACK";
+    fen: string;
+  };
 }
 
 export interface MovePlayedMessage extends BaseMessage {
   type: "MOVE_PLAYED";
-  state: MatchStateData;
-  move: string;
+  payload: {
+    ply: number;
+    player: "WHITE" | "BLACK";
+    notation: string;
+    fen: string;
+    capture: boolean;
+    check: boolean;
+    checkmate: boolean;
+    promotion: boolean;
+  };
 }
 
 export interface MatchFinishedMessage extends BaseMessage {
   type: "MATCH_FINISHED";
-  state: MatchStateData;
+  payload: {
+    result: string;
+    fen: string;
+    totalPlies: number;
+  };
 }
 
 export interface NoMatchMessage extends BaseMessage {
   type: "NO_MATCH";
+  payload: Record<string, never>;
 }
 
-export type MatchStreamMessage = 
+export type MatchStreamMessage =
   | MatchStateMessage
   | MatchStartedMessage
   | MovePlayedMessage

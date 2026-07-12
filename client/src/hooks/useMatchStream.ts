@@ -4,7 +4,8 @@ import { useMatchViewerStore } from "../store/matchViewerStore";
 import { parseMatchMessage } from "../services/matchViewer.messages";
 
 export function useMatchStream(baseUrl = "http://localhost:8082") {
-  const { setConnectionStatus, processMessage, setError } = useMatchViewerStore();
+  const { setConnectionStatus, processMessage, setError } =
+    useMatchViewerStore();
 
   useEffect(() => {
     let reconnectTimer: number;
@@ -32,7 +33,7 @@ export function useMatchStream(baseUrl = "http://localhost:8082") {
       onError: () => {
         if (!isActive) return;
         setError("Connection error occurred.");
-      }
+      },
     });
 
     socket.connect();
