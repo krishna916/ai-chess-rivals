@@ -4,10 +4,12 @@ import { MatchActivityItem } from "./MatchActivityItem";
 
 export function MatchActivityPanel() {
   const activities = useMatchViewerStore((state) => state.activities);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "auto" });
+    if (activities.length > 0 && feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
   }, [activities.length]);
 
   return (
@@ -22,6 +24,7 @@ export function MatchActivityPanel() {
       </div>
 
       <div
+        ref={feedRef}
         className="flex-1 overflow-y-auto p-4 space-y-3"
         id="match-activity-feed"
       >
@@ -39,7 +42,6 @@ export function MatchActivityPanel() {
             {activities.map((activity) => (
               <MatchActivityItem key={activity.id} activity={activity} />
             ))}
-            <div ref={bottomRef} />
           </>
         )}
       </div>

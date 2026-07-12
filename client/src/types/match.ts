@@ -1,4 +1,5 @@
-export type MatchStatus = "IDLE" | "NOT_STARTED" | "IN_PROGRESS" | "FINISHED";
+export type MatchStatus =
+  "IDLE" | "NOT_STARTED" | "IN_PROGRESS" | "STOPPED" | "FINISHED";
 export type ConnectionStatus =
   "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ERROR";
 
@@ -8,9 +9,9 @@ export interface BaseMessage {
 
 export interface MoveResponse {
   sequenceNumber: number;
-  playedBy: "WHITE" | "BLACK";
+  player: "WHITE" | "BLACK";
   notation: string;
-  fen: string;
+  fenAfterMove: string;
 }
 
 export interface MatchResponse {

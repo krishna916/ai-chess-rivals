@@ -91,6 +91,8 @@ public final class MatchEngine {
             chessBoardService.applyMove(match.currentPosition(), moveNotation);
         Match nextMatch = match.recordMove(moveNotation, appliedMove.position());
         Move recordedMove = nextMatch.moves().getLast();
+        match = nextMatch;
+        currentMatch.set(match);
         matchEventSink.publish(
             new MovePlayed(
                 recordedMove.sequenceNumber(),
@@ -101,8 +103,6 @@ public final class MatchEngine {
                 appliedMove.check(),
                 appliedMove.checkmate(),
                 appliedMove.promotion()));
-        match = nextMatch;
-        currentMatch.set(match);
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         result =
