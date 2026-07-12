@@ -16,6 +16,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -24,12 +25,19 @@ import org.junit.jupiter.api.Test;
 
 class MatchEngineTest {
 
+  private static GameProperties gameProperties(int moveThinkTimeMillis, int maxPlies) {
+    return new GameProperties(
+        moveThinkTimeMillis,
+        maxPlies,
+        new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
+  }
+
   @Test
   void startNewMatchInitializesFreshState() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
 
     Match match = matchEngine.startNewMatch();
 
@@ -44,7 +52,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 2), event -> {});
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -72,7 +80,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match match = matchEngine.playUntilFinished();
@@ -88,7 +96,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 2), event -> {});
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match stoppedMatch = matchEngine.playUntilFinished();
@@ -108,7 +116,7 @@ class MatchEngineTest {
         new FakeChessPlayer("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 20), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 20), event -> {});
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -122,7 +130,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
     matchEngine.startNewMatch();
 
     IllegalStateException error =
@@ -136,7 +144,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), event -> {});
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
 
     IllegalStateException error =
         assertThrows(IllegalStateException.class, matchEngine::currentMatch);
@@ -150,7 +158,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
 
     Match match = matchEngine.startNewMatch();
 
@@ -167,7 +175,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
 
     assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
 
@@ -180,7 +188,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 1), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 1), eventSink);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -201,7 +209,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 2), eventSink);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -220,7 +228,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 2), eventSink);
 
     matchEngine.playUntilFinished();
 
@@ -234,7 +242,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -248,7 +256,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 2), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 2), eventSink);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -264,7 +272,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 10), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 10), eventSink);
 
     matchEngine.playUntilFinished();
 
@@ -281,7 +289,7 @@ class MatchEngineTest {
     eventSink.failure = new IllegalStateException("sink failed");
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 300), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
 
     MatchEngineException error =
         assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
@@ -296,7 +304,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 10), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 10), eventSink);
     matchEngine.startNewMatch();
     eventSink.failure = new IllegalStateException("sink failed");
 
@@ -314,7 +322,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine =
         new MatchEngine(
-            chessPlayer, new ChessBoardService(), new GameProperties(250, 1), eventSink);
+            chessPlayer, new ChessBoardService(), gameProperties(250, 1), eventSink);
     matchEngine.startNewMatch();
     eventSink.failOnPublishNumber = 3;
 
