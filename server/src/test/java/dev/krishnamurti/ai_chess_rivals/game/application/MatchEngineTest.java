@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test;
 
 class MatchEngineTest {
 
+  private static final MatchPacing NO_OP_PACING = () -> {};
+
   private static GameProperties gameProperties(int moveThinkTimeMillis, int maxPlies) {
     return new GameProperties(
         moveThinkTimeMillis,
@@ -32,12 +34,37 @@ class MatchEngineTest {
         new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
   }
 
+  private static MatchEngine matchEngine(
+      FakeChessPlayer chessPlayer, int moveThinkTimeMillis, int maxPlies) {
+    return matchEngine(chessPlayer, moveThinkTimeMillis, maxPlies, NO_OP_PACING, event -> {});
+  }
+
+  private static MatchEngine matchEngine(
+      FakeChessPlayer chessPlayer,
+      int moveThinkTimeMillis,
+      int maxPlies,
+      MatchEventSink eventSink) {
+    return matchEngine(chessPlayer, moveThinkTimeMillis, maxPlies, NO_OP_PACING, eventSink);
+  }
+
+  private static MatchEngine matchEngine(
+      FakeChessPlayer chessPlayer,
+      int moveThinkTimeMillis,
+      int maxPlies,
+      MatchPacing matchPacing,
+      MatchEventSink eventSink) {
+    return new MatchEngine(
+        chessPlayer,
+        new ChessBoardService(),
+        gameProperties(moveThinkTimeMillis, maxPlies),
+        matchPacing,
+        eventSink);
+  }
+
   @Test
   void startNewMatchInitializesFreshState() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
 
     Match match = matchEngine.startNewMatch();
 
@@ -50,9 +77,7 @@ class MatchEngineTest {
   @Test
   void playUntilFinishedRecordsMovesAndStopsAtMaxPliesFallback() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 2), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -78,9 +103,7 @@ class MatchEngineTest {
   @Test
   void playUntilFinishedStopsAfterCurrentIterationWhenStopIsRequested() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match match = matchEngine.playUntilFinished();
@@ -94,9 +117,7 @@ class MatchEngineTest {
   @Test
   void playUntilFinishedResumesStoppedMatch() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 2), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match stoppedMatch = matchEngine.playUntilFinished();
@@ -114,9 +135,7 @@ class MatchEngineTest {
   void playUntilFinishedReturnsDrawOnThreefoldRepetition() {
     FakeChessPlayer chessPlayer =
         new FakeChessPlayer("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 20), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 20);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -128,9 +147,7 @@ class MatchEngineTest {
   @Test
   void startNewMatchRejectsReplacingActiveMatch() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
     matchEngine.startNewMatch();
 
     IllegalStateException error =
@@ -142,9 +159,7 @@ class MatchEngineTest {
   @Test
   void currentMatchRejectsWhenNoMatchExists() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), event -> {});
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
 
     IllegalStateException error =
         assertThrows(IllegalStateException.class, matchEngine::currentMatch);
@@ -156,9 +171,7 @@ class MatchEngineTest {
   void startNewMatchEmitsMatchStartedAfterSuccessfulInitialization() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
 
     Match match = matchEngine.startNewMatch();
 
@@ -173,9 +186,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     chessPlayer.startNewGameFailure = new IllegalStateException("boom");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
 
     assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
 
@@ -186,9 +197,7 @@ class MatchEngineTest {
   void playUntilFinishedEmitsMovePlayedWithMovingSideAndPostMovePosition() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 1), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 1, eventSink);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -207,9 +216,7 @@ class MatchEngineTest {
   void playUntilFinishedEmitsOrderedLifecycleEvents() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 2), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2, eventSink);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -226,9 +233,7 @@ class MatchEngineTest {
   void completedMatchEmitsExactlyOneMatchFinished() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 2), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2, eventSink);
 
     matchEngine.playUntilFinished();
 
@@ -240,9 +245,7 @@ class MatchEngineTest {
   void stopCurrentMatchEmitsNoMatchFinished() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -254,9 +257,7 @@ class MatchEngineTest {
   void resumingStoppedMatchDoesNotEmitAnotherMatchStarted() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 2), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2, eventSink);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -270,9 +271,7 @@ class MatchEngineTest {
   void finalMovePlayedCarriesCheckmateMetadataBeforeMatchFinished() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("f2f3", "e7e5", "g2g4", "d8h4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 10), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, eventSink);
 
     matchEngine.playUntilFinished();
 
@@ -287,9 +286,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     eventSink.failure = new IllegalStateException("sink failed");
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 300), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
 
     MatchEngineException error =
         assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
@@ -302,9 +299,7 @@ class MatchEngineTest {
   void playUntilFinishedWrapsMoveSinkFailureWithPlyContext() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 10), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, eventSink);
     matchEngine.startNewMatch();
     eventSink.failure = new IllegalStateException("sink failed");
 
@@ -320,9 +315,7 @@ class MatchEngineTest {
   void playUntilFinishedLeavesMatchUnfinishedWhenMatchFinishedSinkFails() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
-    MatchEngine matchEngine =
-        new MatchEngine(
-            chessPlayer, new ChessBoardService(), gameProperties(250, 1), eventSink);
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 1, eventSink);
     matchEngine.startNewMatch();
     eventSink.failOnPublishNumber = 3;
 
@@ -334,6 +327,66 @@ class MatchEngineTest {
     assertTrue(matchEngine.currentMatch().isInProgress());
   }
 
+  @Test
+  void waitsAfterPublishingANonTerminalMoveBeforeRequestingTheNextMove() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    List<String> order = new ArrayList<>();
+    chessPlayer.operationOrder = order;
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    eventSink.operationOrder = order;
+    RecordingMatchPacing pacing = new RecordingMatchPacing();
+    pacing.operationOrder = order;
+    MatchEngine[] matchEngine = new MatchEngine[1];
+    pacing.onWait = () -> matchEngine[0].stopCurrentMatch();
+    matchEngine[0] = matchEngine(chessPlayer, 250, 2, pacing, eventSink);
+
+    Match stoppedMatch = matchEngine[0].playUntilFinished();
+
+    assertTrue(stoppedMatch.isInProgress());
+    assertEquals(List.of("choose", "move", "pacing"), order);
+    assertEquals(1, chessPlayer.chooseMoveMatches.size());
+  }
+
+  @Test
+  void doesNotPaceAfterATerminalMove() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("f2f3", "e7e5", "g2g4", "d8h4");
+    List<String> order = new ArrayList<>();
+    chessPlayer.operationOrder = order;
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    eventSink.operationOrder = order;
+    RecordingMatchPacing pacing = new RecordingMatchPacing();
+    pacing.operationOrder = order;
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, pacing, eventSink);
+
+    matchEngine.playUntilFinished();
+
+    assertEquals(List.of("choose", "move", "finished"), order.subList(order.size() - 3, order.size()));
+    assertEquals(3, pacing.calls);
+  }
+
+  @Test
+  void playUntilFinishedWrapsUnexpectedPacingInterruptionAndPreservesTheInterruptFlag() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchPacing pacing = new RecordingMatchPacing();
+    pacing.failure = new InterruptedException("boom");
+    MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, pacing, event -> {});
+
+    try {
+      MatchEngineException error =
+          assertThrows(MatchEngineException.class, matchEngine::playUntilFinished);
+
+      assertEquals(
+          "Match execution was interrupted unexpectedly while processing ply 1",
+          error.getMessage());
+      assertTrue(error.getCause() instanceof InterruptedException);
+      assertTrue(Thread.currentThread().isInterrupted());
+      assertEquals(1, matchEngine.currentMatch().moveCount());
+      assertTrue(matchEngine.currentMatch().isInProgress());
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
   private static final class FakeChessPlayer implements ChessPlayer {
 
     private final Deque<MoveNotation> moves = new ArrayDeque<>();
@@ -341,6 +394,7 @@ class MatchEngineTest {
     private int startNewGameCalls;
     private RuntimeException startNewGameFailure;
     private Runnable onChooseMove;
+    private List<String> operationOrder;
 
     private FakeChessPlayer(String... moves) {
       for (String move : moves) {
@@ -359,6 +413,9 @@ class MatchEngineTest {
     @Override
     public MoveNotation chooseMove(Match match) {
       chooseMoveMatches.add(match);
+      if (operationOrder != null) {
+        operationOrder.add("choose");
+      }
       if (onChooseMove != null) {
         Runnable callback = onChooseMove;
         onChooseMove = null;
@@ -377,6 +434,7 @@ class MatchEngineTest {
     private final List<MatchEvent> events = new ArrayList<>();
     private RuntimeException failure;
     private Integer failOnPublishNumber;
+    private List<String> operationOrder;
 
     @Override
     public void publish(MatchEvent event) {
@@ -386,7 +444,36 @@ class MatchEngineTest {
       if (failure != null) {
         throw failure;
       }
+      if (operationOrder != null) {
+        if (event instanceof MovePlayed) {
+          operationOrder.add("move");
+        } else if (event instanceof MatchFinished) {
+          operationOrder.add("finished");
+        }
+      }
       events.add(event);
+    }
+  }
+
+  private static final class RecordingMatchPacing implements MatchPacing {
+
+    private int calls;
+    private InterruptedException failure;
+    private Runnable onWait;
+    private List<String> operationOrder;
+
+    @Override
+    public void waitBeforeNextMove() throws InterruptedException {
+      calls++;
+      if (operationOrder != null) {
+        operationOrder.add("pacing");
+      }
+      if (onWait != null) {
+        onWait.run();
+      }
+      if (failure != null) {
+        throw failure;
+      }
     }
   }
 }

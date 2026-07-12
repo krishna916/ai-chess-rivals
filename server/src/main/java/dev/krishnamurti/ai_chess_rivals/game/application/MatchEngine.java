@@ -24,6 +24,7 @@ public final class MatchEngine {
 
   private final ChessPlayer chessPlayer;
   private final ChessBoardService chessBoardService;
+  private final MatchPacing matchPacing;
   private final MatchEventSink matchEventSink;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
@@ -33,11 +34,13 @@ public final class MatchEngine {
       @Qualifier("stockfishPlayer") ChessPlayer chessPlayer,
       ChessBoardService chessBoardService,
       GameProperties gameProperties,
+      MatchPacing matchPacing,
       MatchEventSink matchEventSink) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
     Objects.requireNonNull(gameProperties, "gameProperties must not be null");
+    this.matchPacing = Objects.requireNonNull(matchPacing, "matchPacing must not be null");
     this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
     this.maxPlies = gameProperties.maxPlies();
   }
@@ -80,6 +83,7 @@ public final class MatchEngine {
       }
 
       int ply = match.moveCount() + 1;
+      GameResult result;
       try {
         MoveNotation moveNotation = chessPlayer.chooseMove(match);
         PlayerColor player = match.sideToMove();
@@ -101,16 +105,19 @@ public final class MatchEngine {
         currentMatch.set(match);
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
-        GameResult result =
+        result =
             chessBoardService
                 .determineResult(
                     match.currentPosition(), match.sideToMove(), currentPositionOccurrences)
                 .orElse(null);
-        if (result != null) {
-          match = finishMatch(match, result);
-        }
       } catch (RuntimeException e) {
         throw new MatchEngineException("Match execution failed while processing ply " + ply, e);
+      }
+
+      if (result != null) {
+        match = finishMatch(match, result);
+      } else if (!stopRequested.get() && !waitBeforeNextMove(ply)) {
+        break;
       }
     }
 
@@ -127,6 +134,20 @@ public final class MatchEngine {
 
   public void stopCurrentMatch() {
     stopRequested.set(true);
+  }
+
+  private boolean waitBeforeNextMove(int ply) {
+    try {
+      matchPacing.waitBeforeNextMove();
+      return true;
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      if (!stopRequested.get()) {
+        throw new MatchEngineException(
+            "Match execution was interrupted unexpectedly while processing ply " + ply, exception);
+      }
+      return false;
+    }
   }
 
   private Match finishMatch(Match match, GameResult result) {
