@@ -69,3 +69,19 @@ export type MatchStreamMessage =
   | MovePlayedMessage
   | MatchFinishedMessage
   | NoMatchMessage;
+
+export type MatchActivityKind = "MATCH_STARTED" | "MOVE" | "MATCH_FINISHED";
+
+export interface MatchActivityItem {
+  id: string;
+  kind: MatchActivityKind;
+  sequence: number;
+  player?: "WHITE" | "BLACK";
+  notation?: string;
+  capture?: boolean;
+  check?: boolean;
+  checkmate?: boolean;
+  promotion?: boolean;
+  result?: string;
+}
+
