@@ -65,7 +65,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
         });
         break;
       case "MATCH_STATE": {
-        const status = msg.payload.status === "NOT_STARTED" ? "IDLE" : msg.payload.status;
+        const status =
+          msg.payload.status === "NOT_STARTED" ? "IDLE" : msg.payload.status;
         const activities: MatchActivityItem[] = [];
 
         if (status !== "IDLE") {
@@ -76,7 +77,9 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           });
 
           if (msg.payload.moves) {
-            const sortedMoves = [...msg.payload.moves].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+            const sortedMoves = [...msg.payload.moves].sort(
+              (a, b) => a.sequenceNumber - b.sequenceNumber,
+            );
             for (const move of sortedMoves) {
               activities.push({
                 id: `move-${move.sequenceNumber}`,
@@ -125,7 +128,9 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           };
 
           const filtered = state.activities.filter((act) => act.id !== moveId);
-          const updatedActivities = [...filtered, newMove].sort((a, b) => a.sequence - b.sequence);
+          const updatedActivities = [...filtered, newMove].sort(
+            (a, b) => a.sequence - b.sequence,
+          );
 
           return {
             boardFen: msg.payload.fen,
@@ -146,8 +151,12 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
             result: msg.payload.result,
           };
 
-          const filtered = state.activities.filter((act) => act.id !== finishedId);
-          const updatedActivities = [...filtered, finishedItem].sort((a, b) => a.sequence - b.sequence);
+          const filtered = state.activities.filter(
+            (act) => act.id !== finishedId,
+          );
+          const updatedActivities = [...filtered, finishedItem].sort(
+            (a, b) => a.sequence - b.sequence,
+          );
 
           return {
             matchStatus: "FINISHED",

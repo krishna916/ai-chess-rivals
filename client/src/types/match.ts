@@ -84,4 +84,3 @@ export interface MatchActivityItem {
   promotion?: boolean;
   result?: string;
 }
-

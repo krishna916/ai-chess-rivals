@@ -40,7 +40,9 @@ export function MatchActivityItem({ activity }: MatchActivityItemProps) {
             </span>
             <span
               className={`w-3 h-3 rounded-sm border ${
-                isWhite ? "bg-white border-neutral-300" : "bg-neutral-900 border-black"
+                isWhite
+                  ? "bg-white border-neutral-300"
+                  : "bg-neutral-900 border-black"
               }`}
               aria-label={activity.player}
             />

@@ -4,6 +4,7 @@ import { PlayerStrip } from "@/features/match-viewer/components/PlayerStrip";
 import { MatchStatusLabel } from "@/features/match-viewer/components/MatchStatusLabel";
 import { ConnectionBadge } from "@/features/match-viewer/components/ConnectionBadge";
 import { MatchControls } from "@/features/match-viewer/components/MatchControls";
+import { MatchActivityPanel } from "@/features/match-viewer/components/MatchActivityPanel";
 
 export function MatchViewerPage() {
   useMatchStream();
@@ -29,11 +30,9 @@ export function MatchViewerPage() {
           </div>
         </div>
 
-        {/* Placeholder for Activity Feed (Issue #13) */}
-        <div className="hidden lg:block">
-          <div className="bg-card shadow rounded-xl p-4 border h-full min-h-[400px] flex items-center justify-center text-neutral-400">
-            Activity Panel Placeholder (Issue #13)
-          </div>
+        {/* Activity Feed (Issue #13) */}
+        <div className="block">
+          <MatchActivityPanel />
         </div>
       </div>
     </div>

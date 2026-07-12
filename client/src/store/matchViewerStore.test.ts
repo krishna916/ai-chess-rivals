@@ -39,7 +39,7 @@ describe("matchViewerStore", () => {
 
   it("should process MATCH_STARTED message, clearing previous activities and creating a start item", () => {
     useMatchViewerStore.setState({
-      activities: [{ id: "stale-move", kind: "MOVE", sequence: 1 }]
+      activities: [{ id: "stale-move", kind: "MOVE", sequence: 1 }],
     });
 
     useMatchViewerStore.getState().processMessage({
@@ -49,7 +49,7 @@ describe("matchViewerStore", () => {
 
     const state = useMatchViewerStore.getState();
     expect(state.activities).toEqual([
-      { id: "match-started", kind: "MATCH_STARTED", sequence: 0 }
+      { id: "match-started", kind: "MATCH_STARTED", sequence: 0 },
     ]);
   });
 
@@ -72,9 +72,26 @@ describe("matchViewerStore", () => {
     const state = useMatchViewerStore.getState();
     expect(state.activities).toEqual([
       { id: "match-started", kind: "MATCH_STARTED", sequence: 0 },
-      { id: "move-1", kind: "MOVE", sequence: 1, player: "WHITE", notation: "e4" },
-      { id: "move-2", kind: "MOVE", sequence: 2, player: "BLACK", notation: "e5" },
-      { id: "match-finished", kind: "MATCH_FINISHED", sequence: 3, result: "WHITE_WINS" },
+      {
+        id: "move-1",
+        kind: "MOVE",
+        sequence: 1,
+        player: "WHITE",
+        notation: "e4",
+      },
+      {
+        id: "move-2",
+        kind: "MOVE",
+        sequence: 2,
+        player: "BLACK",
+        notation: "e5",
+      },
+      {
+        id: "match-finished",
+        kind: "MATCH_FINISHED",
+        sequence: 3,
+        result: "WHITE_WINS",
+      },
     ]);
   });
 
@@ -87,7 +104,14 @@ describe("matchViewerStore", () => {
         sideToMove: "WHITE" as const,
         result: null,
         running: true,
-        moves: [{ sequenceNumber: 1, playedBy: "WHITE" as const, notation: "e4", fen: "fen1" }],
+        moves: [
+          {
+            sequenceNumber: 1,
+            playedBy: "WHITE" as const,
+            notation: "e4",
+            fen: "fen1",
+          },
+        ],
       },
     };
 
@@ -146,7 +170,7 @@ describe("matchViewerStore", () => {
     useMatchViewerStore.getState().processMessage(moveMsg);
 
     const state = useMatchViewerStore.getState();
-    expect(state.activities.filter(a => a.id === "move-1")).toHaveLength(1);
+    expect(state.activities.filter((a) => a.id === "move-1")).toHaveLength(1);
   });
 
   it("should create exactly one final activity on MATCH_FINISHED", () => {
@@ -161,7 +185,9 @@ describe("matchViewerStore", () => {
     useMatchViewerStore.getState().processMessage(finishMsg);
 
     const state = useMatchViewerStore.getState();
-    expect(state.activities.filter(a => a.id === "match-finished")).toHaveLength(1);
+    expect(
+      state.activities.filter((a) => a.id === "match-finished"),
+    ).toHaveLength(1);
     expect(state.activities).toContainEqual({
       id: "match-finished",
       kind: "MATCH_FINISHED",
@@ -172,7 +198,7 @@ describe("matchViewerStore", () => {
 
   it("should clear activities on NO_MATCH", () => {
     useMatchViewerStore.setState({
-      activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }]
+      activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
     });
 
     useMatchViewerStore.getState().processMessage({
