@@ -1,5 +1,6 @@
 import type { MatchActivityItem as ActivityType } from "@/types/match";
 import { Swords, Trophy, CirclePlay, Crown, ShieldAlert } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MatchActivityItemProps {
   activity: ActivityType;
@@ -39,11 +40,12 @@ export function MatchActivityItem({ activity }: MatchActivityItemProps) {
               {moveNumber}.
             </span>
             <span
-              className={`w-3 h-3 rounded-sm border ${
+              className={cn(
+                "w-3 h-3 rounded-sm border",
                 isWhite
                   ? "bg-white border-neutral-300"
-                  : "bg-neutral-900 border-black"
-              }`}
+                  : "bg-neutral-900 border-black",
+              )}
               aria-label={activity.player}
             />
             <span className="font-mono text-sm">{activity.notation}</span>

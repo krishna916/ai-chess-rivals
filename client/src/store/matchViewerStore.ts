@@ -143,7 +143,7 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
       case "MATCH_FINISHED":
         set((state) => {
           const finishedId = "match-finished";
-          const lastPly = state.moveCount;
+          const lastPly = msg.payload.totalPlies;
           const finishedItem: MatchActivityItem = {
             id: finishedId,
             kind: "MATCH_FINISHED",
