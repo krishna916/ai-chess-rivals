@@ -16,7 +16,15 @@ export function MatchStatusLabel() {
 
   return (
     <div className="flex gap-4 text-sm font-medium">
-      <span className="text-green-600 uppercase tracking-wider">Live</span>
+      <span
+        className={
+          matchStatus === "STOPPED"
+            ? "text-amber-600 uppercase tracking-wider"
+            : "text-green-600 uppercase tracking-wider"
+        }
+      >
+        {matchStatus === "STOPPED" ? "Stopped" : "Live"}
+      </span>
       <span className="text-neutral-500">Move {moveCount}</span>
     </div>
   );

@@ -9,6 +9,16 @@ function hasFen(payload: unknown): payload is Record<string, unknown> {
   return isRecord(payload) && typeof payload.fen === "string";
 }
 
+function isSnapshotMove(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.sequenceNumber === "number" &&
+    (value.player === "WHITE" || value.player === "BLACK") &&
+    typeof value.notation === "string" &&
+    typeof value.fenAfterMove === "string"
+  );
+}
+
 export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
   if (!isRecord(data)) return null;
   const msg = data as { type?: string; payload?: unknown };
@@ -41,7 +51,9 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
         (msg.payload.sideToMove !== "WHITE" &&
           msg.payload.sideToMove !== "BLACK") ||
         !Array.isArray(msg.payload.moves) ||
-        typeof msg.payload.status !== "string"
+        !msg.payload.moves.every(isSnapshotMove) ||
+        typeof msg.payload.status !== "string" ||
+        typeof msg.payload.running !== "boolean"
       ) {
         return null;
       }

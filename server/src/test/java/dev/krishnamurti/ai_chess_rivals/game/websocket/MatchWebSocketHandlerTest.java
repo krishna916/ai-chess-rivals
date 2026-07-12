@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchNotFoundException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
+import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -56,6 +57,32 @@ class MatchWebSocketHandlerTest {
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"type\":\"MATCH_STATE\""));
     assertTrue(payload.contains("\"running\":true"));
+  }
+
+  @Test
+  void newClientReceivesStoppedMatchStateImmediately() throws Exception {
+    when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(Match.newGame(), false));
+    StubWebSocketSession rawSession = new StubWebSocketSession("stopped");
+
+    handler.afterConnectionEstablished(rawSession);
+
+    String payload = rawSession.getSentMessages().getFirst().getPayload();
+    assertTrue(payload.contains("\"status\":\"IN_PROGRESS\""));
+    assertTrue(payload.contains("\"running\":false"));
+  }
+
+  @Test
+  void newClientReceivesFinishedMatchStateImmediately() throws Exception {
+    Match finishedMatch = Match.newGame().finish(GameResult.DRAW);
+    when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(finishedMatch, false));
+    StubWebSocketSession rawSession = new StubWebSocketSession("finished");
+
+    handler.afterConnectionEstablished(rawSession);
+
+    String payload = rawSession.getSentMessages().getFirst().getPayload();
+    assertTrue(payload.contains("\"status\":\"FINISHED\""));
+    assertTrue(payload.contains("\"result\":\"DRAW\""));
+    assertTrue(payload.contains("\"running\":false"));
   }
 
   @Test

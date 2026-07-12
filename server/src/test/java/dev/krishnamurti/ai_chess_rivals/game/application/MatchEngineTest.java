@@ -211,6 +211,24 @@ class MatchEngineTest {
   }
 
   @Test
+  void currentMatchContainsAppliedMoveWhenMovePlayedIsPublished() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
+    MatchEngine[] engine = new MatchEngine[1];
+    List<Integer> observedMoveCounts = new ArrayList<>();
+    MatchEventSink eventSink =
+        event -> {
+          if (event instanceof MovePlayed) {
+            observedMoveCounts.add(engine[0].currentMatch().moveCount());
+          }
+        };
+    engine[0] = matchEngine(chessPlayer, 250, 1, eventSink);
+
+    engine[0].playUntilFinished();
+
+    assertEquals(List.of(1), observedMoveCounts);
+  }
+
+  @Test
   void playUntilFinishedEmitsOrderedLifecycleEvents() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
@@ -305,7 +323,7 @@ class MatchEngineTest {
         assertThrows(MatchEngineException.class, matchEngine::playUntilFinished);
 
     assertEquals("Match execution failed while processing ply 1", error.getMessage());
-    assertEquals(0, matchEngine.currentMatch().moveCount());
+    assertEquals(1, matchEngine.currentMatch().moveCount());
     assertTrue(matchEngine.currentMatch().isInProgress());
   }
 

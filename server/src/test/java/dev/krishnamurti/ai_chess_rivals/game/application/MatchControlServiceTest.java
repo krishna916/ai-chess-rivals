@@ -108,7 +108,7 @@ class MatchControlServiceTest {
     assertTrue(restartedSnapshot.running());
     assertEquals(match, restartedSnapshot.match());
     order.verify(matchEngine).stopCurrentMatch();
-    order.verify(activeTask).cancel(true);
+    order.verify(activeTask).cancel(false);
     verify(executorService, never()).shutdown();
   }
 
@@ -180,6 +180,6 @@ class MatchControlServiceTest {
 
     assertFalse(snapshot.running());
     verify(matchEngine).stopCurrentMatch();
-    verify(activeTask).cancel(true);
+    verify(activeTask).cancel(false);
   }
 }

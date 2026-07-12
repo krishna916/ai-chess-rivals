@@ -5,10 +5,6 @@ import { MatchActivityPanel } from "./MatchActivityPanel";
 import { useMatchViewerStore } from "@/store/matchViewerStore";
 import type { MatchActivityItem } from "@/types/match";
 
-// Mock scrollIntoView
-const scrollIntoViewMock = vi.fn();
-window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
-
 describe("MatchActivityPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,15 +79,20 @@ describe("MatchActivityPanel", () => {
     expect(screen.getByText("Capture")).toBeInTheDocument();
   });
 
-  it("triggers scrollIntoView when activities are added", () => {
+  it("scrolls only the activity feed when activities are added", () => {
     const { rerender } = render(<MatchActivityPanel />);
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    const feed = document.querySelector("#match-activity-feed");
+    expect(feed).not.toBeNull();
+    Object.defineProperty(feed, "scrollHeight", {
+      configurable: true,
+      value: 480,
+    });
 
     useMatchViewerStore.setState({
       activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
     });
     rerender(<MatchActivityPanel />);
 
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(feed?.scrollTop).toBe(480);
   });
 });

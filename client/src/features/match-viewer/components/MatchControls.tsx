@@ -2,47 +2,57 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { matchApi } from "@/services/matchApi";
 import { useMatchViewerStore } from "@/store/matchViewerStore";
+import type { MatchResponse } from "@/types/match";
 
 export function MatchControls() {
-  const { matchStatus } = useMatchViewerStore();
-  const [loading, setLoading] = useState(false);
+  const { matchStatus, processMessage } = useMatchViewerStore();
+  const [pendingAction, setPendingAction] = useState<"start" | "stop">();
   const [requestError, setRequestError] = useState<string>();
 
   const handleMatchOperation = async (
-    operation: () => Promise<unknown>,
+    operation: () => Promise<MatchResponse>,
     action: "start" | "stop",
   ) => {
     try {
-      setLoading(true);
+      setPendingAction(action);
       setRequestError(undefined);
-      await operation();
+      const snapshot = await operation();
+      processMessage({ type: "MATCH_STATE", payload: snapshot });
     } catch (error) {
       console.error(`Failed to ${action} match:`, error);
       setRequestError(`Unable to ${action} the match. Please try again.`);
     } finally {
-      setLoading(false);
+      setPendingAction(undefined);
     }
   };
 
   const isRunning = matchStatus === "IN_PROGRESS";
+  const isLoading = pendingAction !== undefined;
+  const startLabel =
+    pendingAction === "start"
+      ? "Starting…"
+      : matchStatus === "STOPPED"
+        ? "Resume Match"
+        : "Start Match";
+  const stopLabel = pendingAction === "stop" ? "Stopping…" : "Stop Match";
 
   return (
     <div className="flex items-center gap-2" aria-live="polite">
       <Button
         onClick={() => handleMatchOperation(matchApi.startMatch, "start")}
-        disabled={loading || isRunning}
+        disabled={isLoading || isRunning}
         variant={isRunning ? "secondary" : "default"}
         size="sm"
       >
-        Start Match
+        {startLabel}
       </Button>
       <Button
         onClick={() => handleMatchOperation(matchApi.stopMatch, "stop")}
-        disabled={loading || !isRunning}
+        disabled={isLoading || !isRunning}
         variant="destructive"
         size="sm"
       >
-        Stop Match
+        {stopLabel}
       </Button>
       {requestError && (
         <p className="text-sm text-destructive" role="alert">

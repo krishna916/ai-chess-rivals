@@ -90,7 +90,7 @@ public final class MatchControlService {
     Future<?> task = activeTask.getAndSet(null);
     activeTaskId.set(0);
     if (task != null) {
-      task.cancel(true);
+      task.cancel(false);
     }
     return new MatchSnapshot(matchEngine.currentMatch(), false);
   }
