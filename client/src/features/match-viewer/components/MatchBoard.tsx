@@ -6,11 +6,13 @@ export function MatchBoard() {
 
   return (
     <div className="w-full aspect-square max-w-[600px] mx-auto">
-      <Chessboard 
-        position={fen} 
-        arePiecesDraggable={false}
-        customDarkSquareStyle={{ backgroundColor: "#779556" }}
-        customLightSquareStyle={{ backgroundColor: "#ebecd0" }}
+      <Chessboard
+        options={{
+          position: fen,
+          allowDragging: false,
+          darkSquareStyle: { backgroundColor: "#779556" },
+          lightSquareStyle: { backgroundColor: "#ebecd0" },
+        }}
       />
     </div>
   );

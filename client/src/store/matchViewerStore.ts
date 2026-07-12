@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import { MatchStatus, ConnectionStatus, MatchStreamMessage } from "../types/match";
+import type {
+  MatchStatus,
+  ConnectionStatus,
+  MatchStreamMessage,
+} from "../types/match";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -22,14 +26,19 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
   connectionStatus: "CONNECTING",
   activeTurn: "WHITE",
   moveCount: 0,
-  
+
   setConnectionStatus: (status) => set({ connectionStatus: status }),
   setError: (error) => set({ error, connectionStatus: "ERROR" }),
-  
+
   processMessage: (msg: MatchStreamMessage) => {
     switch (msg.type) {
       case "NO_MATCH":
-        set({ matchStatus: "IDLE", boardFen: START_FEN, result: undefined, moveCount: 0 });
+        set({
+          matchStatus: "IDLE",
+          boardFen: START_FEN,
+          result: undefined,
+          moveCount: 0,
+        });
         break;
       case "MATCH_STARTED":
         set({
