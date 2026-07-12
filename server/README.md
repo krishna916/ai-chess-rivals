@@ -87,6 +87,17 @@ is configured.
 
 ---
 
+## Match pacing
+
+The backend waits for a random duration after each non-terminal move has been
+broadcast and before it requests the next move. Configure the inclusive range
+with `GAME_MOVE_DELAY_MIN` and `GAME_MOVE_DELAY_MAX` (defaults: `3s` and `10s`).
+Set both to `0s` for fast local runs and integration-style verification.
+Stopping a match interrupts an active wait; the latest in-progress position
+remains available for the existing resume flow.
+
+---
+
 ### Upgrading Stockfish
 
 1. Open `server/pom.xml`.

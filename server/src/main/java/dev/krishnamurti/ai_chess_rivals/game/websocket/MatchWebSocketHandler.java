@@ -95,7 +95,10 @@ public final class MatchWebSocketHandler extends TextWebSocketHandler {
             messageWriter.write(
                 new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage())));
       } catch (JacksonException serializationFailure) {
-        log.error("Failed to serialize websocket message {}", MatchStreamMessageType.NO_MATCH, serializationFailure);
+        log.error(
+            "Failed to serialize websocket message {}",
+            MatchStreamMessageType.NO_MATCH,
+            serializationFailure);
       }
     } catch (JacksonException e) {
       log.error("Failed to serialize websocket message {}", MatchStreamMessageType.MATCH_STATE, e);

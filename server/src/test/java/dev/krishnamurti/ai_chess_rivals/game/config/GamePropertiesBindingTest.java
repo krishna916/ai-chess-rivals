@@ -18,8 +18,7 @@ class GamePropertiesBindingTest {
                   ConfigurationPropertiesAutoConfiguration.class,
                   ValidationAutoConfiguration.class))
           .withUserConfiguration(GameConfig.class)
-          .withPropertyValues(
-              "app.game.move-think-time-millis=250", "app.game.max-plies=300");
+          .withPropertyValues("app.game.move-think-time-millis=250", "app.game.max-plies=300");
 
   @Test
   void bindsDurationValues() {

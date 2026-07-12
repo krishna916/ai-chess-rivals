@@ -41,6 +41,9 @@ app:
   game:
     move-think-time-millis: ${GAME_MOVE_THINK_TIME_MILLIS:250}
     max-plies: ${GAME_MAX_PLIES:300}
+    move-delay:
+      min: ${GAME_MOVE_DELAY_MIN:3s}
+      max: ${GAME_MOVE_DELAY_MAX:10s}
   websocket:
     allowed-origins:
       - ${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}

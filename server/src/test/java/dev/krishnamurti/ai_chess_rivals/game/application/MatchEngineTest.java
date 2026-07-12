@@ -29,9 +29,7 @@ class MatchEngineTest {
 
   private static GameProperties gameProperties(int moveThinkTimeMillis, int maxPlies) {
     return new GameProperties(
-        moveThinkTimeMillis,
-        maxPlies,
-        new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
+        moveThinkTimeMillis, maxPlies, new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
   }
 
   private static MatchEngine matchEngine(
@@ -360,7 +358,8 @@ class MatchEngineTest {
 
     matchEngine.playUntilFinished();
 
-    assertEquals(List.of("choose", "move", "finished"), order.subList(order.size() - 3, order.size()));
+    assertEquals(
+        List.of("choose", "move", "finished"), order.subList(order.size() - 3, order.size()));
     assertEquals(3, pacing.calls);
   }
 

@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
-import java.time.Duration;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
@@ -19,9 +18,7 @@ class StockfishPlayerTest {
 
   private static GameProperties gameProperties(int moveThinkTimeMillis, int maxPlies) {
     return new GameProperties(
-        moveThinkTimeMillis,
-        maxPlies,
-        new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
+        moveThinkTimeMillis, maxPlies, new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
   }
 
   @Test

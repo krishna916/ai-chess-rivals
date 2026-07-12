@@ -18,10 +18,7 @@ class RandomizedMatchPacingTest {
     RecordingSleeper sleeper = new RecordingSleeper();
     MatchPacing pacing =
         pacing(
-            Duration.ofMillis(3),
-            Duration.ofMillis(10),
-            new SequenceRandomGenerator(3L),
-            sleeper);
+            Duration.ofMillis(3), Duration.ofMillis(10), new SequenceRandomGenerator(3L), sleeper);
 
     pacing.waitBeforeNextMove();
 
@@ -33,10 +30,7 @@ class RandomizedMatchPacingTest {
     RecordingSleeper sleeper = new RecordingSleeper();
     MatchPacing pacing =
         pacing(
-            Duration.ofMillis(3),
-            Duration.ofMillis(10),
-            new SequenceRandomGenerator(10L),
-            sleeper);
+            Duration.ofMillis(3), Duration.ofMillis(10), new SequenceRandomGenerator(10L), sleeper);
 
     pacing.waitBeforeNextMove();
 
@@ -48,11 +42,7 @@ class RandomizedMatchPacingTest {
     RecordingSleeper sleeper = new RecordingSleeper();
     SequenceRandomGenerator randomGenerator = new SequenceRandomGenerator();
     MatchPacing pacing =
-        pacing(
-            Duration.ofSeconds(1),
-            Duration.ofSeconds(1),
-            randomGenerator,
-            sleeper);
+        pacing(Duration.ofSeconds(1), Duration.ofSeconds(1), randomGenerator, sleeper);
 
     pacing.waitBeforeNextMove();
 
@@ -90,9 +80,10 @@ class RandomizedMatchPacingTest {
 
   @Test
   void propagatesInterruptionFromSleeper() {
-    Sleeper interruptedSleeper = millis -> {
-      throw new InterruptedException("stop");
-    };
+    Sleeper interruptedSleeper =
+        millis -> {
+          throw new InterruptedException("stop");
+        };
     MatchPacing pacing =
         pacing(Duration.ZERO, Duration.ZERO, new SequenceRandomGenerator(), interruptedSleeper);
 
