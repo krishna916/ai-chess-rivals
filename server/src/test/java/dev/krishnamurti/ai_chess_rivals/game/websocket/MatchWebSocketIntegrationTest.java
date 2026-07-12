@@ -74,8 +74,7 @@ class MatchWebSocketIntegrationTest {
     assertTrue(matchStartedMessage.contains("\"type\":\"MATCH_STARTED\""));
     assertTrue(matchStartedMessage.contains("\"sideToMove\":\"WHITE\""));
     assertTrue(
-        matchStartedMessage.contains(
-            "\"fen\":\"" + BoardPosition.STARTING_POSITION.fen() + "\""));
+        matchStartedMessage.contains("\"fen\":\"" + BoardPosition.STARTING_POSITION.fen() + "\""));
     assertTrue(session.isOpen());
     session.close();
   }

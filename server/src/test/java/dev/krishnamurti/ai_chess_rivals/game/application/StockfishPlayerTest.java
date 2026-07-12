@@ -16,10 +16,15 @@ import org.junit.jupiter.api.Test;
 
 class StockfishPlayerTest {
 
+  private static GameProperties gameProperties(int moveThinkTimeMillis, int maxPlies) {
+    return new GameProperties(
+        moveThinkTimeMillis, maxPlies, new GameProperties.MoveDelay(Duration.ZERO, Duration.ZERO));
+  }
+
   @Test
   void startNewGameDelegatesToStockfish() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
-    StockfishPlayer player = new StockfishPlayer(stockfishClient, new GameProperties(250, 300));
+    StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
 
     player.startNewGame();
 
@@ -29,7 +34,7 @@ class StockfishPlayerTest {
   @Test
   void chooseMovePassesCurrentFenToStockfish() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
-    StockfishPlayer player = new StockfishPlayer(stockfishClient, new GameProperties(250, 300));
+    StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
     Match match = Match.newGame();
 
     player.chooseMove(match);
@@ -42,7 +47,7 @@ class StockfishPlayerTest {
   @Test
   void chooseMoveUsesConfiguredThinkTime() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
-    StockfishPlayer player = new StockfishPlayer(stockfishClient, new GameProperties(375, 300));
+    StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(375, 300));
 
     player.chooseMove(Match.newGame());
 
@@ -52,7 +57,7 @@ class StockfishPlayerTest {
   @Test
   void chooseMoveWrapsReturnedUciMoveAsMoveNotation() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("g1f3");
-    StockfishPlayer player = new StockfishPlayer(stockfishClient, new GameProperties(250, 300));
+    StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
 
     MoveNotation moveNotation = player.chooseMove(Match.newGame());
 
@@ -62,7 +67,7 @@ class StockfishPlayerTest {
   @Test
   void chooseMoveRejectsNullMatch() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
-    StockfishPlayer player = new StockfishPlayer(stockfishClient, new GameProperties(250, 300));
+    StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
 
     NullPointerException error =
         assertThrows(NullPointerException.class, () -> player.chooseMove(null));
@@ -73,7 +78,7 @@ class StockfishPlayerTest {
   @Test
   void chooseMoveRejectsFinishedMatch() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
-    StockfishPlayer player = new StockfishPlayer(stockfishClient, new GameProperties(250, 300));
+    StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
     Match finishedMatch = Match.newGame().finish(GameResult.DRAW);
 
     IllegalStateException error =
@@ -86,7 +91,7 @@ class StockfishPlayerTest {
   void stockfishPlayerImplementsChessPlayerContract() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
 
-    Object player = new StockfishPlayer(stockfishClient, new GameProperties(250, 300));
+    Object player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
 
     assertInstanceOf(ChessPlayer.class, player);
   }

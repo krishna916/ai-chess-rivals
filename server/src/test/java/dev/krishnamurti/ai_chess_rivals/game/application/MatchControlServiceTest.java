@@ -5,9 +5,11 @@ import static org.mockito.Mockito.*;
 
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 class MatchControlServiceTest {
 
@@ -15,11 +17,14 @@ class MatchControlServiceTest {
   private ExecutorService executorService;
   private MatchControlService service;
   private Match match;
+  private Future<Object> activeTask;
 
   @BeforeEach
   void setUp() {
     matchEngine = mock(MatchEngine.class);
     executorService = mock(ExecutorService.class);
+    activeTask = mock(Future.class);
+    doReturn(activeTask).when(executorService).submit(any(Runnable.class));
     service = new MatchControlService(matchEngine, executorService);
     match = Match.newGame();
   }
@@ -92,17 +97,19 @@ class MatchControlServiceTest {
 
   @Test
   void stopMatchDelegatesToStopCurrentAndReturnsStoppedSnapshot() {
-    // Setup running state first
     when(matchEngine.currentMatch()).thenReturn(match);
     service.startMatch();
 
     MatchSnapshot snapshot = service.stopMatch();
     MatchSnapshot restartedSnapshot = assertDoesNotThrow(() -> service.startMatch());
+    InOrder order = inOrder(matchEngine, activeTask);
 
     assertFalse(snapshot.running());
     assertTrue(restartedSnapshot.running());
     assertEquals(match, restartedSnapshot.match());
-    verify(matchEngine).stopCurrentMatch();
+    order.verify(matchEngine).stopCurrentMatch();
+    order.verify(activeTask).cancel(true);
+    verify(executorService, never()).shutdown();
   }
 
   @Test
@@ -161,5 +168,18 @@ class MatchControlServiceTest {
 
     MatchSnapshot snapshot = service.currentMatch();
     assertTrue(snapshot.running());
+  }
+
+  @Test
+  void stopMatchCancelsEvenWhenTheActiveTaskHasAlreadyCompleted() {
+    when(matchEngine.currentMatch()).thenReturn(match);
+    when(activeTask.isDone()).thenReturn(true);
+    service.startMatch();
+
+    MatchSnapshot snapshot = assertDoesNotThrow(() -> service.stopMatch());
+
+    assertFalse(snapshot.running());
+    verify(matchEngine).stopCurrentMatch();
+    verify(activeTask).cancel(true);
   }
 }

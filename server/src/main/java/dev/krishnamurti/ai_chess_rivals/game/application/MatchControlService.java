@@ -86,9 +86,12 @@ public final class MatchControlService {
       throw new MatchConflictException("No match is currently running");
     }
 
-    activeTask.set(null);
-    activeTaskId.set(0);
     matchEngine.stopCurrentMatch();
+    Future<?> task = activeTask.getAndSet(null);
+    activeTaskId.set(0);
+    if (task != null) {
+      task.cancel(true);
+    }
     return new MatchSnapshot(matchEngine.currentMatch(), false);
   }
 

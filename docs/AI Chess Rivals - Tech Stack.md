@@ -155,6 +155,13 @@ Stockfish is used as a local executable process communicating over UCI (stdin/st
     *   **Linux Profile (`-Plinux`)**: Downloads `stockfish-ubuntu-x86-64-avx2.tar`, extracts it, moves the binary to `server/stockfish/stockfish`, and applies execution permissions (`chmod 755`).
 *   **Process Client**: The `StockfishClient` runs `ProcessBuilder` on this native executable, starting the process, sending UCI configuration, and verifying readiness via `isready`/`readyok` sequence.
 
+### 3. Match Runtime Pacing
+Backend move pacing is configured through Spring `Duration` properties and environment-backed defaults.
+*   **Property Binding**: `app.game.move-delay.min` and `app.game.move-delay.max`.
+*   **Environment Variables**: `GAME_MOVE_DELAY_MIN` and `GAME_MOVE_DELAY_MAX`.
+*   **Default Range**: `3s` to `10s` inclusive between completed non-terminal moves.
+*   **Local Fast Mode**: Set both values to `0s` to keep the same pacing code path without introducing a real delay.
+
 ---
 
 ## Configuration Discrepancies & Architecture Notes
