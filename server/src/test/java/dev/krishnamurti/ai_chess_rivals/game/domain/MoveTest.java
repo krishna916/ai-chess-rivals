@@ -17,8 +17,8 @@ class MoveTest {
                     0,
                     PlayerColor.WHITE,
                     new MoveNotation("e2e4"),
-                    new BoardPosition(
-                        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")));
+                    new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
+                    quietPawnMoveDetails()));
 
     assertEquals("sequenceNumber must be positive", error.getMessage());
   }
@@ -33,8 +33,8 @@ class MoveTest {
                     -1,
                     PlayerColor.WHITE,
                     new MoveNotation("e2e4"),
-                    new BoardPosition(
-                        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")));
+                    new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
+                    quietPawnMoveDetails()));
 
     assertEquals("sequenceNumber must be positive", error.getMessage());
   }
@@ -46,10 +46,16 @@ class MoveTest {
             1,
             PlayerColor.WHITE,
             new MoveNotation("e2e4"),
-            new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"));
+            new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
+            quietPawnMoveDetails());
 
     assertEquals(1, move.sequenceNumber());
     assertEquals(PlayerColor.WHITE, move.playedBy());
     assertEquals("e2e4", move.notation().value());
+  }
+
+  private static MoveDetails quietPawnMoveDetails() {
+    return new MoveDetails(
+        ChessPieceType.PAWN, PlayerColor.WHITE, "e2", "e4", null, null, null, null, false, false);
   }
 }

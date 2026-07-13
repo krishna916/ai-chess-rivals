@@ -89,7 +89,8 @@ class MatchTest {
             1,
             PlayerColor.WHITE,
             new MoveNotation("e2e4"),
-            new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")));
+            new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
+            quietPawnMoveDetails()));
 
     Match match =
         new Match(
@@ -111,7 +112,8 @@ class MatchTest {
     BoardPosition positionAfterMove =
         new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 
-    Match updatedMatch = match.recordMove(new MoveNotation("e2e4"), positionAfterMove);
+    MoveDetails details = quietPawnMoveDetails();
+    Match updatedMatch = match.recordMove(new MoveNotation("e2e4"), positionAfterMove, details);
 
     assertEquals(1, updatedMatch.moveCount());
     assertEquals(PlayerColor.BLACK, updatedMatch.sideToMove());
@@ -119,6 +121,7 @@ class MatchTest {
     assertEquals(1, updatedMatch.moves().getFirst().sequenceNumber());
     assertEquals(PlayerColor.WHITE, updatedMatch.moves().getFirst().playedBy());
     assertEquals("e2e4", updatedMatch.moves().getFirst().notation().value());
+    assertEquals(details, updatedMatch.moves().getFirst().details());
   }
 
   @Test
@@ -131,8 +134,8 @@ class MatchTest {
             () ->
                 finishedMatch.recordMove(
                     new MoveNotation("e2e4"),
-                    new BoardPosition(
-                        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")));
+                    new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
+                    quietPawnMoveDetails()));
 
     assertEquals("Cannot record a move when match is not in progress", error.getMessage());
   }
@@ -152,6 +155,22 @@ class MatchTest {
         2,
         PlayerColor.BLACK,
         new MoveNotation("e7e5"),
-        new BoardPosition("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"));
+        new BoardPosition("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"),
+        new MoveDetails(
+            ChessPieceType.PAWN,
+            PlayerColor.BLACK,
+            "e7",
+            "e5",
+            null,
+            null,
+            null,
+            null,
+            false,
+            false));
+  }
+
+  private static MoveDetails quietPawnMoveDetails() {
+    return new MoveDetails(
+        ChessPieceType.PAWN, PlayerColor.WHITE, "e2", "e4", null, null, null, null, false, false);
   }
 }

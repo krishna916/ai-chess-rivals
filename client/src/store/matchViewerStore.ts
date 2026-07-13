@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { Chess } from "chess.js";
 import type {
   MatchStatus,
   ConnectionStatus,
@@ -16,41 +15,28 @@ function reconstructMoveActivities(
     { type: "MATCH_STATE" }
   >["payload"]["moves"],
 ): MatchActivityItem[] {
-  const chess = new Chess();
-
   return [...moves]
     .sort((a, b) => a.sequenceNumber - b.sequenceNumber)
-    .map((move) => {
-      const activity: MatchActivityItem = {
-        id: `move-${move.sequenceNumber}`,
-        kind: "MOVE",
-        sequence: move.sequenceNumber,
-        player: move.player,
-        notation: move.notation,
-      };
-
-      try {
-        const applied = chess.move({
-          from: move.notation.slice(0, 2),
-          to: move.notation.slice(2, 4),
-          promotion: move.notation[4],
-        });
-        return {
-          ...activity,
-          capture: applied.isCapture(),
-          check: chess.inCheck(),
-          checkmate: chess.isCheckmate(),
-          promotion: applied.isPromotion(),
-        };
-      } catch {
-        try {
-          chess.load(move.fenAfterMove);
-        } catch {
-          // Primary snapshot data remains usable even if annotation reconstruction fails.
-        }
-        return activity;
-      }
-    });
+    .map((move) => ({
+      id: `move-${move.sequenceNumber}`,
+      kind: "MOVE" as const,
+      sequence: move.sequenceNumber,
+      player: move.player,
+      notation: move.notation,
+      movingPiece: move.movingPiece,
+      movingPieceColor: move.movingPieceColor,
+      sourceSquare: move.sourceSquare,
+      destinationSquare: move.destinationSquare,
+      capturedPiece: move.capturedPiece ?? undefined,
+      capturedPieceColor: move.capturedPieceColor ?? undefined,
+      promotedPiece: move.promotedPiece ?? undefined,
+      castlingSide: move.castlingSide ?? undefined,
+      capture: move.capture,
+      check: move.check,
+      checkmate: move.checkmate,
+      promotion: move.promotion,
+      isNew: false,
+    }));
 }
 
 interface MatchViewerState {
@@ -165,10 +151,19 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
             sequence: msg.payload.ply,
             player: msg.payload.player,
             notation: msg.payload.notation,
+            movingPiece: msg.payload.movingPiece,
+            movingPieceColor: msg.payload.movingPieceColor,
+            sourceSquare: msg.payload.sourceSquare,
+            destinationSquare: msg.payload.destinationSquare,
+            capturedPiece: msg.payload.capturedPiece ?? undefined,
+            capturedPieceColor: msg.payload.capturedPieceColor ?? undefined,
+            promotedPiece: msg.payload.promotedPiece ?? undefined,
+            castlingSide: msg.payload.castlingSide ?? undefined,
             capture: msg.payload.capture,
             check: msg.payload.check,
             checkmate: msg.payload.checkmate,
             promotion: msg.payload.promotion,
+            isNew: true,
           };
 
           const filtered = state.activities.filter((act) => act.id !== moveId);

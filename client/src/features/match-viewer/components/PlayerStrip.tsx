@@ -1,5 +1,6 @@
 import { useMatchViewerStore } from "@/store/matchViewerStore";
 import { cn } from "@/lib/utils";
+import { MATCH_PLAYERS } from "../lib/matchPlayers";
 
 interface PlayerStripProps {
   side: "WHITE" | "BLACK";
@@ -18,9 +19,7 @@ export function PlayerStrip({ side }: PlayerStripProps) {
           : "bg-card text-card-foreground",
       )}
     >
-      <span className="font-semibold">
-        Stockfish {side === "WHITE" ? "White" : "Black"}
-      </span>
+      <span className="font-semibold">{MATCH_PLAYERS[side].name}</span>
       {isActive && (
         <span className="text-xs uppercase bg-background/50 px-2 py-1 rounded">
           Thinking...

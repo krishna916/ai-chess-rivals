@@ -73,10 +73,11 @@ public final class Match {
     return Optional.ofNullable(result);
   }
 
-  public Match recordMove(MoveNotation notation, BoardPosition positionAfterMove) {
+  public Match recordMove(
+      MoveNotation notation, BoardPosition positionAfterMove, MoveDetails details) {
     requireInProgress("record a move");
 
-    Move move = new Move(moveCount() + 1, sideToMove, notation, positionAfterMove);
+    Move move = new Move(moveCount() + 1, sideToMove, notation, positionAfterMove, details);
     List<Move> updatedMoves = new java.util.ArrayList<>(moves);
     updatedMoves.add(move);
 

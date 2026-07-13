@@ -5,6 +5,28 @@ import { MatchActivityPanel } from "./MatchActivityPanel";
 import { useMatchViewerStore } from "@/store/matchViewerStore";
 import type { MatchActivityItem } from "@/types/match";
 
+function moveActivity(
+  overrides: Partial<Extract<MatchActivityItem, { kind: "MOVE" }>> = {},
+): Extract<MatchActivityItem, { kind: "MOVE" }> {
+  return {
+    id: "move-1",
+    kind: "MOVE",
+    sequence: 1,
+    player: "WHITE",
+    notation: "e2e4",
+    movingPiece: "PAWN",
+    movingPieceColor: "WHITE",
+    sourceSquare: "e2",
+    destinationSquare: "e4",
+    capture: false,
+    check: false,
+    checkmate: false,
+    promotion: false,
+    isNew: false,
+    ...overrides,
+  };
+}
+
 describe("MatchActivityPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,33 +50,28 @@ describe("MatchActivityPanel", () => {
   it("renders activities in chronological order and formats results", () => {
     const activities: MatchActivityItem[] = [
       { id: "match-started", kind: "MATCH_STARTED", sequence: 0 },
-      {
-        id: "move-1",
-        kind: "MOVE",
-        sequence: 1,
-        player: "WHITE",
-        notation: "e4",
-        capture: false,
-        check: false,
-      },
-      {
+      moveActivity(),
+      moveActivity({
         id: "move-2",
-        kind: "MOVE",
         sequence: 2,
         player: "BLACK",
-        notation: "e5",
-        capture: false,
+        notation: "e7e5",
+        movingPieceColor: "BLACK",
+        sourceSquare: "e7",
+        destinationSquare: "e5",
         check: true,
-      },
-      {
+      }),
+      moveActivity({
         id: "move-3",
-        kind: "MOVE",
         sequence: 3,
-        player: "WHITE",
-        notation: "Nf3",
+        notation: "c4d5",
+        movingPiece: "KNIGHT",
+        sourceSquare: "c4",
+        destinationSquare: "d5",
+        capturedPiece: "PAWN",
+        capturedPieceColor: "BLACK",
         capture: true,
-        check: false,
-      },
+      }),
       {
         id: "match-finished",
         kind: "MATCH_FINISHED",
@@ -70,13 +87,92 @@ describe("MatchActivityPanel", () => {
     expect(screen.getByText("5 events")).toBeInTheDocument();
 
     expect(screen.getByText("Match started")).toBeInTheDocument();
-    expect(screen.getByText("e4")).toBeInTheDocument();
-    expect(screen.getByText("e5")).toBeInTheDocument();
-    expect(screen.getByText("Nf3")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stockfish White moves the Pawn to e4"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Stockfish Black moves the Pawn to e5"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Stockfish White's Knight captures Stockfish Black's Pawn",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("c4 × d5 · c4d5")).toBeInTheDocument();
+    expect(screen.getByLabelText("White Knight")).toHaveTextContent("♘");
     expect(screen.getByText("Match finished — White wins")).toBeInTheDocument();
 
     expect(screen.getByText("Check")).toBeInTheDocument();
     expect(screen.getByText("Capture")).toBeInTheDocument();
+  });
+
+  it("styles a new capture for arrival and keeps capture rows focusable", () => {
+    useMatchViewerStore.setState({
+      activities: [
+        moveActivity({
+          movingPiece: "KNIGHT",
+          notation: "c4d5",
+          sourceSquare: "c4",
+          destinationSquare: "d5",
+          capturedPiece: "PAWN",
+          capturedPieceColor: "BLACK",
+          capture: true,
+          isNew: true,
+        }),
+      ],
+    });
+
+    render(<MatchActivityPanel />);
+
+    const row = screen.getByTestId("activity-move-1");
+    expect(row).toHaveAttribute("tabindex", "0");
+    expect(row).toHaveClass("capture-row-arrival");
+    expect(screen.getByText("Capture")).toBeInTheDocument();
+    expect(screen.getByTestId("capture-indicator-arrival")).toHaveClass(
+      "capture-indicator-arrival",
+    );
+    expect(screen.getByTestId("capture-indicator-hover")).toHaveClass(
+      "capture-indicator-hover",
+    );
+  });
+
+  it("keeps historical captures calm until hover or focus", () => {
+    useMatchViewerStore.setState({
+      activities: [
+        moveActivity({
+          capturedPiece: "PAWN",
+          capturedPieceColor: "BLACK",
+          capture: true,
+          isNew: false,
+        }),
+      ],
+    });
+
+    render(<MatchActivityPanel />);
+
+    const row = screen.getByTestId("activity-move-1");
+    expect(row).toHaveAttribute("tabindex", "0");
+    expect(row).not.toHaveClass("capture-row-arrival");
+    expect(
+      screen.queryByTestId("capture-indicator-arrival"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("capture-indicator-hover")).toHaveClass(
+      "capture-indicator-hover",
+    );
+  });
+
+  it("does not add capture behavior to normal moves", () => {
+    useMatchViewerStore.setState({ activities: [moveActivity()] });
+
+    render(<MatchActivityPanel />);
+
+    const row = screen.getByTestId("activity-move-1");
+    expect(row).not.toHaveAttribute("tabindex");
+    expect(row).not.toHaveClass("capture-row-arrival");
+    expect(screen.queryByText("Capture")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("capture-indicator-hover"),
+    ).not.toBeInTheDocument();
   });
 
   it("scrolls only the activity feed when activities are added", () => {
