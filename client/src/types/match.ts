@@ -120,7 +120,7 @@ export type MatchStreamMessage =
 
 export type MatchActivityKind = "MATCH_STARTED" | "MOVE" | "MATCH_FINISHED";
 
-interface MatchStartedActivityItem {
+export interface MatchStartedActivityItem {
   id: string;
   kind: "MATCH_STARTED";
   sequence: number;
@@ -147,7 +147,7 @@ export interface MoveActivityItem {
   isNew: boolean;
 }
 
-interface MatchFinishedActivityItem {
+export interface MatchFinishedActivityItem {
   id: string;
   kind: "MATCH_FINISHED";
   sequence: number;

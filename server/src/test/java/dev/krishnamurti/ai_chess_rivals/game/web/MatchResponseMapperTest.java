@@ -40,10 +40,10 @@ class MatchResponseMapperTest {
                     PlayerColor.WHITE,
                     "e2",
                     "e4",
-                    null,
-                    null,
-                    null,
-                    null,
+                    ChessPieceType.ROOK,
+                    PlayerColor.BLACK,
+                    ChessPieceType.QUEEN,
+                    CastlingSide.KING_SIDE,
                     false,
                     false));
     MatchSnapshot snapshot = new MatchSnapshot(match, false);
@@ -61,12 +61,12 @@ class MatchResponseMapperTest {
     assertEquals(PlayerColor.WHITE, response.moves().get(0).movingPieceColor());
     assertEquals("e2", response.moves().get(0).sourceSquare());
     assertEquals("e4", response.moves().get(0).destinationSquare());
-    assertNull(response.moves().get(0).capturedPiece());
-    assertNull(response.moves().get(0).capturedPieceColor());
-    assertNull(response.moves().get(0).promotedPiece());
-    assertNull(response.moves().get(0).castlingSide());
-    assertFalse(response.moves().get(0).capture());
-    assertFalse(response.moves().get(0).promotion());
+    assertEquals(ChessPieceType.ROOK, response.moves().get(0).capturedPiece());
+    assertEquals(PlayerColor.BLACK, response.moves().get(0).capturedPieceColor());
+    assertEquals(ChessPieceType.QUEEN, response.moves().get(0).promotedPiece());
+    assertEquals(CastlingSide.KING_SIDE, response.moves().get(0).castlingSide());
+    assertTrue(response.moves().get(0).capture());
+    assertTrue(response.moves().get(0).promotion());
     assertEquals(match.status(), response.status());
     assertNull(response.result());
     assertFalse(response.running());
