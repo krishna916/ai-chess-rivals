@@ -7,6 +7,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
     properties = {
+      "app.owner.control-token=test-owner-token",
       "spring.autoconfigure.exclude="
           + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
           + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"

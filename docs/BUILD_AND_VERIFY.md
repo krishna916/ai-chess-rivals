@@ -51,8 +51,9 @@ npm run typecheck
 npm run verify
 ```
 
-`npm run verify` sequentially runs formatting, type checking, linting, and the production
-build. It stops at the first failure and does not rely on shell-specific command chaining.
+`npm run verify` sequentially runs formatting, type checking, linting, Vitest, and the
+production build. It stops at the first failure and does not rely on shell-specific command
+chaining.
 
 ## Phase 1 end-to-end acceptance
 
@@ -64,6 +65,9 @@ cd server
 docker compose up -d postgres
 $env:GAME_MOVE_DELAY_MIN = "0s"
 $env:GAME_MOVE_DELAY_MAX = "0s"
+$env:OWNER_CONTROL_TOKEN = [Convert]::ToHexString(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+).ToLower()
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -74,7 +78,9 @@ cd client
 npm.cmd run dev
 ```
 
-Open `http://localhost:5173`. The application API and WebSocket use port `8082`; the local
+Open `http://localhost:5173` to confirm the viewer is read-only. Then open
+`http://localhost:5173/admin`, enter the value generated for `OWNER_CONTROL_TOKEN`, and use
+that route for Start/Stop. The application API and WebSocket use port `8082`; the local
 Actuator health endpoint is `http://localhost:8081/actuator/health`. The Docker backend does not
 publish its separate management port to the host, so run the backend locally when the host needs
 to query Actuator directly.
@@ -93,16 +99,16 @@ The following items were observed with Stockfish 17.1, the backend on `8082`, th
 - [x] Health check reports `UP` on management port `8081`.
 - [x] Frontend loads with no browser console errors or warnings.
 - [x] WebSocket connects and clears a previous connection error after reconnecting.
-- [x] The no-match state shows an empty board, disabled Stop control, and empty activity panel.
+- [ ] The no-match state shows an empty board and activity panel with no public controls.
 
 #### Match lifecycle
 
-- [x] Start creates one active match and updates the page without a refresh.
+- [ ] A valid token entered on `/admin` starts one active match and updates both routes.
 - [x] Moves, board position, active side, move count, and activity advance together.
 - [x] Capture and check annotations appear during live play and after snapshot hydration.
 - [x] One real Stockfish-vs-Stockfish match completed autonomously as a draw after 70 plies.
 - [x] The final board, one final activity entry, and `DRAW` result remain visible.
-- [x] A second match can start after completion.
+- [ ] A second match can start from `/admin` after the configured cooldown.
 - [ ] Promotion was not encountered in the observed games; snapshot reconstruction is covered by
       focused store tests.
 
@@ -112,7 +118,7 @@ The following items were observed with Stockfish 17.1, the backend on `8082`, th
       final entry.
 - [x] Disconnect shows `Connection lost. Reconnecting...`; reconnect clears it and hydrates the
       authoritative current state without duplicate activity.
-- [x] Stop preserves the latest valid board and exposes `Stopped` plus `Resume Match`.
+- [ ] Stop from `/admin` preserves the latest valid board and exposes `Stopped` publicly.
 - [x] Stop during Stockfish selection no longer interrupts the UCI reader; the stopped game resumed
       from ply 4 and completed without an illegal stale move.
 - [x] Unit coverage verifies repeated Stop/Start lifecycle calls remain safe.
@@ -123,4 +129,4 @@ The following items were observed with Stockfish 17.1, the backend on `8082`, th
 - [x] The board and activity panel stack vertically on mobile.
 - [x] Long activity history scrolls inside the activity panel without scrolling the page header
       out of view.
-- [x] Controls, connection state, and status remain readable at the narrow viewport.
+- [ ] Connection state and status remain readable at the narrow public viewport.

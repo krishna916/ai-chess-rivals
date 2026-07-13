@@ -3,6 +3,8 @@ package dev.krishnamurti.ai_chess_rivals.game.web;
 import static org.junit.jupiter.api.Assertions.*;
 
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
 import dev.krishnamurti.ai_chess_rivals.game.domain.*;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +13,9 @@ class MatchResponseMapperTest {
   @Test
   void mapsMatchSnapshotToMatchResponse() {
     Match match = Match.newGame();
-    MatchSnapshot snapshot = new MatchSnapshot(match, true);
+    MatchStartAvailability availability =
+        new MatchStartAvailability(false, MatchStartBlockReason.MATCH_ALREADY_RUNNING, 0, 1, 12);
+    MatchSnapshot snapshot = new MatchSnapshot(match, true, availability);
 
     MatchResponse response = MatchResponseMapper.map(snapshot);
 
@@ -21,6 +25,7 @@ class MatchResponseMapperTest {
     assertEquals(match.status(), response.status());
     assertNull(response.result());
     assertTrue(response.running());
+    assertSame(availability, response.startAvailability());
   }
 
   @Test

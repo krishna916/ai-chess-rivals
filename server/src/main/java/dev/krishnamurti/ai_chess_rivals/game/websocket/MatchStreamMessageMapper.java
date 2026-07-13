@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.game.websocket;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEvent;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,11 @@ final class MatchStreamMessageMapper {
                   move.check(),
                   move.checkmate(),
                   move.promotion()));
+      case MatchStopped stopped ->
+          new MatchStreamMessage<>(
+              MatchStreamMessageType.MATCH_STOPPED,
+              new MatchStoppedMessage(
+                  stopped.sideToMove(), stopped.position().fen(), stopped.totalPlies()));
       case MatchFinished finished ->
           new MatchStreamMessage<>(
               MatchStreamMessageType.MATCH_FINISHED,

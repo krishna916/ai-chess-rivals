@@ -3,6 +3,8 @@ package dev.krishnamurti.ai_chess_rivals.game.websocket;
 import static org.junit.jupiter.api.Assertions.*;
 
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
@@ -11,6 +13,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import org.junit.jupiter.api.Test;
 
@@ -71,10 +74,26 @@ class MatchStreamMessageMapperTest {
   }
 
   @Test
+  void mapsMatchStoppedEventToAuthoritativePayload() {
+    MatchStopped event = new MatchStopped(PlayerColor.BLACK, new BoardPosition("after-e4"), 1);
+
+    MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(event);
+
+    assertEquals(MatchStreamMessageType.MATCH_STOPPED, message.type());
+    MatchStoppedMessage payload = (MatchStoppedMessage) message.payload();
+    assertEquals(PlayerColor.BLACK, payload.sideToMove());
+    assertEquals("after-e4", payload.fen());
+    assertEquals(1, payload.totalPlies());
+  }
+
+  @Test
   void createsMatchStatePayloadFromSnapshot() {
     Match match = Match.newGame();
+    MatchStartAvailability availability =
+        new MatchStartAvailability(false, MatchStartBlockReason.MATCH_ALREADY_RUNNING, 0, 2, 12);
 
-    MatchStateMessage payload = MatchStateMessage.from(new MatchSnapshot(match, true));
+    MatchStateMessage payload =
+        MatchStateMessage.from(new MatchSnapshot(match, true, availability));
 
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(match.currentPosition().fen(), payload.fen());
@@ -82,5 +101,6 @@ class MatchStreamMessageMapperTest {
     assertEquals(GameStatus.IN_PROGRESS, payload.status());
     assertNull(payload.result());
     assertTrue(payload.running());
+    assertSame(availability, payload.startAvailability());
   }
 }

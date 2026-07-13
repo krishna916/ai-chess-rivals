@@ -3,7 +3,6 @@ package dev.krishnamurti.ai_chess_rivals.game.application;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -16,21 +15,22 @@ public final class MatchControlService {
 
   private final MatchEngine matchEngine;
   private final ExecutorService matchExecutor;
-  private final AtomicBoolean running = new AtomicBoolean(false);
+  private final MatchExecutionGuard executionGuard;
   private final AtomicReference<Future<?>> activeTask = new AtomicReference<>();
   private final AtomicLong activeTaskId = new AtomicLong();
   private final AtomicLong nextTaskId = new AtomicLong();
 
   public MatchControlService(
-      MatchEngine matchEngine, @Qualifier("matchExecutor") ExecutorService matchExecutor) {
+      MatchEngine matchEngine,
+      @Qualifier("matchExecutor") ExecutorService matchExecutor,
+      MatchExecutionGuard executionGuard) {
     this.matchEngine = matchEngine;
     this.matchExecutor = matchExecutor;
+    this.executionGuard = executionGuard;
   }
 
-  public MatchSnapshot startMatch() {
-    if (!running.compareAndSet(false, true)) {
-      throw new MatchConflictException("Match is already running");
-    }
+  public synchronized MatchSnapshot startMatch() {
+    MatchExecutionGuard.StartReservation reservation = executionGuard.reserveStart();
 
     try {
       Match match = null;
@@ -51,19 +51,27 @@ public final class MatchControlService {
       Future<?> submittedTask =
           matchExecutor.submit(
               () -> {
+                boolean completedNormally = false;
                 try {
                   matchEngine.playUntilFinished();
+                  completedNormally = true;
                 } catch (Exception e) {
                   int ply = 0;
                   try {
                     ply = matchEngine.currentMatch().moveCount() + 1;
-                  } catch (Exception ignored) {
+                  } catch (Exception stateReadFailure) {
+                    log.debug(
+                        "Could not read match state after background failure", stateReadFailure);
                   }
                   log.error("Unexpected background failure in match execution at ply {}", ply, e);
                 } finally {
                   if (activeTaskId.compareAndSet(taskId, 0)) {
                     activeTask.set(null);
-                    running.set(false);
+                    if (completedNormally) {
+                      executionGuard.markFinished();
+                    } else {
+                      executionGuard.abortExecution();
+                    }
                   }
                 }
               });
@@ -72,35 +80,39 @@ public final class MatchControlService {
         activeTask.compareAndSet(submittedTask, null);
       }
 
-      return new MatchSnapshot(match, true);
-    } catch (Exception e) {
+      return snapshot(match);
+    } catch (RuntimeException | Error e) {
       activeTask.set(null);
       activeTaskId.set(0);
-      running.set(false);
+      executionGuard.abortStart(reservation);
       throw e;
     }
   }
 
-  public MatchSnapshot stopMatch() {
-    if (!running.compareAndSet(true, false)) {
-      throw new MatchConflictException("No match is currently running");
+  public synchronized MatchSnapshot stopMatch() {
+    if (executionGuard.markStopped()) {
+      try {
+        matchEngine.stopCurrentMatch();
+      } finally {
+        Future<?> task = activeTask.getAndSet(null);
+        activeTaskId.set(0);
+        if (task != null) {
+          task.cancel(false);
+        }
+      }
     }
-
-    matchEngine.stopCurrentMatch();
-    Future<?> task = activeTask.getAndSet(null);
-    activeTaskId.set(0);
-    if (task != null) {
-      task.cancel(false);
-    }
-    return new MatchSnapshot(matchEngine.currentMatch(), false);
+    return currentMatch();
   }
 
   public MatchSnapshot currentMatch() {
     try {
-      Match match = matchEngine.currentMatch();
-      return new MatchSnapshot(match, running.get());
+      return snapshot(matchEngine.currentMatch());
     } catch (IllegalStateException e) {
       throw new MatchNotFoundException("No match has been started", e);
     }
+  }
+
+  private MatchSnapshot snapshot(Match match) {
+    return new MatchSnapshot(match, executionGuard.isRunning(), executionGuard.availability());
   }
 }

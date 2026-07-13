@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.game.web;
 
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
@@ -11,7 +12,8 @@ public record MatchResponse(
     List<MoveResponse> moves,
     GameStatus status,
     GameResult result,
-    boolean running) {
+    boolean running,
+    MatchStartAvailability startAvailability) {
 
   public MatchResponse {
     moves = moves != null ? List.copyOf(moves) : List.of();

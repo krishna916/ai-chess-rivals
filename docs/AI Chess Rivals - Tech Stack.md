@@ -80,6 +80,11 @@ The frontend is built using **React** with **TypeScript** and bundled with **Vit
 | `@types/react-dom` | `^19.2.3` | React DOM type definitions |
 | `globals` | `^17.6.0` | Environment globals definition |
 | `prettier` | `^3.9.4` | Frontend code formatter and formatting gate |
+| `vitest` | `^4.1.10` | Frontend unit and component test runner (`npm test`) |
+| `@testing-library/react` | `^16.3.2` | React component testing utilities |
+| `@testing-library/dom` | `^10.4.1` | DOM queries used by component tests |
+| `@testing-library/jest-dom` | `^6.9.1` | DOM assertion matchers for Vitest |
+| `jsdom` | `^29.1.1` | Browser-like test environment |
 
 ---
 
@@ -161,6 +166,13 @@ Backend move pacing is configured through Spring `Duration` properties and envir
 *   **Environment Variables**: `GAME_MOVE_DELAY_MIN` and `GAME_MOVE_DELAY_MAX`.
 *   **Default Range**: `3s` to `10s` inclusive between completed non-terminal moves.
 *   **Local Fast Mode**: Set both values to `0s` to keep the same pacing code path without introducing a real delay.
+
+### 4. Owner Match-Control Guard
+Protected Start/Stop operations use a backend-only bearer token and an in-memory, single-instance lifecycle guard.
+*   **Environment Variables**: `OWNER_CONTROL_TOKEN`, `MATCH_COOLDOWN`, and `MATCH_DAILY_START_LIMIT`.
+*   **Frontend Retention**: The manually entered token is kept only in `sessionStorage` on `/admin`; it is not a frontend build variable.
+*   **Runtime Limits**: One active match, a `60s` default cooldown, and `12` accepted starts per UTC day by default.
+*   **Deployment Constraint**: Guard state is process-local, so production uses one backend instance.
 
 ---
 

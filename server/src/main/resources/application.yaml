@@ -36,6 +36,11 @@ management:
       show-details: when-authorized
 
 app:
+  owner:
+    control-token: ${OWNER_CONTROL_TOKEN:}
+  match:
+    cooldown: ${MATCH_COOLDOWN:60s}
+    daily-start-limit: ${MATCH_DAILY_START_LIMIT:12}
   chess:
     stockfish:
       path: ${STOCKFISH_PATH:stockfish/stockfish}

@@ -258,7 +258,7 @@ class MatchEngineTest {
   }
 
   @Test
-  void stopCurrentMatchEmitsNoMatchFinished() {
+  void stopCurrentMatchEmitsStoppedButNoMatchFinished() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
@@ -267,6 +267,11 @@ class MatchEngineTest {
     matchEngine.playUntilFinished();
 
     assertTrue(eventSink.events.stream().noneMatch(MatchFinished.class::isInstance));
+    assertEquals(
+        1,
+        eventSink.events.stream()
+            .filter(dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped.class::isInstance)
+            .count());
   }
 
   @Test

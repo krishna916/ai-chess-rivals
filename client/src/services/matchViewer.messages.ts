@@ -19,6 +19,24 @@ function isSnapshotMove(value: unknown): boolean {
   );
 }
 
+function isStartAvailability(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const validBlockReasons = [
+    "MATCH_ALREADY_RUNNING",
+    "MATCH_COOLDOWN_ACTIVE",
+    "MATCH_DAILY_LIMIT_REACHED",
+  ];
+  return (
+    typeof value.allowed === "boolean" &&
+    (value.blockedBy === null ||
+      (typeof value.blockedBy === "string" &&
+        validBlockReasons.includes(value.blockedBy))) &&
+    typeof value.retryAfterSeconds === "number" &&
+    typeof value.dailyStartsAccepted === "number" &&
+    typeof value.dailyStartLimit === "number"
+  );
+}
+
 export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
   if (!isRecord(data)) return null;
   const msg = data as { type?: string; payload?: unknown };
@@ -26,6 +44,7 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
     "MATCH_STATE",
     "MATCH_STARTED",
     "MOVE_PLAYED",
+    "MATCH_STOPPED",
     "MATCH_FINISHED",
     "NO_MATCH",
   ];
@@ -53,7 +72,8 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
         !Array.isArray(msg.payload.moves) ||
         !msg.payload.moves.every(isSnapshotMove) ||
         typeof msg.payload.status !== "string" ||
-        typeof msg.payload.running !== "boolean"
+        typeof msg.payload.running !== "boolean" ||
+        !isStartAvailability(msg.payload.startAvailability)
       ) {
         return null;
       }
@@ -63,6 +83,16 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
         !hasFen(msg.payload) ||
         (msg.payload.player !== "WHITE" && msg.payload.player !== "BLACK") ||
         typeof msg.payload.ply !== "number"
+      ) {
+        return null;
+      }
+      break;
+    case "MATCH_STOPPED":
+      if (
+        !hasFen(msg.payload) ||
+        (msg.payload.sideToMove !== "WHITE" &&
+          msg.payload.sideToMove !== "BLACK") ||
+        typeof msg.payload.totalPlies !== "number"
       ) {
         return null;
       }

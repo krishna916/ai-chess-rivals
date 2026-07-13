@@ -14,6 +14,18 @@ export interface MoveResponse {
   fenAfterMove: string;
 }
 
+export interface StartAvailability {
+  allowed: boolean;
+  blockedBy:
+    | "MATCH_ALREADY_RUNNING"
+    | "MATCH_COOLDOWN_ACTIVE"
+    | "MATCH_DAILY_LIMIT_REACHED"
+    | null;
+  retryAfterSeconds: number;
+  dailyStartsAccepted: number;
+  dailyStartLimit: number;
+}
+
 export interface MatchResponse {
   sideToMove: "WHITE" | "BLACK";
   fen: string;
@@ -21,6 +33,7 @@ export interface MatchResponse {
   status: MatchStatus;
   result: string | null;
   running: boolean;
+  startAvailability: StartAvailability;
 }
 
 export interface MatchStateMessage extends BaseMessage {
@@ -59,6 +72,15 @@ export interface MatchFinishedMessage extends BaseMessage {
   };
 }
 
+export interface MatchStoppedMessage extends BaseMessage {
+  type: "MATCH_STOPPED";
+  payload: {
+    sideToMove: "WHITE" | "BLACK";
+    fen: string;
+    totalPlies: number;
+  };
+}
+
 export interface NoMatchMessage extends BaseMessage {
   type: "NO_MATCH";
   payload: Record<string, never>;
@@ -68,6 +90,7 @@ export type MatchStreamMessage =
   | MatchStateMessage
   | MatchStartedMessage
   | MovePlayedMessage
+  | MatchStoppedMessage
   | MatchFinishedMessage
   | NoMatchMessage;
 

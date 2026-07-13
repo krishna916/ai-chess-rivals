@@ -5,6 +5,7 @@ import type {
   ConnectionStatus,
   MatchStreamMessage,
   MatchActivityItem,
+  StartAvailability,
 } from "../types/match";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -61,6 +62,7 @@ interface MatchViewerState {
   activities: MatchActivityItem[];
   result?: string;
   error?: string;
+  startAvailability?: StartAvailability;
   setConnectionStatus: (status: ConnectionStatus) => void;
   setError: (error: string) => void;
   processMessage: (msg: MatchStreamMessage) => void;
@@ -92,6 +94,7 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           moveCount: 0,
           activities: [],
           error: undefined,
+          startAvailability: undefined,
         });
         break;
       case "MATCH_STARTED":
@@ -149,6 +152,7 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           moveCount: lastPly,
           result: msg.payload.result || undefined,
           activities,
+          startAvailability: msg.payload.startAvailability,
         });
         break;
       }
@@ -178,6 +182,14 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
             moveCount: msg.payload.ply,
             activities: updatedActivities,
           };
+        });
+        break;
+      case "MATCH_STOPPED":
+        set({
+          matchStatus: "STOPPED",
+          boardFen: msg.payload.fen,
+          activeTurn: msg.payload.sideToMove,
+          moveCount: msg.payload.totalPlies,
         });
         break;
       case "MATCH_FINISHED":
