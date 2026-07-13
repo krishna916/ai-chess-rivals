@@ -1,6 +1,7 @@
 package dev.krishnamurti.ai_chess_rivals.game.websocket;
 
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
+import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
@@ -14,7 +15,8 @@ record MatchStateMessage(
     List<MoveResponse> moves,
     GameStatus status,
     GameResult result,
-    boolean running) {
+    boolean running,
+    MatchStartAvailability startAvailability) {
 
   public MatchStateMessage {
     moves = moves != null ? List.copyOf(moves) : List.of();
@@ -39,6 +41,7 @@ record MatchStateMessage(
         moves,
         match.status(),
         match.result().orElse(null),
-        snapshot.running());
+        snapshot.running(),
+        snapshot.startAvailability());
   }
 }

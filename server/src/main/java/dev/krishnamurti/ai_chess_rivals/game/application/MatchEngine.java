@@ -9,6 +9,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.HashMap;
 import java.util.Map;
@@ -133,7 +134,13 @@ public final class MatchEngine {
   }
 
   public void stopCurrentMatch() {
-    stopRequested.set(true);
+    if (stopRequested.compareAndSet(false, true)) {
+      Match match = currentMatch.get();
+      if (match != null && match.isInProgress()) {
+        matchEventSink.publish(
+            new MatchStopped(match.sideToMove(), match.currentPosition(), match.moveCount()));
+      }
+    }
   }
 
   private boolean waitBeforeNextMove(int ply) {

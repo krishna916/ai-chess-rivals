@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useMatchViewerStore } from "./matchViewerStore";
 
+const startAvailability = {
+  allowed: true,
+  blockedBy: null,
+  retryAfterSeconds: 0,
+  dailyStartsAccepted: 2,
+  dailyStartLimit: 12,
+} as const;
+
 describe("matchViewerStore", () => {
   beforeEach(() => {
     useMatchViewerStore.setState({
@@ -62,6 +70,7 @@ describe("matchViewerStore", () => {
         sideToMove: "WHITE",
         result: "WHITE_WINS",
         running: false,
+        startAvailability,
         moves: [
           {
             sequenceNumber: 2,
@@ -122,6 +131,7 @@ describe("matchViewerStore", () => {
         sideToMove: "WHITE" as const,
         result: null,
         running: true,
+        startAvailability,
         moves: [
           {
             sequenceNumber: 1,
@@ -138,6 +148,7 @@ describe("matchViewerStore", () => {
 
     const state = useMatchViewerStore.getState();
     expect(state.activities).toHaveLength(2); // start + 1 move
+    expect(state.startAvailability).toEqual(startAvailability);
   });
 
   it("should append a move with all event flags on MOVE_PLAYED", () => {
@@ -217,6 +228,7 @@ describe("matchViewerStore", () => {
   it("should clear activities on NO_MATCH", () => {
     useMatchViewerStore.setState({
       activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
+      startAvailability,
     });
 
     useMatchViewerStore.getState().processMessage({
@@ -226,6 +238,7 @@ describe("matchViewerStore", () => {
 
     const state = useMatchViewerStore.getState();
     expect(state.activities).toEqual([]);
+    expect(state.startAvailability).toBeUndefined();
   });
 
   it("hydrates the actual backend snapshot contract as a stopped match", () => {
@@ -237,6 +250,7 @@ describe("matchViewerStore", () => {
         sideToMove: "BLACK",
         result: null,
         running: false,
+        startAvailability,
         moves: [
           {
             sequenceNumber: 1,
@@ -254,6 +268,7 @@ describe("matchViewerStore", () => {
       activeTurn: "BLACK",
       matchStatus: "STOPPED",
       result: undefined,
+      startAvailability,
     });
     expect(useMatchViewerStore.getState().activities[1]).toMatchObject({
       player: "WHITE",
@@ -289,6 +304,7 @@ describe("matchViewerStore", () => {
         sideToMove: "WHITE",
         result: "BLACK_WINS",
         running: false,
+        startAvailability,
         moves: [
           {
             sequenceNumber: 1,
@@ -350,6 +366,7 @@ describe("matchViewerStore", () => {
         sideToMove: "BLACK",
         result: null,
         running: true,
+        startAvailability,
         moves: moves.map(([player, notation], index) => ({
           sequenceNumber: index + 1,
           player,
@@ -364,5 +381,21 @@ describe("matchViewerStore", () => {
         .getState()
         .activities.find((item) => item.id === "move-9"),
     ).toMatchObject({ capture: true, promotion: true });
+  });
+
+  it("marks a live match stopped from the server event", () => {
+    useMatchViewerStore.setState({ matchStatus: "IN_PROGRESS", moveCount: 1 });
+
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STOPPED",
+      payload: { sideToMove: "BLACK", fen: "after-e4", totalPlies: 1 },
+    });
+
+    expect(useMatchViewerStore.getState()).toMatchObject({
+      matchStatus: "STOPPED",
+      boardFen: "after-e4",
+      activeTurn: "BLACK",
+      moveCount: 1,
+    });
   });
 });

@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { parseMatchMessage } from "./matchViewer.messages";
 
+const startAvailability = {
+  allowed: true,
+  blockedBy: null,
+  retryAfterSeconds: 0,
+  dailyStartsAccepted: 2,
+  dailyStartLimit: 12,
+} as const;
+
 describe("matchViewer.messages", () => {
   it("should safely parse valid messages", () => {
     const msg = { type: "NO_MATCH" };
@@ -39,11 +47,13 @@ describe("matchViewer.messages", () => {
           status: "IN_PROGRESS",
           result: null,
           running: false,
+          startAvailability,
         },
       }),
     ).toMatchObject({
       payload: {
         moves: [{ player: "WHITE", fenAfterMove: "after-e4" }],
+        startAvailability,
       },
     });
   });
@@ -59,8 +69,35 @@ describe("matchViewer.messages", () => {
           status: "IN_PROGRESS",
           result: null,
           running: true,
+          startAvailability,
         },
       }),
     ).toBeNull();
+  });
+
+  it("rejects malformed start availability", () => {
+    expect(
+      parseMatchMessage({
+        type: "MATCH_STATE",
+        payload: {
+          sideToMove: "WHITE",
+          fen: "start",
+          moves: [],
+          status: "IN_PROGRESS",
+          result: null,
+          running: true,
+          startAvailability: { allowed: "yes" },
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("accepts an authoritative MATCH_STOPPED message", () => {
+    expect(
+      parseMatchMessage({
+        type: "MATCH_STOPPED",
+        payload: { sideToMove: "BLACK", fen: "after-e4", totalPlies: 1 },
+      }),
+    ).toMatchObject({ type: "MATCH_STOPPED", payload: { totalPlies: 1 } });
   });
 });

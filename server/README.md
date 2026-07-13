@@ -96,6 +96,44 @@ Set both to `0s` for fast local runs and integration-style verification.
 Stopping a match interrupts an active wait; the latest in-progress position
 remains available for the existing resume flow.
 
+## Owner match controls
+
+`POST /api/v1/match/start` and `POST /api/v1/match/stop` require
+`Authorization: Bearer <owner-token>`. Public match reads and `/ws/match` remain
+anonymous. Set these backend variables locally and in Render:
+
+| Variable | Required/default | Purpose |
+| --- | --- | --- |
+| `OWNER_CONTROL_TOKEN` | Required | Owner bearer token; startup fails when blank |
+| `MATCH_COOLDOWN` | `60s` | Delay after a normal finish or owner Stop |
+| `MATCH_DAILY_START_LIMIT` | `12` | Accepted starts per UTC day |
+
+Generate a random 32-byte token outside the application.
+
+PowerShell:
+
+```powershell
+[Convert]::ToHexString(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+).ToLower()
+```
+
+Linux/macOS:
+
+```bash
+openssl rand -hex 32
+```
+
+Store the generated value in a password manager and in the Render web service's
+`OWNER_CONTROL_TOKEN` environment setting. Never add it to a frontend environment
+variable. Open `/admin`, enter it manually, and use Start/Stop there. The browser
+keeps it only in `sessionStorage`; **Lock Controls** removes it.
+
+Cooldown and accepted-start counters are in memory. The daily counter resets at
+UTC midnight and all guard state resets when the backend restarts. Production must
+therefore run one backend instance; multiple replicas would enforce independent
+counters and active-match state.
+
 ---
 
 ### Upgrading Stockfish
@@ -259,4 +297,7 @@ In Render, set the following environment variables in your web service dashboard
 - `SPRING_FLYWAY_URL`: (Same as `SPRING_DATASOURCE_URL`)
 - `SPRING_FLYWAY_USER`: (Same as `SPRING_DATASOURCE_USERNAME`)
 - `SPRING_FLYWAY_PASSWORD`: (Same as `SPRING_DATASOURCE_PASSWORD`)
+- `OWNER_CONTROL_TOKEN`: (A generated 32-byte hex token; store the same value in a password manager)
+- `MATCH_COOLDOWN`: `60s` (or the desired Spring duration)
+- `MATCH_DAILY_START_LIMIT`: `12` (or the desired positive limit)
 

@@ -19,7 +19,8 @@ public final class MatchResponseMapper {
         moves,
         match.status(),
         match.result().orElse(null),
-        snapshot.running());
+        snapshot.running(),
+        snapshot.startAvailability());
   }
 
   private static MoveResponse mapMove(Move move) {

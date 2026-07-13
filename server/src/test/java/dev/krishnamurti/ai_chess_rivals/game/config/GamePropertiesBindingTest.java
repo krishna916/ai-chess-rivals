@@ -18,7 +18,12 @@ class GamePropertiesBindingTest {
                   ConfigurationPropertiesAutoConfiguration.class,
                   ValidationAutoConfiguration.class))
           .withUserConfiguration(GameConfig.class)
-          .withPropertyValues("app.game.move-think-time-millis=250", "app.game.max-plies=300");
+          .withPropertyValues(
+              "app.game.move-think-time-millis=250",
+              "app.game.max-plies=300",
+              "app.owner.control-token=test-owner-token",
+              "app.match.cooldown=60s",
+              "app.match.daily-start-limit=12");
 
   @Test
   void bindsDurationValues() {

@@ -3,7 +3,6 @@ import { MatchBoard } from "@/features/match-viewer/components/MatchBoard";
 import { PlayerStrip } from "@/features/match-viewer/components/PlayerStrip";
 import { MatchStatusLabel } from "@/features/match-viewer/components/MatchStatusLabel";
 import { ConnectionBadge } from "@/features/match-viewer/components/ConnectionBadge";
-import { MatchControls } from "@/features/match-viewer/components/MatchControls";
 import { MatchActivityPanel } from "@/features/match-viewer/components/MatchActivityPanel";
 
 export function MatchViewerPage() {
@@ -17,7 +16,6 @@ export function MatchViewerPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold">Live Match Viewer</h1>
-              <MatchControls />
             </div>
             <ConnectionBadge />
           </div>

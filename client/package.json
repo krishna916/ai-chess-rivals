@@ -10,6 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
     "verify": "node scripts/verify.js",
     "preview": "vite preview"
   },

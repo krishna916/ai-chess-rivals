@@ -4,6 +4,7 @@ public enum MatchStreamMessageType {
   MATCH_STATE,
   MATCH_STARTED,
   MOVE_PLAYED,
+  MATCH_STOPPED,
   MATCH_FINISHED,
   NO_MATCH
 }

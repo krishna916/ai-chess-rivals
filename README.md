@@ -214,6 +214,29 @@ Frontend dev server: `http://localhost:5173`
 | `STOCKFISH_THREADS` | `1` |
 | `STOCKFISH_HASH_MB` | `16` |
 | `APP_WEBSOCKET_ALLOWED_ORIGIN` | `http://localhost:5173` |
+| `OWNER_CONTROL_TOKEN` | Required; generate a random 32-byte token |
+| `MATCH_COOLDOWN` | `60s` |
+| `MATCH_DAILY_START_LIMIT` | `12` accepted starts per UTC day |
+
+Generate `OWNER_CONTROL_TOKEN` with PowerShell:
+
+```powershell
+[Convert]::ToHexString(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+).ToLower()
+```
+
+Or on Linux/macOS:
+
+```bash
+openssl rand -hex 32
+```
+
+Configure the same token in the backend/Render environment and your password
+manager. Enter it manually at `http://localhost:5173/admin`; it is retained only
+in that tab's `sessionStorage`. The public `/` route is read-only. Cooldown and
+daily quota state are in memory, reset on restart, and require a single backend
+instance.
 
 ## Live Match Stream
 
