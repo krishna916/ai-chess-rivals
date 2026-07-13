@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
+import dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide;
+import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
@@ -18,11 +20,14 @@ class ChessBoardServiceTest {
   @Test
   void applyMoveReturnsMetadataForQuietMove() {
     AppliedMove appliedMove =
-        chessBoardService.applyMove(BoardPosition.STARTING_POSITION, new MoveNotation("e2e4"));
+        chessBoardService.applyMove(BoardPosition.STARTING_POSITION, new MoveNotation("g1f3"));
 
     assertEquals(
-        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
-        appliedMove.position().fen());
+        "rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1", appliedMove.position().fen());
+    assertEquals(ChessPieceType.KNIGHT, appliedMove.details().movingPiece());
+    assertEquals(PlayerColor.WHITE, appliedMove.details().movingPieceColor());
+    assertEquals("g1", appliedMove.details().sourceSquare());
+    assertEquals("f3", appliedMove.details().destinationSquare());
     assertFalse(appliedMove.capture());
     assertFalse(appliedMove.check());
     assertFalse(appliedMove.checkmate());
@@ -40,6 +45,10 @@ class ChessBoardServiceTest {
     assertEquals(
         "rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3", appliedMove.position().fen());
     assertTrue(appliedMove.capture());
+    assertEquals(ChessPieceType.PAWN, appliedMove.details().movingPiece());
+    assertEquals(PlayerColor.BLACK, appliedMove.details().movingPieceColor());
+    assertEquals(ChessPieceType.PAWN, appliedMove.details().capturedPiece());
+    assertEquals(PlayerColor.WHITE, appliedMove.details().capturedPieceColor());
     assertFalse(appliedMove.check());
     assertFalse(appliedMove.checkmate());
     assertFalse(appliedMove.promotion());
@@ -56,6 +65,8 @@ class ChessBoardServiceTest {
     assertEquals(
         "rnbqkbnr/ppp1pppp/3P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3", appliedMove.position().fen());
     assertTrue(appliedMove.capture());
+    assertEquals(ChessPieceType.PAWN, appliedMove.details().capturedPiece());
+    assertEquals(PlayerColor.BLACK, appliedMove.details().capturedPieceColor());
     assertFalse(appliedMove.check());
     assertFalse(appliedMove.checkmate());
     assertFalse(appliedMove.promotion());
@@ -143,6 +154,27 @@ class ChessBoardServiceTest {
     assertTrue(appliedMove.check());
     assertFalse(appliedMove.checkmate());
     assertTrue(appliedMove.promotion());
+    assertEquals(ChessPieceType.QUEEN, appliedMove.details().promotedPiece());
+  }
+
+  @Test
+  void applyMoveDetectsKingsideCastling() {
+    BoardPosition position = new BoardPosition("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+
+    AppliedMove appliedMove = chessBoardService.applyMove(position, new MoveNotation("e1g1"));
+
+    assertEquals(ChessPieceType.KING, appliedMove.details().movingPiece());
+    assertEquals(CastlingSide.KING_SIDE, appliedMove.details().castlingSide());
+  }
+
+  @Test
+  void applyMoveDetectsQueensideCastling() {
+    BoardPosition position = new BoardPosition("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+
+    AppliedMove appliedMove = chessBoardService.applyMove(position, new MoveNotation("e1c1"));
+
+    assertEquals(ChessPieceType.KING, appliedMove.details().movingPiece());
+    assertEquals(CastlingSide.QUEEN_SIDE, appliedMove.details().castlingSide());
   }
 
   @Test

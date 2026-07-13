@@ -6,9 +6,12 @@ import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
+import dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide;
+import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
@@ -27,10 +30,17 @@ class MatchStreamMessageMapperTest {
             PlayerColor.WHITE,
             new MoveNotation("e2e4"),
             new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
-            false,
-            false,
-            false,
-            false);
+            new MoveDetails(
+                ChessPieceType.PAWN,
+                PlayerColor.WHITE,
+                "e2",
+                "e4",
+                ChessPieceType.ROOK,
+                PlayerColor.BLACK,
+                ChessPieceType.QUEEN,
+                CastlingSide.KING_SIDE,
+                false,
+                false));
 
     MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(event);
 
@@ -40,10 +50,18 @@ class MatchStreamMessageMapperTest {
     assertEquals(1, payload.ply());
     assertEquals("e2e4", payload.notation());
     assertEquals("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", payload.fen());
-    assertFalse(payload.capture());
+    assertEquals(ChessPieceType.PAWN, payload.movingPiece());
+    assertEquals(PlayerColor.WHITE, payload.movingPieceColor());
+    assertEquals("e2", payload.sourceSquare());
+    assertEquals("e4", payload.destinationSquare());
+    assertEquals(ChessPieceType.ROOK, payload.capturedPiece());
+    assertEquals(PlayerColor.BLACK, payload.capturedPieceColor());
+    assertEquals(ChessPieceType.QUEEN, payload.promotedPiece());
+    assertEquals(CastlingSide.KING_SIDE, payload.castlingSide());
+    assertTrue(payload.capture());
     assertFalse(payload.check());
     assertFalse(payload.checkmate());
-    assertFalse(payload.promotion());
+    assertTrue(payload.promotion());
   }
 
   @Test

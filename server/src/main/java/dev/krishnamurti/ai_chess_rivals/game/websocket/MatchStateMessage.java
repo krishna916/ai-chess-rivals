@@ -24,16 +24,7 @@ record MatchStateMessage(
 
   public static MatchStateMessage from(MatchSnapshot snapshot) {
     Match match = snapshot.match();
-    List<MoveResponse> moves =
-        match.moves().stream()
-            .map(
-                move ->
-                    new MoveResponse(
-                        move.sequenceNumber(),
-                        move.playedBy(),
-                        move.notation().value(),
-                        move.positionAfterMove().fen()))
-            .toList();
+    List<MoveResponse> moves = match.moves().stream().map(MoveResponse::from).toList();
 
     return new MatchStateMessage(
         match.sideToMove(),

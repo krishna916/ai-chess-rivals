@@ -3,7 +3,9 @@ package dev.krishnamurti.ai_chess_rivals.game.event;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
+import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import org.junit.jupiter.api.Test;
@@ -27,10 +29,7 @@ class MatchEventTest {
                 null,
                 new MoveNotation("e2e4"),
                 BoardPosition.STARTING_POSITION,
-                false,
-                false,
-                false,
-                false));
+                quietPawnMoveDetails()));
     assertThrows(
         NullPointerException.class,
         () ->
@@ -39,15 +38,21 @@ class MatchEventTest {
                 PlayerColor.WHITE,
                 null,
                 BoardPosition.STARTING_POSITION,
-                false,
-                false,
-                false,
-                false));
+                quietPawnMoveDetails()));
     assertThrows(
         NullPointerException.class,
         () ->
             new MovePlayed(
-                1, PlayerColor.WHITE, new MoveNotation("e2e4"), null, false, false, false, false));
+                1, PlayerColor.WHITE, new MoveNotation("e2e4"), null, quietPawnMoveDetails()));
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            new MovePlayed(
+                1,
+                PlayerColor.WHITE,
+                new MoveNotation("e2e4"),
+                BoardPosition.STARTING_POSITION,
+                null));
   }
 
   @Test
@@ -60,10 +65,7 @@ class MatchEventTest {
                 PlayerColor.WHITE,
                 new MoveNotation("e2e4"),
                 BoardPosition.STARTING_POSITION,
-                false,
-                false,
-                false,
-                false));
+                quietPawnMoveDetails()));
   }
 
   @Test
@@ -79,5 +81,10 @@ class MatchEventTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> new MatchFinished(GameResult.DRAW, BoardPosition.STARTING_POSITION, -1));
+  }
+
+  private static MoveDetails quietPawnMoveDetails() {
+    return new MoveDetails(
+        ChessPieceType.PAWN, PlayerColor.WHITE, "e2", "e4", null, null, null, null, false, false);
   }
 }

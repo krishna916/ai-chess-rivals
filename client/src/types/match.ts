@@ -2,6 +2,10 @@ export type MatchStatus =
   "IDLE" | "NOT_STARTED" | "IN_PROGRESS" | "STOPPED" | "FINISHED";
 export type ConnectionStatus =
   "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ERROR";
+export type PlayerColor = "WHITE" | "BLACK";
+export type ChessPieceType =
+  "PAWN" | "KNIGHT" | "BISHOP" | "ROOK" | "QUEEN" | "KING";
+export type CastlingSide = "KING_SIDE" | "QUEEN_SIDE";
 
 export interface BaseMessage {
   type: string;
@@ -9,9 +13,21 @@ export interface BaseMessage {
 
 export interface MoveResponse {
   sequenceNumber: number;
-  player: "WHITE" | "BLACK";
+  player: PlayerColor;
   notation: string;
   fenAfterMove: string;
+  movingPiece: ChessPieceType;
+  movingPieceColor: PlayerColor;
+  sourceSquare: string;
+  destinationSquare: string;
+  capturedPiece: ChessPieceType | null;
+  capturedPieceColor: PlayerColor | null;
+  promotedPiece: ChessPieceType | null;
+  castlingSide: CastlingSide | null;
+  capture: boolean;
+  check: boolean;
+  checkmate: boolean;
+  promotion: boolean;
 }
 
 export interface StartAvailability {
@@ -27,7 +43,7 @@ export interface StartAvailability {
 }
 
 export interface MatchResponse {
-  sideToMove: "WHITE" | "BLACK";
+  sideToMove: PlayerColor;
   fen: string;
   moves: MoveResponse[];
   status: MatchStatus;
@@ -44,7 +60,7 @@ export interface MatchStateMessage extends BaseMessage {
 export interface MatchStartedMessage extends BaseMessage {
   type: "MATCH_STARTED";
   payload: {
-    sideToMove: "WHITE" | "BLACK";
+    sideToMove: PlayerColor;
     fen: string;
   };
 }
@@ -53,9 +69,17 @@ export interface MovePlayedMessage extends BaseMessage {
   type: "MOVE_PLAYED";
   payload: {
     ply: number;
-    player: "WHITE" | "BLACK";
+    player: PlayerColor;
     notation: string;
     fen: string;
+    movingPiece: ChessPieceType;
+    movingPieceColor: PlayerColor;
+    sourceSquare: string;
+    destinationSquare: string;
+    capturedPiece: ChessPieceType | null;
+    capturedPieceColor: PlayerColor | null;
+    promotedPiece: ChessPieceType | null;
+    castlingSide: CastlingSide | null;
     capture: boolean;
     check: boolean;
     checkmate: boolean;
@@ -75,7 +99,7 @@ export interface MatchFinishedMessage extends BaseMessage {
 export interface MatchStoppedMessage extends BaseMessage {
   type: "MATCH_STOPPED";
   payload: {
-    sideToMove: "WHITE" | "BLACK";
+    sideToMove: PlayerColor;
     fen: string;
     totalPlies: number;
   };
@@ -96,15 +120,39 @@ export type MatchStreamMessage =
 
 export type MatchActivityKind = "MATCH_STARTED" | "MOVE" | "MATCH_FINISHED";
 
-export interface MatchActivityItem {
+export interface MatchStartedActivityItem {
   id: string;
-  kind: MatchActivityKind;
+  kind: "MATCH_STARTED";
   sequence: number;
-  player?: "WHITE" | "BLACK";
-  notation?: string;
-  capture?: boolean;
-  check?: boolean;
-  checkmate?: boolean;
-  promotion?: boolean;
-  result?: string;
 }
+
+export interface MoveActivityItem {
+  id: string;
+  kind: "MOVE";
+  sequence: number;
+  player: PlayerColor;
+  notation: string;
+  movingPiece: ChessPieceType;
+  movingPieceColor: PlayerColor;
+  sourceSquare: string;
+  destinationSquare: string;
+  capturedPiece?: ChessPieceType;
+  capturedPieceColor?: PlayerColor;
+  promotedPiece?: ChessPieceType;
+  castlingSide?: CastlingSide;
+  capture: boolean;
+  check: boolean;
+  checkmate: boolean;
+  promotion: boolean;
+  isNew: boolean;
+}
+
+export interface MatchFinishedActivityItem {
+  id: string;
+  kind: "MATCH_FINISHED";
+  sequence: number;
+  result: string;
+}
+
+export type MatchActivityItem =
+  MatchStartedActivityItem | MoveActivityItem | MatchFinishedActivityItem;

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
+import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
@@ -204,6 +205,11 @@ class MatchEngineTest {
     assertEquals(PlayerColor.WHITE, movePlayed.player());
     assertEquals("e2e4", movePlayed.notation().value());
     assertEquals(finalMatch.moves().getFirst().positionAfterMove(), movePlayed.position());
+    assertEquals(ChessPieceType.PAWN, movePlayed.movingPiece());
+    assertEquals(PlayerColor.WHITE, movePlayed.movingPieceColor());
+    assertEquals("e2", movePlayed.sourceSquare());
+    assertEquals("e4", movePlayed.destinationSquare());
+    assertEquals(finalMatch.moves().getFirst().details(), movePlayed.details());
     assertFalse(movePlayed.capture());
     assertFalse(movePlayed.check());
     assertFalse(movePlayed.checkmate());

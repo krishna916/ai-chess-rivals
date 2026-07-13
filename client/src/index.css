@@ -128,3 +128,53 @@
     @apply font-sans;
   }
 }
+
+@keyframes capture-row-arrival {
+  0%,
+  45% {
+    background-color: color-mix(
+      in oklab,
+      var(--color-rose-500) 16%,
+      transparent
+    );
+    border-color: color-mix(in oklab, var(--color-rose-500) 45%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    border-color: transparent;
+  }
+}
+
+@keyframes capture-indicator-impact {
+  0% {
+    transform: scale(0.75) rotate(-10deg) translateY(1px);
+  }
+  60% {
+    transform: scale(1.15) rotate(5deg) translateY(-1px);
+  }
+  100% {
+    transform: scale(1) rotate(0deg) translateY(0);
+  }
+}
+
+.capture-row-arrival {
+  animation: capture-row-arrival 1000ms ease-out both;
+}
+
+.capture-indicator-arrival {
+  animation: capture-indicator-impact 420ms ease-out;
+}
+
+.group:hover .capture-indicator-hover,
+.group:focus-visible .capture-indicator-hover {
+  animation: capture-indicator-impact 420ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-row-arrival,
+  .capture-indicator-arrival,
+  .group:hover .capture-indicator-hover,
+  .group:focus-visible .capture-indicator-hover {
+    animation: none;
+  }
+}

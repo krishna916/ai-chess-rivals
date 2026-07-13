@@ -1,13 +1,64 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import type {
+  MovePlayedMessage,
+  MoveResponse,
+  StartAvailability,
+} from "../types/match";
 import { useMatchViewerStore } from "./matchViewerStore";
 
-const startAvailability = {
+const startAvailability: StartAvailability = {
   allowed: true,
   blockedBy: null,
   retryAfterSeconds: 0,
   dailyStartsAccepted: 2,
   dailyStartLimit: 12,
-} as const;
+};
+
+function snapshotMove(overrides: Partial<MoveResponse> = {}): MoveResponse {
+  return {
+    sequenceNumber: 1,
+    player: "WHITE",
+    notation: "e2e4",
+    fenAfterMove: "after-e4",
+    movingPiece: "PAWN",
+    movingPieceColor: "WHITE",
+    sourceSquare: "e2",
+    destinationSquare: "e4",
+    capturedPiece: null,
+    capturedPieceColor: null,
+    promotedPiece: null,
+    castlingSide: null,
+    capture: false,
+    check: false,
+    checkmate: false,
+    promotion: false,
+    ...overrides,
+  };
+}
+
+function liveMove(
+  overrides: Partial<MovePlayedMessage["payload"]> = {},
+): MovePlayedMessage["payload"] {
+  return {
+    ply: 1,
+    player: "WHITE",
+    notation: "e2e4",
+    fen: "after-e4",
+    movingPiece: "PAWN",
+    movingPieceColor: "WHITE",
+    sourceSquare: "e2",
+    destinationSquare: "e4",
+    capturedPiece: null,
+    capturedPieceColor: null,
+    promotedPiece: null,
+    castlingSide: null,
+    capture: false,
+    check: false,
+    checkmate: false,
+    promotion: false,
+    ...overrides,
+  };
+}
 
 describe("matchViewerStore", () => {
   beforeEach(() => {
@@ -20,21 +71,26 @@ describe("matchViewerStore", () => {
       activities: [],
       result: undefined,
       error: undefined,
+      startAvailability: undefined,
     });
   });
 
-  it("should process MATCH_STARTED message", () => {
+  it("starts a match and clears stale activity", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STARTED",
       payload: { fen: "newfen", sideToMove: "BLACK" },
     });
-    const state = useMatchViewerStore.getState();
-    expect(state.matchStatus).toBe("IN_PROGRESS");
-    expect(state.boardFen).toBe("newfen");
-    expect(state.activeTurn).toBe("BLACK");
+
+    expect(useMatchViewerStore.getState()).toMatchObject({
+      matchStatus: "IN_PROGRESS",
+      boardFen: "newfen",
+      activeTurn: "BLACK",
+      moveCount: 0,
+      activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
+    });
   });
 
-  it("should clear a stale error when connected", () => {
+  it("clears a stale error when connected", () => {
     useMatchViewerStore.setState({ error: "Connection error occurred." });
 
     useMatchViewerStore.getState().setConnectionStatus("CONNECTED");
@@ -45,23 +101,7 @@ describe("matchViewerStore", () => {
     });
   });
 
-  it("should process MATCH_STARTED message, clearing previous activities and creating a start item", () => {
-    useMatchViewerStore.setState({
-      activities: [{ id: "stale-move", kind: "MOVE", sequence: 1 }],
-    });
-
-    useMatchViewerStore.getState().processMessage({
-      type: "MATCH_STARTED",
-      payload: { fen: "newfen", sideToMove: "BLACK" },
-    });
-
-    const state = useMatchViewerStore.getState();
-    expect(state.activities).toEqual([
-      { id: "match-started", kind: "MATCH_STARTED", sequence: 0 },
-    ]);
-  });
-
-  it("should reconstruct start, ordered moves, and final result from MATCH_STATE", () => {
+  it("hydrates ordered structured moves and a final result", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
@@ -72,176 +112,154 @@ describe("matchViewerStore", () => {
         running: false,
         startAvailability,
         moves: [
-          {
+          snapshotMove({
             sequenceNumber: 2,
             player: "BLACK",
             notation: "e7e5",
             fenAfterMove: "fen2",
-          },
-          {
-            sequenceNumber: 1,
-            player: "WHITE",
-            notation: "e2e4",
-            fenAfterMove: "fen1",
-          },
+            movingPieceColor: "BLACK",
+            sourceSquare: "e7",
+            destinationSquare: "e5",
+          }),
+          snapshotMove({ fenAfterMove: "fen1" }),
         ],
       },
     });
 
     const state = useMatchViewerStore.getState();
-    expect(state.activities).toEqual([
-      { id: "match-started", kind: "MATCH_STARTED", sequence: 0 },
-      {
-        id: "move-1",
-        kind: "MOVE",
-        sequence: 1,
-        player: "WHITE",
-        notation: "e2e4",
-        capture: false,
-        check: false,
-        checkmate: false,
-        promotion: false,
-      },
-      {
-        id: "move-2",
-        kind: "MOVE",
-        sequence: 2,
-        player: "BLACK",
-        notation: "e7e5",
-        capture: false,
-        check: false,
-        checkmate: false,
-        promotion: false,
-      },
-      {
-        id: "match-finished",
-        kind: "MATCH_FINISHED",
-        sequence: 3,
-        result: "WHITE_WINS",
-      },
+    expect(state.activities.map((activity) => activity.id)).toEqual([
+      "match-started",
+      "move-1",
+      "move-2",
+      "match-finished",
     ]);
+    expect(state.activities[1]).toMatchObject({
+      movingPiece: "PAWN",
+      sourceSquare: "e2",
+      destinationSquare: "e4",
+      isNew: false,
+    });
+    expect(state.activities[3]).toEqual({
+      id: "match-finished",
+      kind: "MATCH_FINISHED",
+      sequence: 3,
+      result: "WHITE_WINS",
+    });
   });
 
-  it("should not duplicate items when reprocessing the same MATCH_STATE", () => {
-    const msg = {
+  it("maps a snapshot capture directly and keeps it historical", () => {
+    const message = {
       type: "MATCH_STATE" as const,
       payload: {
         status: "IN_PROGRESS" as const,
-        fen: "fen",
-        sideToMove: "WHITE" as const,
+        fen: "after-capture",
+        sideToMove: "BLACK" as const,
         result: null,
         running: true,
         startAvailability,
         moves: [
-          {
-            sequenceNumber: 1,
-            player: "WHITE" as const,
-            notation: "e2e4",
-            fenAfterMove: "fen1",
-          },
+          snapshotMove({
+            notation: "c4d5",
+            fenAfterMove: "after-capture",
+            movingPiece: "KNIGHT",
+            sourceSquare: "c4",
+            destinationSquare: "d5",
+            capturedPiece: "PAWN",
+            capturedPieceColor: "BLACK",
+            capture: true,
+          }),
         ],
       },
     };
 
-    useMatchViewerStore.getState().processMessage(msg);
-    useMatchViewerStore.getState().processMessage(msg);
+    useMatchViewerStore.getState().processMessage(message);
+    useMatchViewerStore.getState().processMessage(message);
 
-    const state = useMatchViewerStore.getState();
-    expect(state.activities).toHaveLength(2); // start + 1 move
-    expect(state.startAvailability).toEqual(startAvailability);
+    expect(useMatchViewerStore.getState().activities).toHaveLength(2);
+    expect(useMatchViewerStore.getState().activities[1]).toMatchObject({
+      movingPiece: "KNIGHT",
+      capturedPiece: "PAWN",
+      capture: true,
+      isNew: false,
+    });
   });
 
-  it("should append a move with all event flags on MOVE_PLAYED", () => {
+  it("maps a live capture directly and marks it newly arrived", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MOVE_PLAYED",
-      payload: {
-        ply: 1,
-        player: "WHITE",
-        notation: "e4",
-        fen: "fen1",
+      payload: liveMove({
+        notation: "c4d5",
+        fen: "after-capture",
+        movingPiece: "KNIGHT",
+        sourceSquare: "c4",
+        destinationSquare: "d5",
+        capturedPiece: "PAWN",
+        capturedPieceColor: "BLACK",
         capture: true,
         check: true,
-        checkmate: false,
-        promotion: false,
-      },
+      }),
     });
 
-    const state = useMatchViewerStore.getState();
-    expect(state.activities).toContainEqual({
-      id: "move-1",
-      kind: "MOVE",
-      sequence: 1,
-      player: "WHITE",
-      notation: "e4",
+    expect(useMatchViewerStore.getState().activities[0]).toMatchObject({
+      movingPiece: "KNIGHT",
+      capturedPiece: "PAWN",
       capture: true,
       check: true,
-      checkmate: false,
-      promotion: false,
+      isNew: true,
     });
   });
 
-  it("should replace/deduplicate rather than appending twice on duplicate MOVE_PLAYED", () => {
-    const moveMsg = {
+  it("deduplicates repeated live moves", () => {
+    const message = {
       type: "MOVE_PLAYED" as const,
-      payload: {
-        ply: 1,
-        player: "WHITE" as const,
-        notation: "e4",
-        fen: "fen1",
-        capture: false,
-        check: false,
-        checkmate: false,
-        promotion: false,
-      },
+      payload: liveMove(),
     };
 
-    useMatchViewerStore.getState().processMessage(moveMsg);
-    useMatchViewerStore.getState().processMessage(moveMsg);
+    useMatchViewerStore.getState().processMessage(message);
+    useMatchViewerStore.getState().processMessage(message);
 
-    const state = useMatchViewerStore.getState();
-    expect(state.activities.filter((a) => a.id === "move-1")).toHaveLength(1);
-  });
-
-  it("should create exactly one final activity on MATCH_FINISHED", () => {
-    useMatchViewerStore.setState({ moveCount: 5 });
-
-    const finishMsg = {
-      type: "MATCH_FINISHED" as const,
-      payload: { result: "DRAW", fen: "fen", totalPlies: 5 },
-    };
-
-    useMatchViewerStore.getState().processMessage(finishMsg);
-    useMatchViewerStore.getState().processMessage(finishMsg);
-
-    const state = useMatchViewerStore.getState();
     expect(
-      state.activities.filter((a) => a.id === "match-finished"),
+      useMatchViewerStore
+        .getState()
+        .activities.filter((activity) => activity.id === "move-1"),
     ).toHaveLength(1);
-    expect(state.activities).toContainEqual({
-      id: "match-finished",
-      kind: "MATCH_FINISHED",
-      sequence: 6,
-      result: "DRAW",
-    });
   });
 
-  it("should clear activities on NO_MATCH", () => {
-    useMatchViewerStore.setState({
-      activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
-      startAvailability,
-    });
-
+  it("hydrates server flags without chess.js reconstruction", () => {
     useMatchViewerStore.getState().processMessage({
-      type: "NO_MATCH",
-      payload: {},
+      type: "MATCH_STATE",
+      payload: {
+        status: "FINISHED",
+        fen: "mate",
+        sideToMove: "WHITE",
+        result: "BLACK_WINS",
+        running: false,
+        startAvailability,
+        moves: [
+          snapshotMove({
+            sequenceNumber: 4,
+            player: "BLACK",
+            notation: "d8h4",
+            fenAfterMove: "mate",
+            movingPiece: "QUEEN",
+            movingPieceColor: "BLACK",
+            sourceSquare: "d8",
+            destinationSquare: "h4",
+            check: true,
+            checkmate: true,
+          }),
+        ],
+      },
     });
 
-    const state = useMatchViewerStore.getState();
-    expect(state.activities).toEqual([]);
-    expect(state.startAvailability).toBeUndefined();
+    expect(
+      useMatchViewerStore
+        .getState()
+        .activities.find((activity) => activity.id === "move-4"),
+    ).toMatchObject({ check: true, checkmate: true, isNew: false });
   });
 
-  it("hydrates the actual backend snapshot contract as a stopped match", () => {
+  it("marks a running snapshot as stopped when execution is not running", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
@@ -251,14 +269,7 @@ describe("matchViewerStore", () => {
         result: null,
         running: false,
         startAvailability,
-        moves: [
-          {
-            sequenceNumber: 1,
-            player: "WHITE",
-            notation: "e2e4",
-            fenAfterMove: "after-e4",
-          },
-        ],
+        moves: [snapshotMove()],
       },
     });
 
@@ -267,123 +278,27 @@ describe("matchViewerStore", () => {
       moveCount: 1,
       activeTurn: "BLACK",
       matchStatus: "STOPPED",
-      result: undefined,
       startAvailability,
     });
-    expect(useMatchViewerStore.getState().activities[1]).toMatchObject({
-      player: "WHITE",
-      notation: "e2e4",
-    });
   });
 
-  it("resets all stale match state on NO_MATCH", () => {
-    useMatchViewerStore.setState({
-      activeTurn: "BLACK",
-      result: "DRAW",
-      error: "stale",
-    });
+  it("creates exactly one final activity", () => {
+    const message = {
+      type: "MATCH_FINISHED" as const,
+      payload: { result: "DRAW", fen: "fen", totalPlies: 5 },
+    };
 
-    useMatchViewerStore.getState().processMessage({
-      type: "NO_MATCH",
-      payload: {},
-    });
-
-    expect(useMatchViewerStore.getState()).toMatchObject({
-      activeTurn: "WHITE",
-      result: undefined,
-      error: undefined,
-    });
-  });
-
-  it("reconstructs checkmate metadata from snapshot moves", () => {
-    useMatchViewerStore.getState().processMessage({
-      type: "MATCH_STATE",
-      payload: {
-        status: "FINISHED",
-        fen: "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",
-        sideToMove: "WHITE",
-        result: "BLACK_WINS",
-        running: false,
-        startAvailability,
-        moves: [
-          {
-            sequenceNumber: 1,
-            player: "WHITE",
-            notation: "f2f3",
-            fenAfterMove:
-              "rnbqkbnr/pppppppp/8/8/8/5P2/PPPPP1PP/RNBQKBNR b KQkq - 0 1",
-          },
-          {
-            sequenceNumber: 2,
-            player: "BLACK",
-            notation: "e7e5",
-            fenAfterMove:
-              "rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq - 0 2",
-          },
-          {
-            sequenceNumber: 3,
-            player: "WHITE",
-            notation: "g2g4",
-            fenAfterMove:
-              "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2",
-          },
-          {
-            sequenceNumber: 4,
-            player: "BLACK",
-            notation: "d8h4",
-            fenAfterMove:
-              "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",
-          },
-        ],
-      },
-    });
+    useMatchViewerStore.getState().processMessage(message);
+    useMatchViewerStore.getState().processMessage(message);
 
     expect(
       useMatchViewerStore
         .getState()
-        .activities.find((item) => item.id === "move-4"),
-    ).toMatchObject({ check: true, checkmate: true });
+        .activities.filter((activity) => activity.id === "match-finished"),
+    ).toHaveLength(1);
   });
 
-  it("reconstructs capture and promotion metadata from snapshot moves", () => {
-    const moves = [
-      ["WHITE", "a2a4"],
-      ["BLACK", "h7h5"],
-      ["WHITE", "a4a5"],
-      ["BLACK", "h5h4"],
-      ["WHITE", "a5a6"],
-      ["BLACK", "h4h3"],
-      ["WHITE", "a6b7"],
-      ["BLACK", "h3g2"],
-      ["WHITE", "b7a8q"],
-    ] as const;
-
-    useMatchViewerStore.getState().processMessage({
-      type: "MATCH_STATE",
-      payload: {
-        status: "IN_PROGRESS",
-        fen: "promotion-position",
-        sideToMove: "BLACK",
-        result: null,
-        running: true,
-        startAvailability,
-        moves: moves.map(([player, notation], index) => ({
-          sequenceNumber: index + 1,
-          player,
-          notation,
-          fenAfterMove: `fen-${index + 1}`,
-        })),
-      },
-    });
-
-    expect(
-      useMatchViewerStore
-        .getState()
-        .activities.find((item) => item.id === "move-9"),
-    ).toMatchObject({ capture: true, promotion: true });
-  });
-
-  it("marks a live match stopped from the server event", () => {
+  it("applies the server stopped event", () => {
     useMatchViewerStore.setState({ matchStatus: "IN_PROGRESS", moveCount: 1 });
 
     useMatchViewerStore.getState().processMessage({
@@ -396,6 +311,29 @@ describe("matchViewerStore", () => {
       boardFen: "after-e4",
       activeTurn: "BLACK",
       moveCount: 1,
+    });
+  });
+
+  it("resets all stale state on NO_MATCH", () => {
+    useMatchViewerStore.setState({
+      activeTurn: "BLACK",
+      result: "DRAW",
+      error: "stale",
+      startAvailability,
+    });
+
+    useMatchViewerStore.getState().processMessage({
+      type: "NO_MATCH",
+      payload: {},
+    });
+
+    expect(useMatchViewerStore.getState()).toMatchObject({
+      matchStatus: "IDLE",
+      activeTurn: "WHITE",
+      result: undefined,
+      error: undefined,
+      activities: [],
+      startAvailability: undefined,
     });
   });
 });

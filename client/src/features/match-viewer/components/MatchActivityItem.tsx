@@ -1,6 +1,12 @@
 import type { MatchActivityItem as ActivityType } from "@/types/match";
 import { Swords, Trophy, CirclePlay, Crown, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  formatMoveDescription,
+  formatMoveDetail,
+  getPieceAccessibleLabel,
+  getPieceSymbol,
+} from "../lib/formatMoveActivity";
 
 interface MatchActivityItemProps {
   activity: ActivityType;
@@ -30,51 +36,84 @@ export function MatchActivityItem({ activity }: MatchActivityItemProps) {
       );
 
     case "MOVE": {
-      const isWhite = activity.player === "WHITE";
       const moveNumber = Math.ceil(activity.sequence / 2);
+      const pieceLabel = getPieceAccessibleLabel(
+        activity.movingPiece,
+        activity.movingPieceColor,
+      );
+      const captureIndicator = (
+        <span
+          data-testid="capture-indicator-hover"
+          className="capture-indicator-hover inline-flex"
+        >
+          <Swords className="w-3 h-3" />
+        </span>
+      );
 
       return (
-        <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors border border-transparent text-sm">
-          <div className="flex items-center gap-2 text-foreground font-medium">
-            <span className="text-muted-foreground w-8 font-mono text-xs">
+        <div
+          data-testid={`activity-${activity.id}`}
+          tabIndex={activity.capture ? 0 : undefined}
+          className={cn(
+            "group rounded-lg border border-transparent px-3 py-2 text-sm transition-colors hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-neutral-800",
+            activity.capture && activity.isNew && "capture-row-arrival",
+          )}
+        >
+          <div className="flex items-start gap-2">
+            <span className="w-7 shrink-0 pt-0.5 font-mono text-xs text-muted-foreground">
               {moveNumber}.
             </span>
             <span
-              className={cn(
-                "w-3 h-3 rounded-sm border",
-                isWhite
-                  ? "bg-white border-neutral-300"
-                  : "bg-neutral-900 border-black",
-              )}
-              aria-label={activity.player}
-            />
-            <span className="font-mono text-sm">{activity.notation}</span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {activity.checkmate && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300 text-xs font-semibold uppercase tracking-wider">
-                <Crown className="w-3 h-3" />
-                Mate
-              </span>
-            )}
-            {!activity.checkmate && activity.check && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 text-xs font-semibold uppercase tracking-wider">
-                <ShieldAlert className="w-3 h-3" />
-                Check
-              </span>
-            )}
-            {activity.capture && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-xs font-semibold uppercase tracking-wider">
-                <Swords className="w-3 h-3" />
-                Capture
-              </span>
-            )}
-            {activity.promotion && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs font-semibold uppercase tracking-wider">
-                Promotion
-              </span>
-            )}
+              aria-label={pieceLabel}
+              className="w-6 shrink-0 text-center text-xl leading-6"
+            >
+              {getPieceSymbol(activity.movingPiece, activity.movingPieceColor)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium leading-snug text-foreground">
+                {formatMoveDescription(activity)}
+              </p>
+              <p
+                className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground"
+                title={activity.notation}
+              >
+                {formatMoveDetail(activity)}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {activity.checkmate && (
+                  <span className="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                    <Crown className="w-3 h-3" />
+                    Mate
+                  </span>
+                )}
+                {!activity.checkmate && activity.check && (
+                  <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                    <ShieldAlert className="w-3 h-3" />
+                    Check
+                  </span>
+                )}
+                {activity.capture && (
+                  <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                    {activity.isNew ? (
+                      <span
+                        data-testid="capture-indicator-arrival"
+                        className="capture-indicator-arrival inline-flex"
+                      >
+                        {captureIndicator}
+                      </span>
+                    ) : (
+                      captureIndicator
+                    )}
+                    Capture
+                  </span>
+                )}
+                {activity.promotion && (
+                  <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                    Promotion
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       );

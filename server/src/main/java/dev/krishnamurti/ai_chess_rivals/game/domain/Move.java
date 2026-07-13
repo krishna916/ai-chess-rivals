@@ -4,7 +4,8 @@ public record Move(
     int sequenceNumber,
     PlayerColor playedBy,
     MoveNotation notation,
-    BoardPosition positionAfterMove) {
+    BoardPosition positionAfterMove,
+    MoveDetails details) {
 
   public Move {
     if (sequenceNumber <= 0) {
@@ -19,5 +20,16 @@ public record Move(
     if (positionAfterMove == null) {
       throw new NullPointerException("positionAfterMove must not be null");
     }
+    if (details == null) {
+      throw new NullPointerException("details must not be null");
+    }
+  }
+
+  public boolean capture() {
+    return details.capture();
+  }
+
+  public boolean promotion() {
+    return details.promotion();
   }
 }

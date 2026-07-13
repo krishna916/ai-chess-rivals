@@ -90,7 +90,8 @@ public final class MatchEngine {
         PlayerColor player = match.sideToMove();
         AppliedMove appliedMove =
             chessBoardService.applyMove(match.currentPosition(), moveNotation);
-        Match nextMatch = match.recordMove(moveNotation, appliedMove.position());
+        Match nextMatch =
+            match.recordMove(moveNotation, appliedMove.position(), appliedMove.details());
         Move recordedMove = nextMatch.moves().getLast();
         match = nextMatch;
         currentMatch.set(match);
@@ -100,10 +101,7 @@ public final class MatchEngine {
                 player,
                 recordedMove.notation(),
                 recordedMove.positionAfterMove(),
-                appliedMove.capture(),
-                appliedMove.check(),
-                appliedMove.checkmate(),
-                appliedMove.promotion()));
+                recordedMove.details()));
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         result =

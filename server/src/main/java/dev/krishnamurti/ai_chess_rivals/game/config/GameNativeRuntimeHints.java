@@ -57,5 +57,24 @@ public class GameNativeRuntimeHints implements RuntimeHintsRegistrar {
             dev.krishnamurti.ai_chess_rivals.game.web.MoveResponse.class,
             MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
             MemberCategory.INVOKE_DECLARED_METHODS);
+
+    hints
+        .reflection()
+        .registerType(
+            dev.krishnamurti.ai_chess_rivals.game.websocket.MovePlayedMessage.class,
+            MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+            MemberCategory.INVOKE_DECLARED_METHODS);
+
+    hints
+        .reflection()
+        .registerType(
+            dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType.class,
+            MemberCategory.INVOKE_DECLARED_METHODS);
+
+    hints
+        .reflection()
+        .registerType(
+            dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide.class,
+            MemberCategory.INVOKE_DECLARED_METHODS);
   }
 }
