@@ -34,20 +34,46 @@ If a local connection fails with `password authentication failed` or connects to
 
 ## 3. Core Architectural Constraints
 
-To preserve the simplicity and focus of this showcase project (as outlined in the [Constitution](file:///D:/projects/ai-chess-rivals/docs/AI%20Chess%20Rivals%20-%20Constitution.md)):
+To preserve the simplicity and focus of this showcase project (as outlined in the [Constitution](../docs/AI%20Chess%20Rivals%20-%20Constitution.md)):
 
 - **LLM Boundary**: LLMs must be used *exclusively* for entertainment (trash talk, match commentary, mocking, reactions). **Never** write code that attempts to calculate chess moves or validate rules via LLMs.
-- **Stockfish Boundary**: Stockfish is the sole engine responsible for move legality, candidate move generation, and positional evaluation. It must never handle personality traits. The personality selection layer must filter/evaluate Stockfish's candidate moves based on play-style traits (aggression, risk, blunders).
+- **Stockfish Boundary**: Stockfish is the sole engine responsible for move legality, candidate move generation, and positional evaluation. It must never handle personality traits, and personality code must never select, validate, or replace a chess move.
+- **Phase 2 AI Boundary**: Phase 2 uses Spring AI; Groq is primary and Gemini is the only automatic fallback.
+- **Provider Configuration**: Provider and model names are environment-configurable.
+- **Phase 3 Deferrals**: Tools, chat memory, autonomous agents, and multi-step workflows are Phase 3 concerns.
 - **Out of Scope (MVP constraints)**: Do **not** implement vector databases, user registration/accounts, multiplayer matches, complex multi-agent orchestrators, or microservices. Keep code explicitly modular-monolithic (using Spring Modulith).
 - **Database Migrations**: In local development, `spring.jpa.hibernate.ddl-auto` defaults to `update` for rapid prototyping. For production (Render + Neon), all database schemas must be driven strictly through **Flyway migration scripts** under `server/src/main/resources/db/migration/`. Developers must set `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` in production environments.
 
 ---
 
-## 4. Windows Environment Command Chaining
+## 4. Formatting and Verification
+
+Read the [Code Formatting Guidelines](../docs/Code%20Formatting%20Guidelines.md). Apply formatting
+before verification. Spotless/Google Java Format remains authoritative for backend code and
+Prettier remains authoritative for frontend code; do not introduce another formatter.
+
+Backend from the repository root:
+
+- Windows: `server\mvnw.cmd -f server\pom.xml spotless:apply`
+- POSIX: `./server/mvnw -f server/pom.xml spotless:apply`
+
+Frontend from `client/`:
+
+- `npm run format`
+- `npm run format:check`
+
+Whole repository:
+
+- Windows: `.\scripts\verify.ps1`
+- POSIX: `./scripts/verify.sh`
+
+See the [Build and Verify](../docs/BUILD_AND_VERIFY.md) document for the full workflow.
+
+## 5. Windows Environment Command Chaining
 
 - **PowerShell Constraint**: When running terminal commands on Windows (powershell), do not use `&&` to chain multiple commands. Instead, propose them as separate sequential tool calls or use `;` as the statement separator.
 
-## 5. Spring Modulith and Schema Validation
+## 6. Spring Modulith and Schema Validation
 
 - **Event Publication Table**: When `spring.jpa.hibernate.ddl-auto` is set to `validate` or `none` and Flyway is managing migrations, Modulith's internal `event_publication` table must be explicitly created via a Flyway migration script (e.g. under `server/src/main/resources/db/migration/`).
 - **DDL Extraction**: To extract the correct table columns for the Modulith version on the classpath, temporarily boot the application once with `ddl-auto=update` on a clean local database, extract the schema using pg_dump, and restore the validation mode.
