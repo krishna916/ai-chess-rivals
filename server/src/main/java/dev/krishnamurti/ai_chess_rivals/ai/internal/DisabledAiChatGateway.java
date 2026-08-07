@@ -13,6 +13,7 @@ final class DisabledAiChatGateway implements AiChatGateway {
   public AiChatResult generate(AiChatRequest request, AiResponseValidator validator) {
     Objects.requireNonNull(request, "request must not be null");
     Objects.requireNonNull(validator, "validator must not be null");
-    return new AiChatResult(request.deterministicFallback(), AiResponseSource.DETERMINISTIC_FALLBACK);
+    return new AiChatResult(
+        request.deterministicFallback(), AiResponseSource.DETERMINISTIC_FALLBACK);
   }
 }

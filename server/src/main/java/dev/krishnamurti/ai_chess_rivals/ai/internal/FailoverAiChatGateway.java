@@ -32,7 +32,8 @@ final class FailoverAiChatGateway implements AiChatGateway {
       return new AiChatResult(geminiResponse, AiResponseSource.GEMINI);
     }
 
-    return new AiChatResult(request.deterministicFallback(), AiResponseSource.DETERMINISTIC_FALLBACK);
+    return new AiChatResult(
+        request.deterministicFallback(), AiResponseSource.DETERMINISTIC_FALLBACK);
   }
 
   private static String attempt(ProviderChatClient provider, String prompt) {

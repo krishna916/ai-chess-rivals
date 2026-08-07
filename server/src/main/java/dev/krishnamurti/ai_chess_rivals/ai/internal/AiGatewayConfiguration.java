@@ -19,7 +19,10 @@ class AiGatewayConfiguration {
 
   @Bean
   @ConditionalOnProperty(
-      prefix = "app.ai", name = "enabled", havingValue = "false", matchIfMissing = true)
+      prefix = "app.ai",
+      name = "enabled",
+      havingValue = "false",
+      matchIfMissing = true)
   AiChatGateway disabledAiChatGateway() {
     return new DisabledAiChatGateway();
   }
