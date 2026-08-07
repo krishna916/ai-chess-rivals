@@ -1,6 +1,6 @@
 # AI Chess Rivals — Implementation Strategy
 
-Version: 1.1  
+Version: 1.1
 Status: Accepted
 
 ## Purpose

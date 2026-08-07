@@ -34,7 +34,7 @@ If a local connection fails with `password authentication failed` or connects to
 
 ## 3. Core Architectural Constraints
 
-To preserve the simplicity and focus of this showcase project (as outlined in the [Constitution](../docs/AI%20Chess%20Rivals%20-%20Constitution.md)):
+To preserve the simplicity and focus of this showcase project (as outlined in the [Constitution](../docs/AI%20Chess%20Rivals%20-%20Constitution.md), [Implementation Strategy](../docs/AI%20Chess%20Rivals%20-%20Implementation%20Strategy.md), and [Tech Stack Document](../docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md)):
 
 - **LLM Boundary**: LLMs must be used *exclusively* for entertainment (trash talk, match commentary, mocking, reactions). **Never** write code that attempts to calculate chess moves or validate rules via LLMs.
 - **Stockfish Boundary**: Stockfish is the sole engine responsible for move legality, candidate move generation, and positional evaluation. It must never handle personality traits, and personality code must never select, validate, or replace a chess move.
