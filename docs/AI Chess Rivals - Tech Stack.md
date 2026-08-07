@@ -22,6 +22,7 @@ The frontend is built using **React** with **TypeScript** and bundled with **Vit
 *   **React** (`v19.2.7`): The core library for rendering UI components.
 *   **Vite** (`v8.1.0`): The fast build tool and development server using ES modules.
 *   **TypeScript** (`~6.0.2`): Typed superset of JavaScript, configured with app/node compilation settings.
+*   **Prettier configuration**: `client/.prettierrc.json` preserves existing line endings so the frontend formatting gate is stable across Windows and CI.
 
 ### User Interface & Styling
 *   **Tailwind CSS** (`v4.3.1`): Utility-first CSS framework (fully integrated with Vite via `@tailwindcss/vite`).
