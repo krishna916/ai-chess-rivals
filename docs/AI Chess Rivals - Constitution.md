@@ -195,9 +195,10 @@ Spring AI is the required Phase 2 integration layer for LLM providers.
 
 # Development Principles
 
-Use Docker Compose as the standard local development environment for PostgreSQL and the backend
-runtime. The React frontend may run through Vite for fast iteration. Stockfish is bundled with
-the backend runtime.
+Use Docker Compose for PostgreSQL during normal local development. Run the Spring Boot backend
+directly through Maven or the IDE for fast iteration and local verification, and run the React
+frontend through the Vite development server. The backend may also run in Docker when a fully
+containerized environment or deployment-parity check is useful.
 
 ---
 
