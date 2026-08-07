@@ -34,6 +34,12 @@ services:
       SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/aichessrivals
       SPRING_FLYWAY_USER: ${POSTGRES_USER}
       SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_GROQ_API_KEY: ${AI_GROQ_API_KEY:-}
+      AI_GROQ_BASE_URL: ${AI_GROQ_BASE_URL:-https://api.groq.com/openai/v1}
+      AI_GROQ_MODEL: ${AI_GROQ_MODEL:-}
+      AI_GEMINI_API_KEY: ${AI_GEMINI_API_KEY:-}
+      AI_GEMINI_MODEL: ${AI_GEMINI_MODEL:-}
       STOCKFISH_PATH: stockfish/stockfish
       OWNER_CONTROL_TOKEN: ${OWNER_CONTROL_TOKEN}
       MATCH_COOLDOWN: ${MATCH_COOLDOWN:-60s}

@@ -6,6 +6,9 @@ spring:
     name: ai-chess-rivals
   config:
     import: optional:file:.env[.properties]
+  ai:
+    model:
+      chat: none
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/aichessrivals}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
@@ -36,6 +39,17 @@ management:
       show-details: when-authorized
 
 app:
+  ai:
+    enabled: ${AI_ENABLED:false}
+    groq:
+      api-key: ${AI_GROQ_API_KEY:}
+      base-url: ${AI_GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      model: ${AI_GROQ_MODEL:}
+      timeout: 8s
+    gemini:
+      api-key: ${AI_GEMINI_API_KEY:}
+      model: ${AI_GEMINI_MODEL:}
+      timeout: 12s
   owner:
     control-token: ${OWNER_CONTROL_TOKEN:}
   match:
