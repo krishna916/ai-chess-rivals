@@ -58,8 +58,8 @@ The match remains authoritative and deterministic at every chess boundary:
 2. The backend commits and classifies the move.
 3. The position receives a lightweight post-move evaluation.
 4. A dialogue policy decides whether anyone speaks and selects one speaker.
-5. Groq generates and validates the response.
-6. Gemini is called once if Groq fails or returns invalid output.
+5. Groq generates the response; the backend validates its structured output.
+6. Gemini is called once if Groq fails or the backend rejects the structured output.
 7. A deterministic character-specific fallback line is used if both providers fail.
 8. Accepted dialogue is persisted and broadcast with the match activity.
 9. The existing move pacing continues and the next turn begins.
@@ -115,7 +115,9 @@ Phase 2 is successful when:
 - viewers can choose or randomize two distinct personalities
 - characters visibly differ in style and speaking frequency
 - start, important-move, and end dialogue appears in order
-- recent banter enables contextual replies
+- recent banter enables contextual replies only through a bounded, explicitly supplied
+  recent-dialogue window. Spring AI `ChatMemory` and any long-term memory remain deferred to
+  Phase 3.
 - Groq-to-Gemini failover is bounded and observable
 - provider failure never prevents match completion
 - dialogue survives refresh and reconnect
