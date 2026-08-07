@@ -1,5 +1,5 @@
 # AI Chess Rivals — Tech Stack Document
-Version: 1.0
+Version: 1.1
 Status: Active
 
 ## Executive Summary
@@ -9,7 +9,7 @@ This document provides an inventory and explanation of all libraries, tools, and
 |---|---|---|
 | **Language & Runtime** | Java (GraalVM AOT), Node.js, TypeScript | Java 25, Node.js 22+, TypeScript ~6.0.2 |
 | **Client-Side (Frontend)** | React, Vite, Tailwind CSS, shadcn/ui | React 19.2.7, Vite 8.1.0, Tailwind CSS 4.3.1 |
-| **Server-Side (Backend)** | Spring Boot, Spring Modulith, Hibernate | Spring Boot 4.1.0 (GraalVM Native Image), Spring Modulith 2.1.0 |
+| **Server-Side (Backend)** | Spring Boot, Spring Modulith, Spring AI, Hibernate | Spring Boot 4.1.0 (GraalVM Native Image), Spring Modulith 2.1.0; Spring AI planned for Phase 2 |
 | **Database** | PostgreSQL | PostgreSQL 17 (via Docker Compose / Neon in production) |
 | **Chess Logic Engine** | Stockfish, chess.js | Stockfish 17.1 (native executable), chess.js 1.4.0 |
 
@@ -96,10 +96,22 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 *   **Spring Boot Starter Parent** (`v4.1.0`): The base configuration establishing dependency versions across the project.
 *   **Spring Modulith** (`v2.1.0`): Extends Spring Boot to enforce logical architecture boundaries, provide module validation, and support module-specific event publication.
 
+### Spring AI and LLM Providers
+
+- Spring AI is the required integration layer for Phase 2.
+- Groq is primary through the OpenAI-compatible integration.
+- Gemini is the only automatic fallback.
+- Provider and model names are configured through environment-backed application properties.
+- Phase 2 uses `ChatClient`, provider-specific `ChatModel` beans/configuration, prompt templates, structured output mapping, a lightweight Advisor, and Actuator/Micrometer observability.
+- Tool calling, chat memory, autonomous agents, and multi-step workflows are deferred to Phase 3.
+
+Spring AI is planned and is not yet a current repository dependency. The planned coordinates below
+are documented for the later provider-foundation work; no Spring AI version is claimed here.
+
 ### Web & API Communication
 *   **Spring Boot Starter WebMVC**: Configures REST APIs and synchronous web endpoints.
 *   **Spring Boot Starter WebSocket**: Handles real-time, bi-directional communication between client and server (crucial for streaming chess matches, live evaluations, and real-time trash talk).
-*   **Spring Boot Starter RestClient**: Lightweight, synchronous client to make HTTP calls (useful for calling external LLM providers).
+*   **Spring Boot Starter RestClient**: Lightweight, synchronous generic HTTP-client support. It is not the planned Phase 2 LLM integration path; Spring AI owns that boundary.
 
 ### Persistence & Database
 *   **Spring Boot Starter Data JPA**: Database access layer powered by Spring Data and Hibernate ORM.
@@ -109,7 +121,7 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 
 ### Developer Tooling & Verification
 *   **Lombok**: Reduces boilerplate code (e.g., automatically generating getters/setters, constructors, and builders via annotations).
-*   **Spring Boot Actuator**: Exposes operational endpoints (health, environment, metrics) and works with Spring Modulith to expose module diagrams.
+*   **Spring Boot Actuator**: Exposes operational endpoints (health, environment, and metrics) and works with Spring Modulith to expose module diagrams. Micrometer provides the metrics facade used by the planned Phase 2 observability.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
 *   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
 *   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
@@ -139,6 +151,18 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 | `spring-boot-configuration-processor` | `org.springframework.boot` | Compile (Opt) | Inherited (`4.1.0`) | Metadata generator for configuration settings |
 
 *Note: Test dependencies mirror their compile counterparts with `org.springframework.boot` or `org.springframework.modulith` grouping and are restricted to the `<scope>test</scope>` lifecycle.*
+
+### Planned Phase 2 Dependencies
+
+| Artifact ID | Group ID | Status | Purpose |
+|---|---|---|---|
+| `spring-ai-bom` | `org.springframework.ai` | Planned | Align Spring AI module versions without selecting a version in this inventory |
+| `spring-ai-starter-model-openai` | `org.springframework.ai` | Planned | Spring AI OpenAI-compatible model integration for primary Groq access |
+| `spring-ai-starter-model-google-genai` | `org.springframework.ai` | Planned | Spring AI Google GenAI model integration for the Gemini fallback |
+
+These artifacts are future Phase 2 dependencies only. They are not present in `server/pom.xml` and
+must not be treated as current repository dependencies until the provider-foundation issue adds and
+verifies them.
 
 ---
 
@@ -178,10 +202,6 @@ Protected Start/Stop operations use a backend-only bearer token and an in-memory
 
 ## Configuration Discrepancies & Architecture Notes
 During the codebase review, the following notes were compiled for reference:
-
-> [!WARNING]
-> **Java Version Inconsistency**
-> The project's core constitution document (`docs/AI Chess Rivals - Constitution.md`) specifies **Java 21**, whereas the server build specification (`server/pom.xml`) uses **Java 25** (`<java.version>25</java.version>`). Make sure your development environments have JDK 25 installed to avoid compilation issues.
 
 > [!NOTE]
 > **Chesslib Added For Backend Match Orchestration**

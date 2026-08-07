@@ -118,7 +118,7 @@ If a simpler solution provides similar value, always choose it.
 | react-chessboard         | 5 (board UI)                           |
 | Axios                    | 1 (HTTP client)                        |
 
-Refer to [Tech Stack Document](file:///D:/projects/ai-chess-rivals/docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) for full version details and dependency tables.
+Refer to the [Constitution](docs/AI%20Chess%20Rivals%20-%20Constitution.md), [Implementation Strategy](docs/AI%20Chess%20Rivals%20-%20Implementation%20Strategy.md), and [Tech Stack Document](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) for governing principles, phase delivery decisions, and full version details.
 
 ---
 
@@ -248,7 +248,9 @@ Examples include:
 
 Keep the chess layer independent from AI-specific logic.
 
-The application should support configurable AI providers and models. The choice of provider (e.g. Gemini, OpenAI, Anthropic, OpenRouter) is an implementation detail.
+Phase 2 uses Spring AI as the required LLM integration layer. Groq is primary through the
+OpenAI-compatible integration, Gemini is the only automatic fallback, and provider/model names are
+environment-configurable.
 
 ---
 
@@ -273,6 +275,9 @@ Do not introduce:
 Add the entertainment layer on top of the completed chess foundation.
 
 Keep these concerns separated.
+
+Phase 2 dialogue is generated only after committed chess events. Tool calling, chat memory,
+autonomous agents, and multi-step workflows belong to Phase 3.
 
 ---
 
@@ -422,10 +427,34 @@ When making meaningful architectural or behavioral changes:
 
 Key documentation locations:
 
-- `docs/AI Chess Rivals - Constitution.md` — project principles and north star.
-- `docs/AI Chess Rivals - Tech Stack.md` — full dependency inventory.
+- [Constitution](docs/AI%20Chess%20Rivals%20-%20Constitution.md) — project principles and north star.
+- [Implementation Strategy](docs/AI%20Chess%20Rivals%20-%20Implementation%20Strategy.md) — phased delivery and architecture boundaries.
+- [Tech Stack Document](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) — full dependency inventory.
+- [Code Formatting Guidelines](docs/Code%20Formatting%20Guidelines.md) — authoritative formatter policy.
+- [Build and Verify](docs/BUILD_AND_VERIFY.md) — repository verification workflow.
 - `.agents/AGENTS.md` — local development rules and debugging procedures.
 - `AGENTS.md` (this file) — agent guidelines.
+
+## Formatting and Verification
+
+Read the [Code Formatting Guidelines](docs/Code%20Formatting%20Guidelines.md). Apply formatting
+before verification. Spotless/Google Java Format remains authoritative for backend code and
+Prettier remains authoritative for frontend code; do not introduce another formatter.
+
+Backend from the repository root:
+
+- Windows: `server\mvnw.cmd -f server\pom.xml spotless:apply`
+- POSIX: `./server/mvnw -f server/pom.xml spotless:apply`
+
+Frontend from `client/`:
+
+- `npm run format`
+- `npm run format:check`
+
+Whole repository:
+
+- Windows: `.\scripts\verify.ps1`
+- POSIX: `./scripts/verify.sh`
 
 ---
 
@@ -451,8 +480,8 @@ When implementing a task:
 4. Explain important design decisions.
 5. Ask before introducing major architectural changes or new dependencies.
 6. Keep solutions pragmatic and aligned with the project's short-lived showcase nature.
-7. Read the [Constitution](file:///D:/projects/ai-chess-rivals/docs/AI%20Chess%20Rivals%20-%20Constitution.md) for project principles.
-8. Check the [Tech Stack](file:///D:/projects/ai-chess-rivals/docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) before adding any dependency.
+7. Read the [Constitution](docs/AI%20Chess%20Rivals%20-%20Constitution.md) for project principles.
+8. Check the [Tech Stack](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md) before adding any dependency.
 
 Remember:
 

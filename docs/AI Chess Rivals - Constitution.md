@@ -1,5 +1,5 @@
 # AI Chess Rivals — Constitution
-Version: 1.0
+Version: 1.1
 Status: Accepted
 
 ---
@@ -122,13 +122,15 @@ Stockfish is never responsible for personality.
 
 ## Personality Layer
 
-Personality selects from Stockfish's candidate moves using structured attributes such as:
+Personality is expressed through entertainment behavior and structured attributes such as:
 
 - Aggression
 - Risk tolerance
-- Blunder chance
+- Speaking frequency
+- Rivalry hooks
 
-The goal is distinct play styles rather than stronger chess.
+The goal is distinct characters rather than stronger chess. The chess layer remains authoritative;
+personality and language models never select, validate, or replace a chess move.
 
 ---
 
@@ -144,26 +146,35 @@ Examples include:
 - Mocking
 - Commentary
 
-LLMs never calculate chess moves.
+LLMs never calculate, select, validate, or replace chess moves.
 
-The application should support configurable AI providers and models. The choice of provider (e.g. Gemini, OpenAI, Anthropic, OpenRouter, or compatible APIs) is an implementation detail and may change for experimentation, cost, or quality reasons.
+Spring AI is the required Phase 2 integration layer for LLM providers.
+
+- Groq is the default primary provider through Spring AI's OpenAI-compatible integration.
+- Gemini is the only automatic fallback provider.
+- Provider and model names are environment-configurable.
+- Provider failure must never stop or fail a chess match.
 
 ---
 
 # Technology Stack
 
-## Server
+## Backend
 
-- Java 21
-- Spring Boot
-- Spring Web
+- Java 25
+- Spring Boot 4.1.0
+- Spring Modulith 2.1.0
+- Spring AI
+- Spring Web MVC
 - Spring Data JPA
-- PostgreSQL
 - Bean Validation
+- PostgreSQL 17
 - Lombok
-- Actuator
+- Flyway
+- Actuator / Micrometer
 - Chesslib
-- Stockfish
+- Stockfish 17.1
+- GraalVM Native Image
 
 ## Client
 
@@ -184,28 +195,26 @@ The application should support configurable AI providers and models. The choice 
 
 # Development Principles
 
-Development should maximize productivity.
-
-Run:
-
-- Spring Boot directly from the IDE
-- React using the Vite development server
-- PostgreSQL in Docker Compose
-- Stockfish as a native executable
-
-Only containerize what meaningfully improves development.
+Use Docker Compose for PostgreSQL during normal local development. Run the Spring Boot backend
+directly through Maven or the IDE for fast iteration and local verification, and run the React
+frontend through the Vite development server. The backend may also run in Docker when a fully
+containerized environment or deployment-parity check is useful.
 
 ---
 
 # Deployment Principles
 
-Keep deployment simple.
+Deploy the backend as a Docker container compiled for the project's GraalVM Native Image target.
+Bundle the Linux Stockfish executable in the backend image and keep provider/model selection
+environment-configurable.
 
-Deploy Spring Boot directly to Railway or Render.
+## Phase Boundaries
 
-Bundle the appropriate Stockfish executable with the application.
+Phase 2 includes Spring AI-based dialogue, structured output, provider fallback, prompt templates,
+a lightweight Advisor, and observability.
 
-Introduce Docker only if deployment complexity justifies it.
+Tool calling, chat memory, autonomous agents, multi-step workflows, and generic orchestration
+remain deferred to Phase 3.
 
 ---
 
