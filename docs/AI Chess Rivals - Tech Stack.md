@@ -9,7 +9,7 @@ This document provides an inventory and explanation of all libraries, tools, and
 |---|---|---|
 | **Language & Runtime** | Java (GraalVM AOT), Node.js, TypeScript | Java 25, Node.js 22+, TypeScript ~6.0.2 |
 | **Client-Side (Frontend)** | React, Vite, Tailwind CSS, shadcn/ui | React 19.2.7, Vite 8.1.0, Tailwind CSS 4.3.1 |
-| **Server-Side (Backend)** | Spring Boot, Spring Modulith, Spring AI, Hibernate | Spring Boot 4.1.0 (GraalVM Native Image), Spring Modulith 2.1.0; Spring AI planned for Phase 2 |
+| **Server-Side (Backend)** | Spring Boot, Spring Modulith, Spring AI, Hibernate | Spring Boot 4.1.0 (GraalVM Native Image), Spring Modulith 2.1.0, Spring AI 2.0.0 |
 | **Database** | PostgreSQL | PostgreSQL 17 (via Docker Compose / Neon in production) |
 | **Chess Logic Engine** | Stockfish, chess.js | Stockfish 17.1 (native executable), chess.js 1.4.0 |
 
@@ -101,12 +101,13 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 - Spring AI is the required integration layer for Phase 2.
 - Groq is primary through the OpenAI-compatible integration.
 - Gemini is the only automatic fallback.
+- The application creates both provider `ChatModel`/`ChatClient` pairs explicitly, so Spring AI's generic single-model `ChatClient.Builder` auto-configuration is disabled with `spring.ai.chat.client.enabled=false`.
 - Provider and model names are configured through environment-backed application properties.
 - Phase 2 uses `ChatClient`, provider-specific `ChatModel` beans/configuration, prompt templates, structured output mapping, a lightweight Advisor, and Actuator/Micrometer observability.
 - Tool calling, chat memory, autonomous agents, and multi-step workflows are deferred to Phase 3.
 
-Spring AI is planned and is not yet a current repository dependency. The planned coordinates below
-are documented for the later provider-foundation work; no Spring AI version is claimed here.
+Spring AI 2.0.0 is the current Phase 2 provider layer added by issue #38. The BOM manages the
+provider starter versions used for Groq primary access and Gemini fallback.
 
 ### Web & API Communication
 *   **Spring Boot Starter WebMVC**: Configures REST APIs and synchronous web endpoints.
@@ -152,17 +153,15 @@ are documented for the later provider-foundation work; no Spring AI version is c
 
 *Note: Test dependencies mirror their compile counterparts with `org.springframework.boot` or `org.springframework.modulith` grouping and are restricted to the `<scope>test</scope>` lifecycle.*
 
-### Planned Phase 2 Dependencies
+### Spring AI Phase 2 Dependencies
 
-| Artifact ID | Group ID | Status | Purpose |
-|---|---|---|---|
-| `spring-ai-bom` | `org.springframework.ai` | Planned | Align Spring AI module versions without selecting a version in this inventory |
-| `spring-ai-starter-model-openai` | `org.springframework.ai` | Planned | Spring AI OpenAI-compatible model integration for primary Groq access |
-| `spring-ai-starter-model-google-genai` | `org.springframework.ai` | Planned | Spring AI Google GenAI model integration for the Gemini fallback |
+| Artifact ID | Group ID | Version | Status | Purpose |
+|---|---|---|---|---|
+| `spring-ai-bom` | `org.springframework.ai` | 2.0.0 | Current | Align Spring AI module versions |
+| `spring-ai-starter-model-openai` | `org.springframework.ai` | BOM-managed | Current | OpenAI-compatible model integration used for Groq |
+| `spring-ai-starter-model-google-genai` | `org.springframework.ai` | BOM-managed | Current | Google GenAI model integration used for Gemini fallback |
 
-These artifacts are future Phase 2 dependencies only. They are not present in `server/pom.xml` and
-must not be treated as current repository dependencies until the provider-foundation issue adds and
-verifies them.
+These artifacts are current Phase 2 dependencies managed by the Spring AI 2.0.0 BOM.
 
 ---
 
