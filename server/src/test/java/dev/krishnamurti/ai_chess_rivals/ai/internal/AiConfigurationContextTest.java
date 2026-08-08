@@ -6,14 +6,16 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatGateway;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatRequest;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseValidator;
-import dev.krishnamurti.ai_chess_rivals.ai.config.AiConfig;
+import dev.krishnamurti.ai_chess_rivals.ai.config.AiProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
+import org.springframework.context.annotation.Configuration;
 
 class AiConfigurationContextTest {
 
@@ -24,7 +26,7 @@ class AiConfigurationContextTest {
                   ConfigurationPropertiesAutoConfiguration.class,
                   ValidationAutoConfiguration.class))
           .withUserConfiguration(
-              AiConfig.class, AiProviderConfiguration.class, AiGatewayConfiguration.class)
+              TestAiConfig.class, AiProviderConfiguration.class, AiGatewayConfiguration.class)
           .withPropertyValues(
               "app.ai.groq.base-url=https://api.groq.com/openai/v1",
               "app.ai.groq.timeout=8s",
@@ -71,4 +73,8 @@ class AiConfigurationContextTest {
               assertThat(context).hasSingleBean(AiChatGateway.class);
             });
   }
+
+  @Configuration(proxyBeanMethods = false)
+  @EnableConfigurationProperties(AiProperties.class)
+  static class TestAiConfig {}
 }

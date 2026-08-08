@@ -32,9 +32,20 @@ public record AiProperties(
   }
 
   public record Gemini(String apiKey, String model, @NotNull Duration timeout) {
-    @AssertTrue(message = "app.ai.gemini.timeout must be greater than zero")
-    public boolean isTimeoutPositive() {
-      return timeout == null || (!timeout.isNegative() && !timeout.isZero());
+    @AssertTrue(
+        message =
+            "app.ai.gemini.timeout must be between 1 and " + Integer.MAX_VALUE + " milliseconds")
+    public boolean isTimeoutWithinHttpOptionsRange() {
+      if (timeout == null) {
+        return true;
+      }
+
+      try {
+        long timeoutMillis = timeout.toMillis();
+        return timeoutMillis >= 1 && timeoutMillis <= Integer.MAX_VALUE;
+      } catch (ArithmeticException exception) {
+        return false;
+      }
     }
   }
 

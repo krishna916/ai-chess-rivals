@@ -6,4 +6,4 @@ import org.springframework.context.annotation.Configuration;
 /** Activates configuration properties for the AI module. */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AiProperties.class)
-public class AiConfig {}
+class AiConfig {}

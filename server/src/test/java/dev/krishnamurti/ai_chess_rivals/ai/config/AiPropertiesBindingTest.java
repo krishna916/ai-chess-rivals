@@ -67,4 +67,11 @@ class AiPropertiesBindingTest {
         .withPropertyValues("app.ai.enabled=false", "app.ai.groq.timeout=0s")
         .run(context -> assertThat(context).hasFailed());
   }
+
+  @Test
+  void rejectsGeminiTimeoutBeyondHttpOptionsRange() {
+    contextRunner
+        .withPropertyValues("app.ai.enabled=false", "app.ai.gemini.timeout=2147483648ms")
+        .run(context -> assertThat(context).hasFailed());
+  }
 }
