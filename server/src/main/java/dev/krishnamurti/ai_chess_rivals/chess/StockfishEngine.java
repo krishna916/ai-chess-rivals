@@ -220,7 +220,7 @@ final class StockfishEngine implements StockfishClient {
         UciResponse response = new UciResponse(rawLine);
         log.debug("<<< {}", rawLine);
         latestScore = latestScore(latestScore, response);
-        if (response.startsWith("bestmove")) {
+        if (hasToken(response, "bestmove")) {
           bestmoveReceived = true;
           if (latestScore == null) {
             throw new StockfishException("Stockfish returned bestmove without an evaluation score");
@@ -336,11 +336,15 @@ final class StockfishEngine implements StockfishClient {
       }
       UciResponse response = new UciResponse(rawLine);
       log.debug("<<< {}", rawLine);
-      String normalizedLine = rawLine.trim();
-      if (normalizedLine.equals(expected) || normalizedLine.startsWith(expected + " ")) {
+      if (hasToken(response, expected)) {
         return response;
       }
     }
+  }
+
+  private static boolean hasToken(UciResponse response, String expected) {
+    String normalizedLine = response.raw().trim();
+    return normalizedLine.equals(expected) || normalizedLine.startsWith(expected + " ");
   }
 
   /**

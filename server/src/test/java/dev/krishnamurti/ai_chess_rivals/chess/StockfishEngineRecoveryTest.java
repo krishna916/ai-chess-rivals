@@ -301,6 +301,11 @@ class StockfishEngineRecoveryTest {
                 delayedBestmove.start();
               }
             }
+            case "go depth 8 movetime 1" -> {
+              if (mode == Mode.RECOVERABLE_TIMEOUT) {
+                emitLine("bestmoveX");
+              }
+            }
             case "go depth 8 movetime 10" -> {
               if (mode == Mode.BESTMOVE_WITHOUT_SCORE) {
                 emitLine("bestmove a2a3");
