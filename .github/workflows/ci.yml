@@ -94,7 +94,12 @@ jobs:
           cache: maven
           cache-dependency-path: server/pom.xml
 
+      - name: Prepare Linux Stockfish
+        run: ./server/mvnw -f server/pom.xml generate-resources -Plinux
+
       - name: Verify backend
+        env:
+          STOCKFISH_PATH: ${{ github.workspace }}/server/stockfish/stockfish
         run: ./server/mvnw -f server/pom.xml verify
 
   frontend:

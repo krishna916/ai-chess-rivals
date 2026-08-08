@@ -28,8 +28,10 @@ The scripts stop at the first failing backend or frontend check.
 Pull requests targeting `master` and pushes to `master` run the `CI` workflow. A lightweight
 `Detect changes` job decides which verification jobs are relevant to the changed files.
 
-- `Backend verification` runs for `server/**`, `scripts/**`, or CI workflow changes and executes
-  `./server/mvnw -f server/pom.xml verify` with Java 25.
+- `Backend verification` runs for `server/**`, `scripts/**`, or CI workflow changes, prepares the
+  pinned Linux Stockfish binary with `./server/mvnw -f server/pom.xml generate-resources -Plinux`,
+  sets `STOCKFISH_PATH` to that executable, and executes `./server/mvnw -f server/pom.xml verify`
+  with Java 25.
 - `Frontend verification` runs for `client/**`, `scripts/**`, or CI workflow changes, installs
   dependencies with `npm ci`, and executes `npm run verify` with Node.js 22.
 - `Native image verification` runs only for `server/**` or CI workflow changes, only after backend
