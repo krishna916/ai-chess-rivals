@@ -126,7 +126,7 @@ provider starter versions used for Groq primary access and Gemini fallback.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
 *   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
 *   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
-*   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`.
+*   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`, with `server/spotbugs-exclude.xml` limited to Hibernate-generated accessors on the personality entity.
 *   **Maven Enforcer Plugin** (`v3.6.3`): Requires Java 25 and Maven 3.9 or newer.
 *   **Spring Modulith verification**: A focused test validates module cycles and dependency boundaries.
 
