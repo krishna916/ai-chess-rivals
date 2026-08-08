@@ -101,6 +101,7 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 - Spring AI is the required integration layer for Phase 2.
 - Groq is primary through the OpenAI-compatible integration.
 - Gemini is the only automatic fallback.
+- The application creates both provider `ChatModel`/`ChatClient` pairs explicitly, so Spring AI's generic single-model `ChatClient.Builder` auto-configuration is disabled with `spring.ai.chat.client.enabled=false`.
 - Provider and model names are configured through environment-backed application properties.
 - Phase 2 uses `ChatClient`, provider-specific `ChatModel` beans/configuration, prompt templates, structured output mapping, a lightweight Advisor, and Actuator/Micrometer observability.
 - Tool calling, chat memory, autonomous agents, and multi-step workflows are deferred to Phase 3.

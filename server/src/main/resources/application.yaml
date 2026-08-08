@@ -7,6 +7,9 @@ spring:
   config:
     import: optional:file:.env[.properties]
   ai:
+    chat:
+      client:
+        enabled: false
     model:
       chat: none
       embedding: none
