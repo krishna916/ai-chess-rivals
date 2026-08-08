@@ -4,7 +4,7 @@
 
 **Goal:** Make failed Stockfish search recovery correct under the actual UCI protocol by retaining ownership of a timed-out read, draining the stopped search through its mandatory `bestmove`, and only then performing `isready` / `readyok` before engine reuse.
 
-**Architecture:** Keep the existing single Stockfish process and single reader executor. Replace the current “cancel-and-forget” timed-out `readLine()` behavior with one retained package-internal pending read future so exactly one thread owns stdout at a time. A failed in-flight search recovers in this exact order: `stop` -> drain through that search's `bestmove` -> `isready` -> `readyok`; if any recovery step fails, keep the existing fail-closed `usable=false` behavior. Do not add another engine process, restart orchestration, a queue-based reader framework, or a new public API.
+**Architecture:** Keep the existing single Stockfish process and single reader executor. Replace the current cancel-and-forget timed-out `readLine()` behavior with one retained pending read future so exactly one task owns stdout at a time. A failed in-flight search recovers in this exact order: `stop` -> consume that search's `bestmove` -> `isready` -> consume `readyok`; if any recovery step fails, keep the existing fail-closed `usable=false` behavior. Do not add another process, restart orchestration, a queue-based production reader, or a new public API.
 
 **Tech Stack:** Java 25, Spring Boot 4.1.0, Stockfish 17.1/UCI, JUnit 5, AssertJ, existing Maven/Spotless/Error Prone/SpotBugs verification.
 
@@ -12,33 +12,33 @@
 
 - PR: `#51 feat: add Stockfish evaluation swing analysis`
 - Issue: `#39 Phase 2: Add lightweight Stockfish evaluation swing analysis`
-- Original implementation plan: `docs/superpowers/plans/2026-08-08-stockfish-evaluation-swing-analysis.md`
+- Original plan: `docs/superpowers/plans/2026-08-08-stockfish-evaluation-swing-analysis.md`
 - First review-fix plan: `docs/superpowers/plans/2026-08-08-pr51-uci-search-recovery.md`
-- Latest review finding: `readyok` is not a search-completion barrier; UCI allows `isready` to be answered while a search is still running. The stopped search's mandatory `bestmove` is the completion barrier that must be consumed before `readyok` is used as the final readiness check.
+- Latest review finding: `readyok` is not a search-completion barrier. UCI permits `isready` to be answered while a search is still running. For a started `go`, the corresponding `bestmove` is the search-completion message that must be consumed before `readyok` is used as the final readiness check.
 
 ## Global Constraints
 
 - Keep exactly one Stockfish process.
-- Keep the existing single-threaded `lineReaderExecutor`; do not introduce another executor, background reader loop, reactive stream, queue, or scheduler.
+- Keep the existing single-threaded `lineReaderExecutor`; do not add another executor, background production reader loop, queue, scheduler, or reactive abstraction.
 - There must never be more than one outstanding `reader.readLine()` operation.
 - A timeout must **not** cancel and discard the outstanding read future. That future remains owned by `StockfishEngine` and is reused by recovery.
-- Recovery order for an actually in-flight failed search is exactly: `stop` -> consume lines until that search's `bestmove` -> `isready` -> consume lines until `readyok`.
+- Recovery for an actually in-flight failed search is exactly: `stop` -> consume lines until that search's `bestmove` -> `isready` -> consume lines until `readyok`.
 - `readyok` alone must never be treated as proof that a stopped search completed.
-- If `bestmove` was already consumed before the failure (for example evaluation ends with `bestmove` but no score), do **not** send `stop` and do not wait for another `bestmove`.
-- If recovery cannot consume `bestmove` and then `readyok` within the existing bounded timeout, keep the current behavior that marks the engine unusable and prevents later commands.
-- Apply the same search-completion invariant to both `bestMove()` and `evaluate()`.
-- Preserve issue #39 behavior unchanged: evaluation remains best-effort, mover-perspective normalization and thresholds do not change, legal committed moves are not rolled back, baseline reuse still requires exact FEN + ply.
+- If `bestmove` was already consumed before the failure (for example evaluation receives `bestmove` but no score), do **not** send `stop` and do not wait for a second `bestmove`.
+- If recovery cannot consume `bestmove` and then `readyok` within the existing bounded timeout, keep the current behavior that marks the engine unusable and blocks later commands.
+- Apply the same search-state invariant to both `bestMove()` and `evaluate()`.
+- Preserve issue #39 behavior unchanged: evaluation remains best-effort, mover-perspective normalization and thresholds do not change, legal committed moves are not rolled back, and baseline reuse still requires exact FEN + ply.
 - Preserve the stop-during-post-move-evaluation lifecycle test already added in the previous review fix.
 - Do not modify `StockfishClient`, `ChessEvaluationService`, `StockfishEvaluationService`, match event payloads, WebSocket schema, frontend, persistence, Spring AI code, or evaluation configuration defaults.
-- No new runtime dependencies.
+- No new runtime dependency.
 - Run Spotless before full verification.
 
 ## File Map
 
 **Modify only:**
 
-- `server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngine.java` — retain one pending read future, distinguish “search started” from “bestmove consumed”, and recover through `bestmove` before `readyok`.
-- `server/src/test/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngineRecoveryTest.java` — replace the optimistic fake ordering with a deterministic asynchronous fake that can emit `readyok` before the delayed stopped-search `bestmove`, and emulate a process pipe whose blocked read ignores thread interruption.
+- `server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngine.java` — retain one pending read future, distinguish `searchStarted` from `bestmoveReceived`, and recover through `bestmove` before `readyok`.
+- `server/src/test/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngineRecoveryTest.java` — make the protocol fake asynchronous and interrupt-insensitive so it reproduces both the early-`readyok` ordering problem and the orphaned-reader problem.
 
 **Do not modify:**
 
@@ -46,127 +46,26 @@
 - `server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/api/StockfishClient.java`
 - `server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEvaluationService.java`
 - `server/src/main/java/dev/krishnamurti/ai_chess_rivals/game/application/MatchEngine.java`
-- `server/src/test/java/dev/krishnamurti/ai_chess_rivals/game/application/MatchEngineTest.java` unless compilation forces a mechanical fixture update; no behavioral redesign is required there.
+- `server/src/test/java/dev/krishnamurti/ai_chess_rivals/game/application/MatchEngineTest.java` unless compilation requires a purely mechanical fixture adjustment; no behavioral redesign is needed there.
 - `client/**`
 - persistence/Flyway files
 - `ai/**`
 
 ---
 
-### Task 1: Reproduce the Real UCI Ordering Bug
+### Task 1: Replace the Optimistic Protocol Fake with a Realistic Regression Harness
 
 **Files:**
 - Modify: `server/src/test/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngineRecoveryTest.java`
 
 **Interfaces:**
 - Consumes: current package-private `StockfishEngine(Process, ChessProperties.Stockfish)` constructor.
-- Produces: deterministic protocol regression proving recovery does not declare success on an early `readyok` and does not orphan the timed-out read.
+- Produces: a deterministic fake process whose stdout read ignores interruption and whose stopped-search `bestmove` is delayed independently of `isready`.
+- Produces: trace entries formatted exactly as `IN <command>` and `OUT <response>`.
 
-- [ ] **Step 1: Replace the current synchronous stale-bestmove fake behavior**
+- [ ] **Step 1: Replace the fake process stdout pipe with an interrupt-insensitive test stream**
 
-The current fake writes `bestmove a2a3` directly inside the `stop` command handler. Replace that behavior because it accidentally guarantees `bestmove` precedes `readyok`, which real UCI does not guarantee.
-
-Add a trace list to `ScriptedUciProcess`:
-
-```java
-private final List<String> trace = new CopyOnWriteArrayList<>();
-```
-
-Expose it:
-
-```java
-List<String> trace() {
-  return List.copyOf(trace);
-}
-```
-
-Whenever the fake receives a command, record it before the switch:
-
-```java
-commands.add(command);
-trace.add("IN " + command);
-```
-
-Replace direct output writes with an instance helper that also records output:
-
-```java
-private synchronized void emitLine(BufferedWriter writer, String line) throws IOException {
-  trace.add("OUT " + line);
-  writer.write(line);
-  writer.newLine();
-  writer.flush();
-}
-```
-
-For multiple handshake lines, call `emitLine(...)` once per line.
-
-- [ ] **Step 2: Make stopped-search bestmove asynchronous and later than an early readyok**
-
-In the recoverable fake, change the `stop` case to schedule the stale evaluation result asynchronously rather than writing it immediately:
-
-```java
-case "stop" -> {
-  if (recoverable) {
-    Thread delayedBestmove =
-        new Thread(
-            () -> {
-              try {
-                Thread.sleep(75);
-                emitLine(writer, "bestmove a2a3");
-              } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-              } catch (IOException exception) {
-                alive = false;
-              }
-            },
-            "scripted-delayed-stale-bestmove");
-    delayedBestmove.setDaemon(true);
-    delayedBestmove.start();
-  }
-}
-```
-
-Keep `isready` immediate:
-
-```java
-case "isready" -> {
-  if (recoverable || commands.stream().noneMatch("go depth 8 movetime 1"::equals)) {
-    emitLine(writer, "readyok");
-  } else {
-    closeEngineOutput();
-  }
-}
-```
-
-For the real move search, delay the valid move long enough that a stale `bestmove` would win the race if recovery incorrectly returned on `readyok`:
-
-```java
-case "go movetime 10" -> {
-  Thread validBestmove =
-      new Thread(
-          () -> {
-            try {
-              Thread.sleep(150);
-              emitLine(writer, "bestmove e2e4");
-            } catch (InterruptedException exception) {
-              Thread.currentThread().interrupt();
-            } catch (IOException exception) {
-              alive = false;
-            }
-          },
-          "scripted-delayed-valid-bestmove");
-  validBestmove.setDaemon(true);
-  validBestmove.start();
-}
-```
-
-Do not add sleeps to production code.
-
-- [ ] **Step 3: Make fake stdout ignore reader-thread interruption**
-
-The production bug also depends on the fact that cancelling a Java future does not reliably abort an OS process-pipe read. The regression fake must model that explicitly instead of relying on `PipedInputStream` interrupt behavior.
-
-Create this nested test-only input stream inside `StockfishEngineRecoveryTest`:
+Inside `StockfishEngineRecoveryTest`, add this nested class:
 
 ```java
 private static final class InterruptIgnoringInputStream extends InputStream {
@@ -176,7 +75,9 @@ private static final class InterruptIgnoringInputStream extends InputStream {
   private volatile boolean closed;
 
   void emitLine(String line) {
-    byte[] encoded = (line + System.lineSeparator()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] encoded =
+        (line + System.lineSeparator())
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
     for (byte value : encoded) {
       bytes.add(value & 0xFF);
     }
@@ -195,7 +96,7 @@ private static final class InterruptIgnoringInputStream extends InputStream {
       try {
         Thread.sleep(5);
       } catch (InterruptedException ignored) {
-        // Deliberately ignore interruption to model a blocking process-pipe read that
+        // Deliberately ignore interruption to model a process-pipe read that
         // Future.cancel(true) cannot safely detach from the underlying stream.
       }
     }
@@ -227,27 +128,160 @@ private static final class InterruptIgnoringInputStream extends InputStream {
 }
 ```
 
-Replace the fake process's `clientReads = new PipedInputStream()` / `engineWrites` pair with:
+In `ScriptedUciProcess`, replace the old fake-engine-to-client pipe fields:
 
 ```java
-private final InterruptIgnoringInputStream clientReads = new InterruptIgnoringInputStream();
+private final PipedInputStream clientReads = new PipedInputStream();
+private final PipedOutputStream engineWrites;
 ```
 
-The fake engine should emit stdout through `clientReads.emitLine(...)`; keep the existing pipe used for commands sent from `StockfishEngine` to the fake process.
+with:
 
-Update `getInputStream()` to return `clientReads`.
+```java
+private final InterruptIgnoringInputStream clientReads =
+    new InterruptIgnoringInputStream();
+```
 
-This is test-only code. Do not copy this stream implementation into production.
+Keep the client-to-fake-engine command pipe:
 
-- [ ] **Step 4: Strengthen the main regression assertion**
+```java
+private final PipedInputStream engineReads = new PipedInputStream();
+private final PipedOutputStream clientWrites;
+```
 
-Keep the behavioral assertion:
+The constructor should now connect only the command pipe:
+
+```java
+try {
+  clientWrites = new PipedOutputStream(engineReads);
+} catch (IOException exception) {
+  throw new IllegalStateException(exception);
+}
+```
+
+`getInputStream()` continues to return `clientReads`.
+
+In `close()`, close `clientWrites`, `clientReads`, and `engineReads`; remove references to the deleted `engineWrites` field.
+
+This stream exists only in tests. Do not copy it into production.
+
+- [ ] **Step 2: Add deterministic protocol tracing and one output helper**
+
+Add:
+
+```java
+private final List<String> trace = new CopyOnWriteArrayList<>();
+```
+
+Expose:
+
+```java
+List<String> trace() {
+  return List.copyOf(trace);
+}
+```
+
+When the fake receives a command, record both lists before handling it:
+
+```java
+commands.add(command);
+trace.add("IN " + command);
+```
+
+Add exactly one fake-engine output helper:
+
+```java
+private synchronized void emitLine(String line) {
+  trace.add("OUT " + line);
+  clientReads.emitLine(line);
+}
+```
+
+After this change, every fake response must use `emitLine(...)`. Do not keep a `BufferedWriter` for fake stdout.
+
+The `runEngine()` resource header should therefore be only:
+
+```java
+try (BufferedReader reader =
+    new BufferedReader(new InputStreamReader(engineReads))) {
+```
+
+- [ ] **Step 3: Make the stopped evaluation bestmove asynchronous**
+
+For the recoverable fake, change `stop` handling to:
+
+```java
+case "stop" -> {
+  if (recoverable) {
+    Thread delayedBestmove =
+        new Thread(
+            () -> {
+              try {
+                Thread.sleep(75);
+                emitLine("bestmove a2a3");
+              } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+              }
+            },
+            "scripted-delayed-stale-bestmove");
+    delayedBestmove.setDaemon(true);
+    delayedBestmove.start();
+  }
+}
+```
+
+This delayed `bestmove a2a3` represents the timed-out evaluation search completing after `stop`.
+
+- [ ] **Step 4: Keep `isready` immediate so the old implementation is provably unsafe**
+
+Keep the fake able to respond to `isready` immediately:
+
+```java
+case "isready" -> {
+  if (recoverable || commands.stream().noneMatch("go depth 8 movetime 1"::equals)) {
+    emitLine("readyok");
+  } else {
+    clientReads.close();
+    alive = false;
+  }
+}
+```
+
+This deliberately allows `readyok` to be emitted before the delayed stopped-search `bestmove` if production code sends `isready` too early.
+
+- [ ] **Step 5: Delay the next valid move so stale output would win the race**
+
+Handle the normal move search as:
+
+```java
+case "go movetime 10" -> {
+  Thread validBestmove =
+      new Thread(
+          () -> {
+            try {
+              Thread.sleep(150);
+              emitLine("bestmove e2e4");
+            } catch (InterruptedException exception) {
+              Thread.currentThread().interrupt();
+            }
+          },
+          "scripted-delayed-valid-bestmove");
+  validBestmove.setDaemon(true);
+  validBestmove.start();
+}
+```
+
+Do not add sleeps to production code.
+
+- [ ] **Step 6: Strengthen the timed-out-evaluation regression**
+
+Keep:
 
 ```java
 assertThat(move).isEqualTo("e2e4");
 ```
 
-Replace the old command-only subsequence assertion with this protocol ordering assertion:
+Replace the old command-only subsequence check with:
 
 ```java
 assertThat(process.trace())
@@ -262,13 +296,36 @@ assertThat(process.trace())
         "OUT bestmove e2e4");
 ```
 
-The essential invariant is that **the stale stopped-search `bestmove` must be consumed before recovery sends `isready`**.
+The critical invariant is that `OUT bestmove a2a3` occurs before recovery sends `IN isready`.
 
-- [ ] **Step 5: Add a completed-search failure regression**
+- [ ] **Step 7: Add a completed-search-with-invalid-payload fake mode**
 
-Add a third fake mode where evaluation emits `bestmove a2a3` without any preceding `info ... score ...` line. `evaluate()` must throw because there is no score, but recovery must **not** send `stop` because that search's `bestmove` has already been consumed.
+Add a third mode/factory:
 
-Add test:
+```java
+static ScriptedUciProcess bestmoveWithoutScore() {
+  return new ScriptedUciProcess(Mode.BESTMOVE_WITHOUT_SCORE);
+}
+```
+
+Replace the boolean `recoverable` with this nested enum if needed to keep the fake explicit:
+
+```java
+private enum Mode {
+  RECOVERABLE_TIMEOUT,
+  UNRECOVERABLE_TIMEOUT,
+  BESTMOVE_WITHOUT_SCORE
+}
+```
+
+For `BESTMOVE_WITHOUT_SCORE`:
+
+- startup `uci` / `isready` behavior remains normal;
+- `go depth 8 movetime 10` emits only `bestmove a2a3` with no `info ... score ...` line;
+- `go movetime 10` emits `bestmove e2e4`;
+- `stop` should not be required.
+
+Add this test:
 
 ```java
 @Test
@@ -289,29 +346,19 @@ void completedEvaluationWithMissingScoreDoesNotWaitForAnotherBestMove() {
 }
 ```
 
-Implement `bestmoveWithoutScore()` so the evaluation `go depth 8 movetime 10` emits only:
-
-```text
-bestmove a2a3
-```
-
-and the later `go movetime 10` emits `bestmove e2e4`.
-
-- [ ] **Step 6: Run only the protocol regression and verify RED**
-
-Run:
+- [ ] **Step 8: Run the recovery test and verify RED before production edits**
 
 ```powershell
 server\mvnw.cmd -f server\pom.xml -Dtest=StockfishEngineRecoveryTest test
 ```
 
-Expected before production changes: at least the delayed-order/pending-read regression fails. The current `readyok`-first recovery is not allowed to satisfy the strengthened test.
+Expected before Task 2: the strengthened timeout regression fails under the current `stop -> isready -> readyok` recovery and/or because the timed-out reader is cancelled/orphaned.
 
-Do not proceed until the test genuinely demonstrates the bug.
+Do not continue until the test genuinely exposes the bug.
 
 ---
 
-### Task 2: Retain One Pending Read and Recover Through Bestmove
+### Task 2: Retain the Pending Read and Use Bestmove as the Search Barrier
 
 **Files:**
 - Modify: `server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngine.java`
@@ -319,11 +366,11 @@ Do not proceed until the test genuinely demonstrates the bug.
 
 **Interfaces:**
 - Produces: field `private Future<String> pendingRead;`.
-- Produces: invariant that `readLineWithTimeout(...)` reuses the same outstanding `reader.readLine()` future after timeout instead of cancelling it.
+- Produces: `readLineWithTimeout(...)` that reuses one outstanding read future after timeout.
+- Produces: `searchStarted` + `bestmoveReceived` state in both search methods.
 - Produces: recovery sequence `stop -> waitForToken("bestmove") -> isready -> waitForToken("readyok")`.
-- Produces: local search-state distinction between `searchStarted` and `bestmoveReceived` in both search methods.
 
-- [ ] **Step 1: Add one retained pending-read field**
+- [ ] **Step 1: Add exactly one retained read future**
 
 Add beside `lineReaderExecutor`:
 
@@ -331,17 +378,18 @@ Add beside `lineReaderExecutor`:
 private Future<String> pendingRead;
 ```
 
-Do not use `AtomicReference`; the class contract already states UCI communication is serialized and not safe for concurrent callers.
+Do not use `AtomicReference`; `StockfishEngine` already documents that UCI calls are serialized and must not be invoked concurrently.
 
-- [ ] **Step 2: Refactor `readLineWithTimeout` to reuse, not cancel, a timed-out read**
+- [ ] **Step 2: Refactor `readLineWithTimeout(...)` ownership**
 
-Replace the local future creation in:
+At the start of the existing overload:
 
 ```java
 private String readLineWithTimeout(long timeout, TimeUnit timeUnit, String waitingFor)
+    throws IOException {
 ```
 
-with this behavior:
+keep the existing `timeout <= 0` guard, then use:
 
 ```java
 if (pendingRead == null) {
@@ -350,7 +398,7 @@ if (pendingRead == null) {
 Future<String> future = pendingRead;
 ```
 
-Use this exact completion/exception ownership pattern:
+Use this exception/completion handling:
 
 ```java
 try {
@@ -375,39 +423,39 @@ try {
 }
 ```
 
-Critical rules:
+Rules:
 
-- Remove `future.cancel(true)` from the timeout branch.
-- Do **not** clear `pendingRead` on timeout.
-- Do **not** clear `pendingRead` on caller interruption; recovery will fail closed because the interrupt flag remains set.
-- Clear `pendingRead` only when that exact future completed normally or completed exceptionally.
+- delete `future.cancel(true)` from the timeout branch;
+- do not clear `pendingRead` on timeout;
+- do not clear it on caller interruption;
+- clear it only after that exact future completes normally or exceptionally.
 
-This guarantees no second `reader.readLine()` task can be submitted while the timed-out one still owns stdout.
+This prevents a second `reader.readLine()` from being queued while the first timed-out task still owns the process stream.
 
-- [ ] **Step 3: Track whether bestmove was already consumed in `bestMove()`**
+- [ ] **Step 3: Track completed search state in `bestMove()`**
 
-Change the method-local state to:
+Use:
 
 ```java
 boolean searchStarted = false;
 boolean bestmoveReceived = false;
 ```
 
-Immediately after this call succeeds:
+After:
 
 ```java
 UciResponse response = waitForToken("bestmove", deadlineSeconds);
 ```
 
-set:
+immediately set:
 
 ```java
 bestmoveReceived = true;
 ```
 
-Then perform `extractBestMove()` as today.
+Only then validate/extract the move.
 
-In both `StockfishException` and wrapped-`IOException` catch blocks, recover only when:
+In both failure catch paths, change recovery condition to:
 
 ```java
 if (searchStarted && !bestmoveReceived) {
@@ -415,9 +463,9 @@ if (searchStarted && !bestmoveReceived) {
 }
 ```
 
-If `bestmove` was already consumed but malformed, throw the original failure without sending `stop` or waiting for a nonexistent second `bestmove`.
+A malformed `bestmove` is still an operation failure, but it is not an in-flight search and must not trigger a second stop/drain cycle.
 
-- [ ] **Step 4: Track whether bestmove was already consumed in `evaluate()`**
+- [ ] **Step 4: Track completed search state in `evaluate()`**
 
 Add:
 
@@ -425,7 +473,7 @@ Add:
 boolean bestmoveReceived = false;
 ```
 
-When processing a line that starts with `bestmove`, set the flag **before** validating whether `latestScore` exists:
+When the response is `bestmove`, set the flag before score validation:
 
 ```java
 if (response.startsWith("bestmove")) {
@@ -437,7 +485,7 @@ if (response.startsWith("bestmove")) {
 }
 ```
 
-Use the same catch condition as `bestMove()`:
+Use the same recovery condition in both catches:
 
 ```java
 if (searchStarted && !bestmoveReceived) {
@@ -445,11 +493,9 @@ if (searchStarted && !bestmoveReceived) {
 }
 ```
 
-This prevents unnecessary recovery after a completed search whose payload is invalid.
+- [ ] **Step 5: Correct the recovery barrier**
 
-- [ ] **Step 5: Make `bestmove` the recovery completion barrier**
-
-Replace the current recovery body:
+Replace:
 
 ```java
 sendCommand(UciCommand.stop());
@@ -466,7 +512,7 @@ sendCommand(UciCommand.isReady());
 waitForToken("readyok", moveTimeoutSeconds);
 ```
 
-Keep the existing catch block unchanged in principle:
+Keep the existing failure handling:
 
 ```java
 } catch (IOException | RuntimeException recoveryFailure) {
@@ -476,11 +522,9 @@ Keep the existing catch block unchanged in principle:
 }
 ```
 
-Do not swallow or replace the original search failure. Successful recovery makes the engine safe to reuse but the original operation still failed and must still throw.
+Successful recovery makes the engine safe to reuse, but the original operation still failed and must still throw the original `StockfishException`.
 
-- [ ] **Step 6: Run protocol tests and verify GREEN**
-
-Run:
+- [ ] **Step 6: Run the protocol regression and verify GREEN**
 
 ```powershell
 server\mvnw.cmd -f server\pom.xml -Dtest=StockfishEngineRecoveryTest test
@@ -488,22 +532,21 @@ server\mvnw.cmd -f server\pom.xml -Dtest=StockfishEngineRecoveryTest test
 
 Expected: all recovery tests pass, including:
 
-- delayed stale `bestmove` is drained before `isready`;
-- next real move returns `e2e4`, never stale `a2a3`;
-- interrupted/failed recovery leaves engine unusable;
-- completed evaluation with missing score does not send `stop` or wait for another `bestmove`.
+- delayed stopped-search `bestmove` is consumed before `isready`;
+- next real move is `e2e4`, never stale `a2a3`;
+- interrupt-insensitive stdout does not create an orphaned reader;
+- recovery failure leaves the engine unusable;
+- already-consumed `bestmove` with missing evaluation score does not send `stop` or wait for a second `bestmove`.
 
-- [ ] **Step 7: Run the surrounding chess tests**
-
-Run:
+- [ ] **Step 7: Run focused surrounding tests**
 
 ```powershell
 server\mvnw.cmd -f server\pom.xml -Dtest=StockfishEngineTest,StockfishEngineRecoveryTest,StockfishClientIntegrationTest,StockfishEvaluationServiceTest,UciResponseTest,MatchEngineTest test
 ```
 
-Expected: all selected tests pass with zero failures/errors.
+Expected: zero failures and zero errors.
 
-- [ ] **Step 8: Commit the production fix**
+- [ ] **Step 8: Commit the fix**
 
 ```powershell
 git add server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngine.java server/src/test/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngineRecoveryTest.java
@@ -516,12 +559,12 @@ git commit -m "fix: drain stopped Stockfish search before reuse"
 
 **Files:**
 - No production design changes expected.
-- Update PR description only if the existing “Review fixes” wording still says `stop -> isready -> readyok`; it must say `stop -> bestmove -> isready -> readyok` after this fix.
+- Update the PR description only if its recovery wording still says `stop -> isready -> readyok`.
 
 **Interfaces:**
-- Produces: fresh verification evidence for PR #51 head.
+- Produces: fresh verification evidence for the new PR head.
 
-- [ ] **Step 1: Format backend code**
+- [ ] **Step 1: Format and check backend code**
 
 ```powershell
 server\mvnw.cmd -f server\pom.xml spotless:apply
@@ -536,9 +579,9 @@ Expected: both commands exit 0.
 server\mvnw.cmd -f server\pom.xml verify
 ```
 
-Expected: exit 0; all backend tests, Spotless, Error Prone, and SpotBugs checks pass.
+Expected: exit 0; tests, Spotless, Error Prone, and SpotBugs all pass.
 
-- [ ] **Step 3: Run frontend verification even though no client code changed**
+- [ ] **Step 3: Run frontend verification**
 
 ```powershell
 client\npm.cmd run verify
@@ -546,85 +589,82 @@ client\npm.cmd run verify
 
 Expected: exit 0.
 
-- [ ] **Step 4: Review the final diff for scope creep**
-
-Run:
+- [ ] **Step 4: Inspect the final focused diff**
 
 ```powershell
 git diff origin/master...HEAD -- server/src/main/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngine.java server/src/test/java/dev/krishnamurti/ai_chess_rivals/chess/StockfishEngineRecoveryTest.java
 ```
 
-Confirm all of the following manually:
+Confirm manually:
 
-- no second Stockfish process;
-- no new runtime dependency;
-- no new reader executor/queue/background loop;
-- no change to evaluation thresholds or move-selection strength;
-- no frontend/persistence/AI changes;
-- timeout leaves exactly one retained read future;
-- stopped search `bestmove` is consumed before `isready`;
-- engine still fails closed if recovery cannot complete;
-- malformed already-completed search does not trigger a second recovery search.
+- one Stockfish process only;
+- one reader executor only;
+- no production reader queue/background loop;
+- one retained pending read maximum;
+- no `Future.cancel(true)` on read timeout;
+- `bestmove` consumed before `isready` during recovery;
+- `readyok` used only as final readiness check;
+- already-consumed `bestmove` does not trigger another drain;
+- recovery failure still marks engine unusable;
+- no change to evaluation thresholds, move strength, frontend, persistence, or AI code.
 
-- [ ] **Step 5: Update PR description wording if necessary**
+- [ ] **Step 5: Correct PR description wording**
 
-The recovery summary must say exactly this concept:
+Use this exact concept in the review-fix summary:
 
 ```text
 Recover a failed in-flight Stockfish search with stop -> drain through bestmove -> isready -> readyok before reusing the shared UCI stream. Retain the timed-out read future so no orphaned reader can consume the stopped search's bestmove.
 ```
 
-Do not claim `readyok` itself is the search-completion barrier.
+Do not describe `readyok` itself as the search-completion barrier.
 
-- [ ] **Step 6: Push and wait for fresh PR CI**
+- [ ] **Step 6: Push**
 
 ```powershell
 git push
 ```
 
-Require fresh success on the new head for:
+- [ ] **Step 7: Require fresh CI for the new head**
+
+Do not reuse results from commit `4690f6b94c4308880971f34bd0c4e4ab6058d025`.
+
+Require successful new-head checks for:
 
 - Backend verification
 - Native image verification
-- any required repository status checks
+- any other required repository checks
 
-Do not reuse CI results from commit `4690f6b94c4308880971f34bd0c4e4ab6058d025`.
-
-- [ ] **Step 7: Final Luna handoff comment**
-
-Add a concise PR comment containing:
+- [ ] **Step 8: Add the final Luna handoff comment only after CI is actually green**
 
 ```text
 Addressed the second UCI recovery review finding.
 
 - Timed-out readLine future is retained and reused; it is no longer cancelled/orphaned.
-- Recovery now waits for the stopped search's bestmove before sending isready.
+- Recovery waits for the stopped search's bestmove before sending isready.
 - readyok is used only as the final engine-readiness check.
 - Failures after bestmove was already consumed do not attempt a second stop/drain cycle.
-- Deterministic fake-process regression now allows readyok to race ahead of delayed bestmove and models an interrupt-insensitive process-pipe read.
+- Deterministic fake-process regression allows readyok to race ahead of delayed bestmove and models an interrupt-insensitive process-pipe read.
 - Full backend/frontend verification completed and fresh CI is green.
 
 Ready for re-review.
 ```
 
-Only say “fresh CI is green” after GitHub actually reports the new-head checks successful.
+Do not claim fresh CI is green until GitHub reports it on the pushed implementation head.
 
 ---
 
 ## Final Acceptance Checklist
 
-Before asking for re-review, every item must be true:
-
 - [ ] A timed-out `reader.readLine()` future is retained instead of cancelled/discarded.
 - [ ] At most one outstanding `reader.readLine()` exists at any time.
 - [ ] Recovery sends `stop` and consumes the stopped search's `bestmove` before sending `isready`.
-- [ ] Recovery consumes `readyok` only after `bestmove` has completed the stopped search.
-- [ ] A delayed stale evaluation `bestmove` can never become the next real move-selection result.
-- [ ] A failure that occurs after `bestmove` was already consumed does not attempt to wait for another `bestmove`.
+- [ ] Recovery consumes `readyok` only after `bestmove` completed the stopped search.
+- [ ] A delayed stale evaluation `bestmove` cannot become the next real move-selection result.
+- [ ] A failure occurring after `bestmove` was already consumed does not wait for another `bestmove`.
 - [ ] Recovery failure marks the engine unusable and later commands fail before writing to the dirty stream.
 - [ ] `bestMove()` and `evaluate()` share the same recovery invariant.
 - [ ] Existing stop/resume and issue #39 evaluation tests remain green.
 - [ ] Full backend verification passes.
 - [ ] Frontend verification passes.
-- [ ] Fresh PR CI for the new head passes, including native-image verification.
-- [ ] No unrelated architecture or feature work was introduced.
+- [ ] Fresh PR CI for the implementation head passes, including native-image verification.
+- [ ] No unrelated architecture or feature work is introduced.
