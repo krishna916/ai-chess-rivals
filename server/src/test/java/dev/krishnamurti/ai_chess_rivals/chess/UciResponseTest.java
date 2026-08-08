@@ -59,4 +59,14 @@ class UciResponseTest {
     assertThat(new UciResponse("info depth 8 nodes 99 pv e2e4").extractScore()).isEmpty();
     assertThat(new UciResponse("bestmove e2e4").extractScore()).isEmpty();
   }
+
+  @Test
+  void retainsTheLatestParsableInfoScore() {
+    PositionEvaluation first =
+        StockfishEngine.latestScore(null, new UciResponse("info depth 4 score cp 12 nodes 10"));
+    PositionEvaluation latest =
+        StockfishEngine.latestScore(first, new UciResponse("info depth 8 score cp -34 nodes 20"));
+
+    assertThat(latest.value()).isEqualTo(-34);
+  }
 }

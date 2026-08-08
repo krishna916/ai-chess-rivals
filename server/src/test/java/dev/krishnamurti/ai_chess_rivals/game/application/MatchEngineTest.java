@@ -174,6 +174,12 @@ class MatchEngineTest {
             .toList();
     assertEquals(List.of(1, 2), moveEvents.stream().map(MovePlayed::ply).toList());
     assertEquals(3, evaluationService.fens.size());
+    assertEquals(
+        List.of(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+            "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"),
+        evaluationService.fens);
     EvaluationSwing secondSwing = moveEvents.get(1).evaluation().orElseThrow();
     assertEquals(-20, secondSwing.beforeCentipawns());
     assertEquals(10, secondSwing.afterCentipawns());

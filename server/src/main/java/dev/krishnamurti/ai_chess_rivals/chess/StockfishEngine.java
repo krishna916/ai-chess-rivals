@@ -162,19 +162,22 @@ final class StockfishEngine implements StockfishClient {
 
     try {
       sendCommand(UciCommand.evaluate(depth, moveTime.toMillis()));
-      long deadlineSeconds = Math.max(1L, moveTime.toSeconds()) + moveTimeoutSeconds;
+      long evaluationTimeoutMillis =
+          Math.max(1_000L, moveTime.toMillis()) + TimeUnit.SECONDS.toMillis(moveTimeoutSeconds);
+      long deadlineNanos =
+          System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(evaluationTimeoutMillis);
       PositionEvaluation latestScore = null;
 
       while (true) {
-        String rawLine = readLineWithTimeout(deadlineSeconds, "evaluation bestmove");
+        long remainingNanos = deadlineNanos - System.nanoTime();
+        String rawLine =
+            readLineWithTimeout(remainingNanos, TimeUnit.NANOSECONDS, "evaluation bestmove");
         if (rawLine == null) {
           throw new StockfishException("Stockfish process ended during position evaluation");
         }
         UciResponse response = new UciResponse(rawLine);
         log.debug("<<< {}", rawLine);
-        if (response.startsWith("info ")) {
-          latestScore = response.extractScore().orElse(latestScore);
-        }
+        latestScore = latestScore(latestScore, response);
         if (response.startsWith("bestmove")) {
           if (latestScore == null) {
             throw new StockfishException("Stockfish returned bestmove without an evaluation score");
@@ -278,15 +281,33 @@ final class StockfishEngine implements StockfishClient {
    * @throws IOException if the underlying read fails
    */
   private String readLineWithTimeout(long timeoutSeconds, String waitingFor) throws IOException {
+    return readLineWithTimeout(timeoutSeconds, TimeUnit.SECONDS, waitingFor);
+  }
+
+  static PositionEvaluation latestScore(PositionEvaluation current, UciResponse response) {
+    if (response.startsWith("info ")) {
+      return response.extractScore().orElse(current);
+    }
+    return current;
+  }
+
+  private String readLineWithTimeout(long timeout, TimeUnit timeUnit, String waitingFor)
+      throws IOException {
+    if (timeout <= 0) {
+      throw new StockfishException(
+          ("Stockfish did not respond within the allotted time while waiting for %s. "
+                  + "The engine process may be hung or unresponsive.")
+              .formatted(waitingFor));
+    }
     Future<String> future = lineReaderExecutor.submit(reader::readLine);
     try {
-      return future.get(timeoutSeconds, TimeUnit.SECONDS);
+      return future.get(timeout, timeUnit);
     } catch (TimeoutException e) {
       future.cancel(true);
       throw new StockfishException(
-          ("Stockfish did not respond within %d s while waiting for %s. "
+          ("Stockfish did not respond within %d %s while waiting for %s. "
                   + "The engine process may be hung or unresponsive.")
-              .formatted(timeoutSeconds, waitingFor));
+              .formatted(timeout, timeUnit == TimeUnit.SECONDS ? "s" : "ns", waitingFor));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException ioe) {
