@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      native: ${{ steps.changes.outputs.native }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect relevant paths
+        id: changes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$BEFORE_SHA"
+          fi
+
+          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+            changed_files="$(git ls-tree -r --name-only "$GITHUB_SHA")"
+          else
+            changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA")"
+          fi
+          printf '%s\n' "$changed_files"
+
+          backend=false
+          frontend=false
+          native=false
+
+          while IFS= read -r file; do
+            case "$file" in
+              server/*)
+                backend=true
+                native=true
+                ;;
+              client/*)
+                frontend=true
+                ;;
+              scripts/*)
+                backend=true
+                frontend=true
+                ;;
+              .github/workflows/ci.yml)
+                backend=true
+                frontend=true
+                native=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          {
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+            echo "native=$native"
+          } >> "$GITHUB_OUTPUT"
+
+  backend:
+    name: Backend verification
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: server/pom.xml
+
+      - name: Prepare Linux Stockfish
+        run: ./server/mvnw -f server/pom.xml generate-resources -Plinux
+
+      - name: Verify backend
+        env:
+          STOCKFISH_PATH: ${{ github.workspace }}/server/stockfish/stockfish
+        run: ./server/mvnw -f server/pom.xml verify
+
+  frontend:
+    name: Frontend verification
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify frontend
+        run: npm run verify
+
+  native:
+    name: Native image verification
+    needs:
+      - changes
+      - backend
+    if: ${{ needs.changes.outputs.native == 'true' && needs.backend.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build production native image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=server-native
+          cache-to: type=gha,mode=max,scope=server-native
