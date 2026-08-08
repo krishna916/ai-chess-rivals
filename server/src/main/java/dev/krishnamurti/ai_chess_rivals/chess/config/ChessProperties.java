@@ -22,6 +22,9 @@ import org.springframework.validation.annotation.Validated;
  *       threads: 1
  *       hash-mb: 16
  *       startup-timeout-seconds: 10
+ *       evaluation:
+ *         depth: 8
+ *         move-time-millis: 50
  * </pre>
  *
  * @param stockfish Stockfish engine settings.
@@ -40,11 +43,21 @@ public record ChessProperties(@NotNull @Valid Stockfish stockfish) {
    *     during startup.
    * @param moveTimeoutSeconds Maximum seconds to wait for a readyok or bestmove response during
    *     gameplay. Acts as a safety net against an unresponsive engine between moves.
+   * @param evaluation Bounded position-evaluation settings.
    */
   public record Stockfish(
       @NotBlank String path,
       @Min(1) @Max(1024) int threads,
       @Min(1) @Max(33554432) int hashMb,
       @Min(1) @Max(300) int startupTimeoutSeconds,
-      @Min(1) @Max(600) int moveTimeoutSeconds) {}
+      @Min(1) @Max(600) int moveTimeoutSeconds,
+      @NotNull @Valid Evaluation evaluation) {
+
+    /** Shallow, bounded settings for post-move position evaluation. */
+    public record Evaluation(
+        @Min(1) @Max(30) int depth,
+        @Min(1) @Max(5_000) int moveTimeMillis,
+        @Min(1) @Max(100_000) int majorGainThresholdCentipawns,
+        @Min(1) @Max(100_000) int majorMistakeThresholdCentipawns) {}
+  }
 }

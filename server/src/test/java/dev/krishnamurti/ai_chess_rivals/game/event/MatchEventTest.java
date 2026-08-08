@@ -8,6 +8,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class MatchEventTest {
@@ -29,7 +30,8 @@ class MatchEventTest {
                 null,
                 new MoveNotation("e2e4"),
                 BoardPosition.STARTING_POSITION,
-                quietPawnMoveDetails()));
+                quietPawnMoveDetails(),
+                Optional.empty()));
     assertThrows(
         NullPointerException.class,
         () ->
@@ -38,12 +40,18 @@ class MatchEventTest {
                 PlayerColor.WHITE,
                 null,
                 BoardPosition.STARTING_POSITION,
-                quietPawnMoveDetails()));
+                quietPawnMoveDetails(),
+                Optional.empty()));
     assertThrows(
         NullPointerException.class,
         () ->
             new MovePlayed(
-                1, PlayerColor.WHITE, new MoveNotation("e2e4"), null, quietPawnMoveDetails()));
+                1,
+                PlayerColor.WHITE,
+                new MoveNotation("e2e4"),
+                null,
+                quietPawnMoveDetails(),
+                Optional.empty()));
     assertThrows(
         NullPointerException.class,
         () ->
@@ -52,7 +60,8 @@ class MatchEventTest {
                 PlayerColor.WHITE,
                 new MoveNotation("e2e4"),
                 BoardPosition.STARTING_POSITION,
-                null));
+                null,
+                Optional.empty()));
   }
 
   @Test
@@ -65,7 +74,8 @@ class MatchEventTest {
                 PlayerColor.WHITE,
                 new MoveNotation("e2e4"),
                 BoardPosition.STARTING_POSITION,
-                quietPawnMoveDetails()));
+                quietPawnMoveDetails(),
+                Optional.empty()));
   }
 
   @Test

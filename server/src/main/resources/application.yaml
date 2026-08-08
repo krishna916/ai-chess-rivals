@@ -71,6 +71,11 @@ app:
       hash-mb: ${STOCKFISH_HASH_MB:16}
       startup-timeout-seconds: ${STOCKFISH_STARTUP_TIMEOUT_SECONDS:10}
       move-timeout-seconds: ${STOCKFISH_MOVE_TIMEOUT_SECONDS:30}
+      evaluation:
+        depth: ${STOCKFISH_EVALUATION_DEPTH:8}
+        move-time-millis: ${STOCKFISH_EVALUATION_MOVE_TIME_MILLIS:50}
+        major-gain-threshold-centipawns: ${STOCKFISH_MAJOR_GAIN_THRESHOLD_CP:200}
+        major-mistake-threshold-centipawns: ${STOCKFISH_MAJOR_MISTAKE_THRESHOLD_CP:200}
   game:
     move-think-time-millis: ${GAME_MOVE_THINK_TIME_MILLIS:250}
     max-plies: ${GAME_MAX_PLIES:300}

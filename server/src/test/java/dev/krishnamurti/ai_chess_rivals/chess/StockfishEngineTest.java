@@ -17,7 +17,7 @@ class StockfishEngineTest {
     Path nonExistentPath = tempDir.resolve("non-existent-stockfish");
     ChessProperties props =
         new ChessProperties(
-            new ChessProperties.Stockfish(nonExistentPath.toString(), 1, 16, 10, 30));
+            new ChessProperties.Stockfish(nonExistentPath.toString(), 1, 16, 10, 30, evaluation()));
 
     assertThatThrownBy(() -> new StockfishEngine(props))
         .isInstanceOf(StockfishException.class)
@@ -50,7 +50,8 @@ class StockfishEngineTest {
 
     final Path finalPath = targetPath;
     ChessProperties props =
-        new ChessProperties(new ChessProperties.Stockfish(finalPath.toString(), 1, 16, 10, 30));
+        new ChessProperties(
+            new ChessProperties.Stockfish(finalPath.toString(), 1, 16, 10, 30, evaluation()));
 
     assertThatThrownBy(() -> new StockfishEngine(props))
         .isInstanceOf(StockfishException.class)
@@ -58,5 +59,9 @@ class StockfishEngineTest {
             "Stockfish file exists at '" + finalPath.toAbsolutePath() + "' but is not executable.")
         .hasMessageContaining("On Linux, run: chmod +x " + finalPath.toAbsolutePath())
         .hasMessageNotContaining("%s");
+  }
+
+  private static ChessProperties.Stockfish.Evaluation evaluation() {
+    return new ChessProperties.Stockfish.Evaluation(8, 50, 200, 200);
   }
 }

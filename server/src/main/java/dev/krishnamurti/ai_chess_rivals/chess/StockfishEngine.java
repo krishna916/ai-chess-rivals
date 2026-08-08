@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.chess;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import jakarta.annotation.PreDestroy;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,6 +44,7 @@ final class StockfishEngine implements StockfishClient {
   private final BufferedReader reader;
   private final BufferedWriter writer;
   private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final AtomicBoolean usable = new AtomicBoolean(true);
   private final long startupTimeoutSeconds;
   private final long moveTimeoutSeconds;
 
@@ -56,6 +59,8 @@ final class StockfishEngine implements StockfishClient {
             t.setDaemon(true);
             return t;
           });
+
+  private Future<String> pendingRead;
 
   StockfishEngine(ChessProperties chessProperties) {
     ChessProperties.Stockfish config = chessProperties.stockfish();
@@ -92,29 +97,62 @@ final class StockfishEngine implements StockfishClient {
               .formatted(executablePath.toAbsolutePath(), executablePath.toAbsolutePath()));
     }
 
+    Process launchedProcess = null;
+    BufferedReader launchedReader = null;
     try {
       log.info("Launching Stockfish: {}", executablePath.toAbsolutePath());
-      this.process =
+      launchedProcess =
           new ProcessBuilder(executablePath.toAbsolutePath().toString())
               .redirectErrorStream(true)
               .start();
+      this.process = launchedProcess;
 
-      this.reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+      launchedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+      this.reader = launchedReader;
       this.writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 
       performUciHandshake();
       configureOptions(config);
       waitForReady(startupTimeoutSeconds);
 
-    } catch (IOException e) {
-      throw new StockfishException("Failed to launch Stockfish process", e);
+    } catch (IOException | RuntimeException failure) {
+      cleanupAfterConstructionFailure(launchedProcess, launchedReader);
+      if (failure instanceof StockfishException stockfishFailure) {
+        throw stockfishFailure;
+      }
+      throw new StockfishException("Failed to launch Stockfish process", failure);
     }
 
     log.info("Stockfish ready. Threads={}, Hash={}MB", config.threads(), config.hashMb());
   }
 
+  StockfishEngine(Process process, ChessProperties.Stockfish config) {
+    Process injectedProcess = Objects.requireNonNull(process, "process must not be null");
+    Objects.requireNonNull(config, "config must not be null");
+    BufferedReader injectedReader =
+        new BufferedReader(new InputStreamReader(injectedProcess.getInputStream()));
+    this.process = injectedProcess;
+    this.reader = injectedReader;
+    this.writer = new BufferedWriter(new OutputStreamWriter(injectedProcess.getOutputStream()));
+    this.startupTimeoutSeconds = config.startupTimeoutSeconds();
+    this.moveTimeoutSeconds = config.moveTimeoutSeconds();
+
+    try {
+      performUciHandshake();
+      configureOptions(config);
+      waitForReady(startupTimeoutSeconds);
+    } catch (IOException | RuntimeException failure) {
+      cleanupAfterConstructionFailure(injectedProcess, injectedReader);
+      if (failure instanceof StockfishException stockfishFailure) {
+        throw stockfishFailure;
+      }
+      throw new StockfishException("Failed to initialize injected Stockfish process", failure);
+    }
+  }
+
   @Override
   public void newGame() {
+    ensureUsable();
     try {
       sendCommand(UciCommand.newGame());
       waitForReady(moveTimeoutSeconds);
@@ -125,6 +163,7 @@ final class StockfishEngine implements StockfishClient {
 
   @Override
   public void setPosition(String fen) {
+    ensureUsable();
     try {
       sendCommand(UciCommand.position(fen));
     } catch (IOException e) {
@@ -134,19 +173,89 @@ final class StockfishEngine implements StockfishClient {
 
   @Override
   public String bestMove(Duration thinkTime) {
+    ensureUsable();
+    boolean searchStarted = false;
+    boolean bestmoveReceived = false;
     try {
       sendCommand(UciCommand.go(thinkTime.toMillis()));
+      searchStarted = true;
       // Add a safety margin on top of the engine think time so a normally
       // running engine is never interrupted, but a silent/hung engine is.
       long safetyMarginSeconds = moveTimeoutSeconds;
       long deadlineSeconds = thinkTime.toSeconds() + safetyMarginSeconds;
       UciResponse response = waitForToken("bestmove", deadlineSeconds);
+      bestmoveReceived = true;
       return response
           .extractBestMove()
           .orElseThrow(
               () -> new StockfishException("Unexpected bestmove response: " + response.raw()));
+    } catch (StockfishException failure) {
+      if (searchStarted && !bestmoveReceived) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
     } catch (IOException e) {
-      throw new StockfishException("Failed to obtain best move from Stockfish", e);
+      StockfishException failure =
+          new StockfishException("Failed to obtain best move from Stockfish", e);
+      if (searchStarted && !bestmoveReceived) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
+    }
+  }
+
+  @Override
+  public PositionEvaluation evaluate(int depth, Duration moveTime) {
+    ensureUsable();
+    if (depth <= 0) {
+      throw new IllegalArgumentException("depth must be positive");
+    }
+    if (moveTime == null || moveTime.isZero() || moveTime.isNegative()) {
+      throw new IllegalArgumentException("moveTime must be positive");
+    }
+    long moveTimeMillis = Math.max(1L, moveTime.toMillis());
+
+    boolean searchStarted = false;
+    boolean bestmoveReceived = false;
+    try {
+      sendCommand(UciCommand.evaluate(depth, moveTimeMillis));
+      searchStarted = true;
+      long evaluationTimeoutMillis =
+          Math.max(1_000L, moveTimeMillis) + TimeUnit.SECONDS.toMillis(moveTimeoutSeconds);
+      long deadlineNanos =
+          System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(evaluationTimeoutMillis);
+      PositionEvaluation latestScore = null;
+
+      while (true) {
+        long remainingNanos = deadlineNanos - System.nanoTime();
+        String rawLine =
+            readLineWithTimeout(remainingNanos, TimeUnit.NANOSECONDS, "evaluation bestmove");
+        if (rawLine == null) {
+          throw new StockfishException("Stockfish process ended during position evaluation");
+        }
+        UciResponse response = new UciResponse(rawLine);
+        log.debug("<<< {}", rawLine);
+        latestScore = latestScore(latestScore, response);
+        if (hasToken(response, "bestmove")) {
+          bestmoveReceived = true;
+          if (latestScore == null) {
+            throw new StockfishException("Stockfish returned bestmove without an evaluation score");
+          }
+          return latestScore;
+        }
+      }
+    } catch (StockfishException failure) {
+      if (searchStarted && !bestmoveReceived) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
+    } catch (IOException e) {
+      StockfishException failure =
+          new StockfishException("Failed to evaluate position with Stockfish", e);
+      if (searchStarted && !bestmoveReceived) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
     }
   }
 
@@ -169,6 +278,44 @@ final class StockfishEngine implements StockfishClient {
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
+
+  private void ensureUsable() {
+    if (!usable.get()) {
+      throw new StockfishException("Stockfish engine is not usable after failed search recovery");
+    }
+  }
+
+  private void cleanupAfterConstructionFailure(Process failedProcess, BufferedReader failedReader) {
+    if (failedProcess != null) {
+      try {
+        failedProcess.destroy();
+      } catch (RuntimeException cleanupFailure) {
+        log.warn("Could not destroy Stockfish process after construction failure", cleanupFailure);
+      }
+    }
+    if (failedReader != null) {
+      try {
+        failedReader.close();
+      } catch (IOException cleanupFailure) {
+        log.warn("Could not close Stockfish reader after construction failure", cleanupFailure);
+      }
+    }
+    lineReaderExecutor.shutdownNow();
+  }
+
+  private void recoverAfterSearchFailure(StockfishException failure) {
+    long recoveryDeadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(moveTimeoutSeconds);
+    try {
+      sendCommand(UciCommand.stop());
+      waitForTokenUntil("bestmove", recoveryDeadlineNanos);
+      sendCommand(UciCommand.isReady());
+      waitForTokenUntil("readyok", recoveryDeadlineNanos);
+    } catch (IOException | RuntimeException recoveryFailure) {
+      usable.set(false);
+      failure.addSuppressed(recoveryFailure);
+      log.error("Stockfish search recovery failed; engine marked unusable", recoveryFailure);
+    }
+  }
 
   private void performUciHandshake() throws IOException {
     sendCommand(UciCommand.uci());
@@ -210,24 +357,36 @@ final class StockfishEngine implements StockfishClient {
   }
 
   /**
-   * Reads lines from Stockfish until one containing {@code expected} is found, or until {@code
-   * timeoutSeconds} elapses with no response.
+   * Reads lines from Stockfish until one containing {@code expected} is found, or until the overall
+   * {@code timeoutSeconds} deadline elapses.
    *
    * @throws StockfishException if the deadline expires or the process exits unexpectedly.
    */
   private UciResponse waitForToken(String expected, long timeoutSeconds) throws IOException {
+    return waitForTokenUntil(
+        expected, System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds));
+  }
+
+  private UciResponse waitForTokenUntil(String expected, long deadlineNanos) throws IOException {
     while (true) {
-      String rawLine = readLineWithTimeout(timeoutSeconds, "token '" + expected + "'");
+      long remainingNanos = deadlineNanos - System.nanoTime();
+      String rawLine =
+          readLineWithTimeout(remainingNanos, TimeUnit.NANOSECONDS, "token '" + expected + "'");
       if (rawLine == null) {
         throw new StockfishException(
             "Stockfish process ended before responding with expected token: " + expected);
       }
       UciResponse response = new UciResponse(rawLine);
       log.debug("<<< {}", rawLine);
-      if (response.contains(expected)) {
+      if (hasToken(response, expected)) {
         return response;
       }
     }
+  }
+
+  private static boolean hasToken(UciResponse response, String expected) {
+    String normalizedLine = response.raw().trim();
+    return normalizedLine.equals(expected) || normalizedLine.startsWith(expected + " ");
   }
 
   /**
@@ -241,16 +400,39 @@ final class StockfishEngine implements StockfishClient {
    * @throws IOException if the underlying read fails
    */
   private String readLineWithTimeout(long timeoutSeconds, String waitingFor) throws IOException {
-    Future<String> future = lineReaderExecutor.submit(reader::readLine);
-    try {
-      return future.get(timeoutSeconds, TimeUnit.SECONDS);
-    } catch (TimeoutException e) {
-      future.cancel(true);
+    return readLineWithTimeout(timeoutSeconds, TimeUnit.SECONDS, waitingFor);
+  }
+
+  static PositionEvaluation latestScore(PositionEvaluation current, UciResponse response) {
+    if (response.startsWith("info ")) {
+      return response.extractScore().orElse(current);
+    }
+    return current;
+  }
+
+  private String readLineWithTimeout(long timeout, TimeUnit timeUnit, String waitingFor)
+      throws IOException {
+    if (timeout <= 0) {
       throw new StockfishException(
-          ("Stockfish did not respond within %d s while waiting for %s. "
+          ("Stockfish did not respond within the allotted time while waiting for %s. "
                   + "The engine process may be hung or unresponsive.")
-              .formatted(timeoutSeconds, waitingFor));
+              .formatted(waitingFor));
+    }
+    if (pendingRead == null) {
+      pendingRead = lineReaderExecutor.submit(reader::readLine);
+    }
+    Future<String> future = pendingRead;
+    try {
+      String line = future.get(timeout, timeUnit);
+      pendingRead = null;
+      return line;
+    } catch (TimeoutException e) {
+      throw new StockfishException(
+          ("Stockfish did not respond within %d %s while waiting for %s. "
+                  + "The engine process may be hung or unresponsive.")
+              .formatted(timeout, timeUnit == TimeUnit.SECONDS ? "s" : "ns", waitingFor));
     } catch (ExecutionException e) {
+      pendingRead = null;
       Throwable cause = e.getCause();
       if (cause instanceof IOException ioe) {
         throw ioe;

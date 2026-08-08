@@ -182,6 +182,7 @@ Stockfish is used as a local executable process communicating over UCI (stdin/st
     *   **Windows Profile (`-Pwindows`)**: Downloads `stockfish-windows-x86-64-avx2.zip`, extracts it, and moves the exe to `server/stockfish/stockfish.exe`.
     *   **Linux Profile (`-Plinux`)**: Downloads `stockfish-ubuntu-x86-64-avx2.tar`, extracts it, moves the binary to `server/stockfish/stockfish`, and applies execution permissions (`chmod 755`).
 *   **Process Client**: The `StockfishClient` runs `ProcessBuilder` on this native executable, starting the process, sending UCI configuration, and verifying readiness via `isready`/`readyok` sequence.
+*   **Position Evaluation**: The match engine requests a shallow, bounded evaluation for each committed position using the configured depth and move-time limits (defaults: depth `8`, `50ms`). Scores are normalized to the moving player's perspective and classified as `STABLE`, `MAJOR_GAIN`, or `MAJOR_MISTAKE` using inclusive `200cp` swing thresholds. Evaluation is best effort and does not invalidate a legal move when Stockfish is unavailable.
 
 ### 3. Match Runtime Pacing
 Backend move pacing is configured through Spring `Duration` properties and environment-backed defaults.

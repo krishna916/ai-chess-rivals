@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
+import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
+import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwingClassification;
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
@@ -52,12 +56,29 @@ class MatchEngineTest {
       int maxPlies,
       MatchPacing matchPacing,
       MatchEventSink eventSink) {
+    return matchEngine(
+        chessPlayer,
+        moveThinkTimeMillis,
+        maxPlies,
+        matchPacing,
+        eventSink,
+        new FakeChessEvaluationService());
+  }
+
+  private static MatchEngine matchEngine(
+      FakeChessPlayer chessPlayer,
+      int moveThinkTimeMillis,
+      int maxPlies,
+      MatchPacing matchPacing,
+      MatchEventSink eventSink,
+      FakeChessEvaluationService evaluationService) {
     return new MatchEngine(
         chessPlayer,
         new ChessBoardService(),
         gameProperties(moveThinkTimeMillis, maxPlies),
         matchPacing,
-        eventSink);
+        eventSink,
+        evaluationService);
   }
 
   @Test
@@ -128,6 +149,86 @@ class MatchEngineTest {
     assertEquals(GameResult.DRAW, resumedMatch.result().orElseThrow());
     assertEquals(2, resumedMatch.moveCount());
     assertEquals("e7e5", resumedMatch.moves().get(1).notation().value());
+  }
+
+  @Test
+  void playUntilFinishedResumesWithoutDuplicatingEvaluationBaseline() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService().withEvaluations(cp(0), cp(-20), cp(-10));
+    MatchEngine matchEngine =
+        matchEngine(chessPlayer, 250, 2, NO_OP_PACING, eventSink, evaluationService);
+    chessPlayer.onChooseMove = matchEngine::stopCurrentMatch;
+
+    matchEngine.playUntilFinished();
+    Match finalMatch = matchEngine.playUntilFinished();
+
+    assertTrue(finalMatch.isFinished());
+    assertEquals(
+        1, eventSink.events.stream().filter(event -> event instanceof MatchStarted).count());
+    List<MovePlayed> moveEvents =
+        eventSink.events.stream()
+            .filter(MovePlayed.class::isInstance)
+            .map(MovePlayed.class::cast)
+            .toList();
+    assertEquals(List.of(1, 2), moveEvents.stream().map(MovePlayed::ply).toList());
+    assertEquals(3, evaluationService.fens.size());
+    assertEquals(
+        List.of(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+            "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"),
+        evaluationService.fens);
+    EvaluationSwing secondSwing = moveEvents.get(1).evaluation().orElseThrow();
+    assertEquals(-20, secondSwing.beforeCentipawns());
+    assertEquals(10, secondSwing.afterCentipawns());
+    assertEquals(30, secondSwing.swingCentipawns());
+  }
+
+  @Test
+  void stopDuringPostMoveEvaluationKeepsCommittedPlyAndResumeBaselineConsistent() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService().withEvaluations(cp(0), cp(-20), cp(-10));
+    MatchEngine[] engine = new MatchEngine[1];
+    int[] evaluationCalls = new int[1];
+    evaluationService.onEvaluate(
+        () -> {
+          evaluationCalls[0]++;
+          if (evaluationCalls[0] == 2) {
+            engine[0].stopCurrentMatch();
+          }
+        });
+    engine[0] = matchEngine(chessPlayer, 250, 2, NO_OP_PACING, eventSink, evaluationService);
+
+    Match stoppedMatch = engine[0].playUntilFinished();
+    Match resumedMatch = engine[0].playUntilFinished();
+
+    assertTrue(stoppedMatch.isInProgress());
+    assertEquals(1, stoppedMatch.moveCount());
+    assertTrue(resumedMatch.isFinished());
+    assertEquals(2, resumedMatch.moveCount());
+    assertEquals(
+        List.of(1, 2),
+        eventSink.events.stream()
+            .filter(MovePlayed.class::isInstance)
+            .map(MovePlayed.class::cast)
+            .map(MovePlayed::ply)
+            .toList());
+    assertEquals(3, evaluationService.fens.size());
+    EvaluationSwing secondSwing =
+        eventSink.events.stream()
+            .filter(MovePlayed.class::isInstance)
+            .map(MovePlayed.class::cast)
+            .toList()
+            .get(1)
+            .evaluation()
+            .orElseThrow();
+    assertEquals(-20, secondSwing.beforeCentipawns());
+    assertEquals(10, secondSwing.afterCentipawns());
+    assertEquals(30, secondSwing.swingCentipawns());
   }
 
   @Test
@@ -214,6 +315,79 @@ class MatchEngineTest {
     assertFalse(movePlayed.check());
     assertFalse(movePlayed.checkmate());
     assertFalse(movePlayed.promotion());
+    assertTrue(movePlayed.evaluation().isPresent());
+  }
+
+  @Test
+  void movePlayedCarriesMoverPerspectiveEvaluationSwing() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService().withEvaluations(cp(10), cp(-250));
+    MatchEngine matchEngine =
+        matchEngine(chessPlayer, 250, 1, NO_OP_PACING, eventSink, evaluationService);
+
+    matchEngine.playUntilFinished();
+
+    MovePlayed event = (MovePlayed) eventSink.events.get(1);
+    EvaluationSwing swing = event.evaluation().orElseThrow();
+    assertEquals(10L, swing.beforeCentipawns());
+    assertEquals(250L, swing.afterCentipawns());
+    assertEquals(240L, swing.swingCentipawns());
+    assertEquals(EvaluationSwingClassification.MAJOR_GAIN, swing.classification());
+    assertEquals(2, evaluationService.fens.size());
+    assertEquals(
+        List.of(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"),
+        evaluationService.fens);
+  }
+
+  @Test
+  void evaluationFailureDoesNotInvalidateCommittedMove() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService()
+            .failsForFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            .withEvaluations(cp(-250));
+    MatchEngine matchEngine =
+        matchEngine(chessPlayer, 250, 1, NO_OP_PACING, eventSink, evaluationService);
+
+    Match finalMatch = matchEngine.playUntilFinished();
+
+    assertEquals(1, finalMatch.moveCount());
+    MovePlayed event = (MovePlayed) eventSink.events.get(1);
+    assertTrue(event.evaluation().isEmpty());
+  }
+
+  @Test
+  void postMoveEvaluationFailureDoesNotInvalidateCommittedMove() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService().withEvaluations(cp(10)).failsOnCall(2);
+    MatchEngine matchEngine =
+        matchEngine(chessPlayer, 250, 1, NO_OP_PACING, eventSink, evaluationService);
+
+    Match finalMatch = matchEngine.playUntilFinished();
+
+    assertEquals(1, finalMatch.moveCount());
+    MovePlayed event = (MovePlayed) eventSink.events.get(1);
+    assertTrue(event.evaluation().isEmpty());
+  }
+
+  @Test
+  void reusesCommittedEvaluationBaselineForNextPly() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService().withEvaluations(cp(0), cp(-20), cp(-10));
+    MatchEngine matchEngine =
+        matchEngine(chessPlayer, 250, 2, NO_OP_PACING, event -> {}, evaluationService);
+
+    matchEngine.playUntilFinished();
+
+    assertEquals(3, evaluationService.fens.size());
   }
 
   @Test
@@ -455,6 +629,63 @@ class MatchEngineTest {
       }
       return move;
     }
+  }
+
+  private static final class FakeChessEvaluationService implements ChessEvaluationService {
+
+    private final Deque<PositionEvaluation> evaluations = new ArrayDeque<>();
+    private final List<String> fens = new ArrayList<>();
+    private int failureOnCall = -1;
+    private String failureFen;
+    private Runnable onEvaluate = () -> {};
+
+    private FakeChessEvaluationService withEvaluations(PositionEvaluation... values) {
+      evaluations.addAll(List.of(values));
+      return this;
+    }
+
+    private FakeChessEvaluationService failsOnCall(int call) {
+      failureOnCall = call;
+      return this;
+    }
+
+    private FakeChessEvaluationService failsForFen(String fen) {
+      failureFen = fen;
+      return this;
+    }
+
+    private FakeChessEvaluationService onEvaluate(Runnable callback) {
+      onEvaluate = callback;
+      return this;
+    }
+
+    @Override
+    public PositionEvaluation evaluate(String fen) {
+      fens.add(fen);
+      onEvaluate.run();
+      if (fens.size() == failureOnCall || fen.equals(failureFen)) {
+        throw new IllegalStateException("evaluation failed");
+      }
+      return evaluations.isEmpty() ? cp(0) : evaluations.removeFirst();
+    }
+
+    @Override
+    public EvaluationSwing compare(PositionEvaluation before, PositionEvaluation after) {
+      long beforeCentipawns = before.comparableCentipawns();
+      long afterCentipawns = -after.comparableCentipawns();
+      long swing = afterCentipawns - beforeCentipawns;
+      EvaluationSwingClassification classification =
+          swing >= 200
+              ? EvaluationSwingClassification.MAJOR_GAIN
+              : swing <= -200
+                  ? EvaluationSwingClassification.MAJOR_MISTAKE
+                  : EvaluationSwingClassification.STABLE;
+      return new EvaluationSwing(beforeCentipawns, afterCentipawns, swing, classification);
+    }
+  }
+
+  private static PositionEvaluation cp(int value) {
+    return new PositionEvaluation(PositionEvaluation.ScoreType.CENTIPAWNS, value);
   }
 
   private static final class RecordingMatchEventSink implements MatchEventSink {

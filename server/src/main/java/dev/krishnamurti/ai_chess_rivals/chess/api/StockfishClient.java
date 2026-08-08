@@ -38,6 +38,16 @@ public interface StockfishClient {
   String bestMove(Duration thinkTime);
 
   /**
+   * Evaluates the position most recently supplied by {@link #setPosition(String)}.
+   *
+   * @param depth maximum search depth
+   * @param moveTime maximum search time
+   * @return latest UCI score seen before {@code bestmove}
+   * @throws StockfishException if no evaluation score is produced before the bounded search ends
+   */
+  PositionEvaluation evaluate(int depth, Duration moveTime);
+
+  /**
    * Gracefully shuts down the engine process. Safe to call multiple times; subsequent calls are
    * no-ops.
    */

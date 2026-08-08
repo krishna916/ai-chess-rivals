@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.chess;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,5 +23,11 @@ class StockfishConfiguration {
     } catch (Exception e) {
       throw new StockfishException("Failed to initialize StockfishEngine bean", e);
     }
+  }
+
+  @Bean
+  ChessEvaluationService chessEvaluationService(
+      StockfishClient stockfishClient, ChessProperties chessProperties) {
+    return new StockfishEvaluationService(stockfishClient, chessProperties);
   }
 }
