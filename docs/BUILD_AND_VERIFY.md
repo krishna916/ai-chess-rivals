@@ -23,6 +23,35 @@ From any working directory, use the script appropriate for your shell:
 
 The scripts stop at the first failing backend or frontend check.
 
+## GitHub Actions CI
+
+Pull requests targeting `master` and pushes to `master` run the `CI` workflow. A lightweight
+`Detect changes` job decides which verification jobs are relevant to the changed files.
+
+- `Backend verification` runs for `server/**`, `scripts/**`, or CI workflow changes and executes
+  `./server/mvnw -f server/pom.xml verify` with Java 25.
+- `Frontend verification` runs for `client/**`, `scripts/**`, or CI workflow changes, installs
+  dependencies with `npm ci`, and executes `npm run verify` with Node.js 22.
+- `Native image verification` runs only for `server/**` or CI workflow changes, only after backend
+  verification succeeds. It builds `server/Dockerfile` for `linux/amd64` with Docker Buildx and
+  GitHub Actions layer caching.
+
+Frontend-only changes therefore do not compile the GraalVM native image. Documentation-only
+changes still create the lightweight `Detect changes` check, while irrelevant backend/frontend
+jobs are reported as skipped.
+
+The automated verification suite requires no Groq/Gemini credentials and does not start
+PostgreSQL. AI remains disabled by default in tests, and provider tests must use local stubs/fakes
+rather than real API calls.
+
+The native CI job is verification only. It does not publish an image, log into GHCR, or deploy to
+Render; image publication and deployment remain separate work.
+
+If branch protection is enabled later, the checks produced by this workflow are:
+`CI / Detect changes`, `CI / Backend verification`, `CI / Frontend verification`, and
+`CI / Native image verification`. Job-level conditions intentionally report irrelevant jobs as
+skipped/successful instead of omitting the workflow entirely.
+
 ## Backend
 
 Run Maven verification from the repository root:
