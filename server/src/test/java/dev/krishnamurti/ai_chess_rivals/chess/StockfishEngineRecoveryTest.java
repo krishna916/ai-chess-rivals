@@ -42,6 +42,17 @@ class StockfishEngineRecoveryTest {
   }
 
   @Test
+  void failedInjectedProcessInitializationCleansOwnedResources() {
+    try (ScriptedUciProcess process = ScriptedUciProcess.startupFailure()) {
+      assertThatThrownBy(() -> new StockfishEngine(process, stockfishConfig()))
+          .isInstanceOf(StockfishException.class);
+
+      assertThat(process.destroyed()).isTrue();
+      assertThat(process.inputClosed()).isTrue();
+    }
+  }
+
+  @Test
   void timedOutEvaluationDoesNotLeakItsBestMoveIntoNextMoveSearch() {
     try (ScriptedUciProcess process = ScriptedUciProcess.recoverable()) {
       StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
@@ -216,6 +227,10 @@ class StockfishEngineRecoveryTest {
       }
     }
 
+    boolean isClosed() {
+      return closed;
+    }
+
     @Override
     public int read() {
       while (true) {
@@ -268,7 +283,8 @@ class StockfishEngineRecoveryTest {
       NOISY_TIMEOUT,
       BESTMOVE_WITHOUT_SCORE,
       MALFORMED_BESTMOVE,
-      SUB_MILLISECOND_EVALUATION
+      SUB_MILLISECOND_EVALUATION,
+      STARTUP_FAILURE
     }
 
     private final InterruptIgnoringInputStream clientReads = new InterruptIgnoringInputStream();
@@ -279,6 +295,7 @@ class StockfishEngineRecoveryTest {
     private final Mode mode;
     private final Thread engineThread;
     private volatile boolean alive = true;
+    private volatile boolean destroyed;
 
     private ScriptedUciProcess(Mode mode) {
       try {
@@ -316,8 +333,20 @@ class StockfishEngineRecoveryTest {
       return new ScriptedUciProcess(Mode.SUB_MILLISECOND_EVALUATION);
     }
 
+    static ScriptedUciProcess startupFailure() {
+      return new ScriptedUciProcess(Mode.STARTUP_FAILURE);
+    }
+
     List<String> commands() {
       return List.copyOf(commands);
+    }
+
+    boolean destroyed() {
+      return destroyed;
+    }
+
+    boolean inputClosed() {
+      return clientReads.isClosed();
     }
 
     List<String> trace() {
@@ -336,7 +365,9 @@ class StockfishEngineRecoveryTest {
               emitLine("uciok");
             }
             case "isready" -> {
-              if (mode != Mode.UNRECOVERABLE_TIMEOUT
+              if (mode == Mode.STARTUP_FAILURE) {
+                // Deliberately omit readyok to fail constructor setup.
+              } else if (mode != Mode.UNRECOVERABLE_TIMEOUT
                   || commands.stream().noneMatch("go depth 8 movetime 1"::equals)) {
                 emitLine("readyok");
               } else {
@@ -466,6 +497,7 @@ class StockfishEngineRecoveryTest {
 
     @Override
     public void destroy() {
+      destroyed = true;
       close();
     }
 

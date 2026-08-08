@@ -97,32 +97,43 @@ final class StockfishEngine implements StockfishClient {
               .formatted(executablePath.toAbsolutePath(), executablePath.toAbsolutePath()));
     }
 
+    Process launchedProcess = null;
+    BufferedReader launchedReader = null;
     try {
       log.info("Launching Stockfish: {}", executablePath.toAbsolutePath());
-      this.process =
+      launchedProcess =
           new ProcessBuilder(executablePath.toAbsolutePath().toString())
               .redirectErrorStream(true)
               .start();
+      this.process = launchedProcess;
 
-      this.reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+      launchedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+      this.reader = launchedReader;
       this.writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 
       performUciHandshake();
       configureOptions(config);
       waitForReady(startupTimeoutSeconds);
 
-    } catch (IOException e) {
-      throw new StockfishException("Failed to launch Stockfish process", e);
+    } catch (IOException | RuntimeException failure) {
+      cleanupAfterConstructionFailure(launchedProcess, launchedReader);
+      if (failure instanceof StockfishException stockfishFailure) {
+        throw stockfishFailure;
+      }
+      throw new StockfishException("Failed to launch Stockfish process", failure);
     }
 
     log.info("Stockfish ready. Threads={}, Hash={}MB", config.threads(), config.hashMb());
   }
 
   StockfishEngine(Process process, ChessProperties.Stockfish config) {
-    this.process = Objects.requireNonNull(process, "process must not be null");
+    Process injectedProcess = Objects.requireNonNull(process, "process must not be null");
     Objects.requireNonNull(config, "config must not be null");
-    this.reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-    this.writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+    BufferedReader injectedReader =
+        new BufferedReader(new InputStreamReader(injectedProcess.getInputStream()));
+    this.process = injectedProcess;
+    this.reader = injectedReader;
+    this.writer = new BufferedWriter(new OutputStreamWriter(injectedProcess.getOutputStream()));
     this.startupTimeoutSeconds = config.startupTimeoutSeconds();
     this.moveTimeoutSeconds = config.moveTimeoutSeconds();
 
@@ -130,8 +141,12 @@ final class StockfishEngine implements StockfishClient {
       performUciHandshake();
       configureOptions(config);
       waitForReady(startupTimeoutSeconds);
-    } catch (IOException e) {
-      throw new StockfishException("Failed to initialize injected Stockfish process", e);
+    } catch (IOException | RuntimeException failure) {
+      cleanupAfterConstructionFailure(injectedProcess, injectedReader);
+      if (failure instanceof StockfishException stockfishFailure) {
+        throw stockfishFailure;
+      }
+      throw new StockfishException("Failed to initialize injected Stockfish process", failure);
     }
   }
 
@@ -268,6 +283,24 @@ final class StockfishEngine implements StockfishClient {
     if (!usable.get()) {
       throw new StockfishException("Stockfish engine is not usable after failed search recovery");
     }
+  }
+
+  private void cleanupAfterConstructionFailure(Process failedProcess, BufferedReader failedReader) {
+    if (failedProcess != null) {
+      try {
+        failedProcess.destroy();
+      } catch (RuntimeException cleanupFailure) {
+        log.warn("Could not destroy Stockfish process after construction failure", cleanupFailure);
+      }
+    }
+    if (failedReader != null) {
+      try {
+        failedReader.close();
+      } catch (IOException cleanupFailure) {
+        log.warn("Could not close Stockfish reader after construction failure", cleanupFailure);
+      }
+    }
+    lineReaderExecutor.shutdownNow();
   }
 
   private void recoverAfterSearchFailure(StockfishException failure) {
