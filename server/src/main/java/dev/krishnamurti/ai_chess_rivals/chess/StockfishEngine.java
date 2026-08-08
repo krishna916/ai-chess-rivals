@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +44,7 @@ final class StockfishEngine implements StockfishClient {
   private final BufferedReader reader;
   private final BufferedWriter writer;
   private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final AtomicBoolean usable = new AtomicBoolean(true);
   private final long startupTimeoutSeconds;
   private final long moveTimeoutSeconds;
 
@@ -114,8 +116,26 @@ final class StockfishEngine implements StockfishClient {
     log.info("Stockfish ready. Threads={}, Hash={}MB", config.threads(), config.hashMb());
   }
 
+  StockfishEngine(Process process, ChessProperties.Stockfish config) {
+    this.process = Objects.requireNonNull(process, "process must not be null");
+    Objects.requireNonNull(config, "config must not be null");
+    this.reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+    this.writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+    this.startupTimeoutSeconds = config.startupTimeoutSeconds();
+    this.moveTimeoutSeconds = config.moveTimeoutSeconds();
+
+    try {
+      performUciHandshake();
+      configureOptions(config);
+      waitForReady(startupTimeoutSeconds);
+    } catch (IOException e) {
+      throw new StockfishException("Failed to initialize injected Stockfish process", e);
+    }
+  }
+
   @Override
   public void newGame() {
+    ensureUsable();
     try {
       sendCommand(UciCommand.newGame());
       waitForReady(moveTimeoutSeconds);
@@ -126,6 +146,7 @@ final class StockfishEngine implements StockfishClient {
 
   @Override
   public void setPosition(String fen) {
+    ensureUsable();
     try {
       sendCommand(UciCommand.position(fen));
     } catch (IOException e) {
@@ -135,8 +156,11 @@ final class StockfishEngine implements StockfishClient {
 
   @Override
   public String bestMove(Duration thinkTime) {
+    ensureUsable();
+    boolean searchStarted = false;
     try {
       sendCommand(UciCommand.go(thinkTime.toMillis()));
+      searchStarted = true;
       // Add a safety margin on top of the engine think time so a normally
       // running engine is never interrupted, but a silent/hung engine is.
       long safetyMarginSeconds = moveTimeoutSeconds;
@@ -146,13 +170,24 @@ final class StockfishEngine implements StockfishClient {
           .extractBestMove()
           .orElseThrow(
               () -> new StockfishException("Unexpected bestmove response: " + response.raw()));
+    } catch (StockfishException failure) {
+      if (searchStarted) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
     } catch (IOException e) {
-      throw new StockfishException("Failed to obtain best move from Stockfish", e);
+      StockfishException failure =
+          new StockfishException("Failed to obtain best move from Stockfish", e);
+      if (searchStarted) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
     }
   }
 
   @Override
   public PositionEvaluation evaluate(int depth, Duration moveTime) {
+    ensureUsable();
     if (depth <= 0) {
       throw new IllegalArgumentException("depth must be positive");
     }
@@ -160,8 +195,10 @@ final class StockfishEngine implements StockfishClient {
       throw new IllegalArgumentException("moveTime must be positive");
     }
 
+    boolean searchStarted = false;
     try {
       sendCommand(UciCommand.evaluate(depth, moveTime.toMillis()));
+      searchStarted = true;
       long evaluationTimeoutMillis =
           Math.max(1_000L, moveTime.toMillis()) + TimeUnit.SECONDS.toMillis(moveTimeoutSeconds);
       long deadlineNanos =
@@ -185,8 +222,18 @@ final class StockfishEngine implements StockfishClient {
           return latestScore;
         }
       }
+    } catch (StockfishException failure) {
+      if (searchStarted) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
     } catch (IOException e) {
-      throw new StockfishException("Failed to evaluate position with Stockfish", e);
+      StockfishException failure =
+          new StockfishException("Failed to evaluate position with Stockfish", e);
+      if (searchStarted) {
+        recoverAfterSearchFailure(failure);
+      }
+      throw failure;
     }
   }
 
@@ -209,6 +256,24 @@ final class StockfishEngine implements StockfishClient {
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
+
+  private void ensureUsable() {
+    if (!usable.get()) {
+      throw new StockfishException("Stockfish engine is not usable after failed search recovery");
+    }
+  }
+
+  private void recoverAfterSearchFailure(StockfishException failure) {
+    try {
+      sendCommand(UciCommand.stop());
+      sendCommand(UciCommand.isReady());
+      waitForToken("readyok", moveTimeoutSeconds);
+    } catch (IOException | RuntimeException recoveryFailure) {
+      usable.set(false);
+      failure.addSuppressed(recoveryFailure);
+      log.error("Stockfish search recovery failed; engine marked unusable", recoveryFailure);
+    }
+  }
 
   private void performUciHandshake() throws IOException {
     sendCommand(UciCommand.uci());

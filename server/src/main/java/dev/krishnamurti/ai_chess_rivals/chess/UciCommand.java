@@ -23,6 +23,11 @@ record UciCommand(String text) {
     return new UciCommand("ucinewgame");
   }
 
+  /** Stops the current search. Engine responds with {@code bestmove} when the search is stopped. */
+  static UciCommand stop() {
+    return new UciCommand("stop");
+  }
+
   /** Asks the engine to quit cleanly. */
   static UciCommand quit() {
     return new UciCommand("quit");
