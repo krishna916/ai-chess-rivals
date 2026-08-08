@@ -60,6 +60,8 @@ final class StockfishEngine implements StockfishClient {
             return t;
           });
 
+  private Future<String> pendingRead;
+
   StockfishEngine(ChessProperties chessProperties) {
     ChessProperties.Stockfish config = chessProperties.stockfish();
     Path executablePath = Paths.get(config.path());
@@ -158,6 +160,7 @@ final class StockfishEngine implements StockfishClient {
   public String bestMove(Duration thinkTime) {
     ensureUsable();
     boolean searchStarted = false;
+    boolean bestmoveReceived = false;
     try {
       sendCommand(UciCommand.go(thinkTime.toMillis()));
       searchStarted = true;
@@ -166,19 +169,20 @@ final class StockfishEngine implements StockfishClient {
       long safetyMarginSeconds = moveTimeoutSeconds;
       long deadlineSeconds = thinkTime.toSeconds() + safetyMarginSeconds;
       UciResponse response = waitForToken("bestmove", deadlineSeconds);
+      bestmoveReceived = true;
       return response
           .extractBestMove()
           .orElseThrow(
               () -> new StockfishException("Unexpected bestmove response: " + response.raw()));
     } catch (StockfishException failure) {
-      if (searchStarted) {
+      if (searchStarted && !bestmoveReceived) {
         recoverAfterSearchFailure(failure);
       }
       throw failure;
     } catch (IOException e) {
       StockfishException failure =
           new StockfishException("Failed to obtain best move from Stockfish", e);
-      if (searchStarted) {
+      if (searchStarted && !bestmoveReceived) {
         recoverAfterSearchFailure(failure);
       }
       throw failure;
@@ -196,6 +200,7 @@ final class StockfishEngine implements StockfishClient {
     }
 
     boolean searchStarted = false;
+    boolean bestmoveReceived = false;
     try {
       sendCommand(UciCommand.evaluate(depth, moveTime.toMillis()));
       searchStarted = true;
@@ -216,6 +221,7 @@ final class StockfishEngine implements StockfishClient {
         log.debug("<<< {}", rawLine);
         latestScore = latestScore(latestScore, response);
         if (response.startsWith("bestmove")) {
+          bestmoveReceived = true;
           if (latestScore == null) {
             throw new StockfishException("Stockfish returned bestmove without an evaluation score");
           }
@@ -223,14 +229,14 @@ final class StockfishEngine implements StockfishClient {
         }
       }
     } catch (StockfishException failure) {
-      if (searchStarted) {
+      if (searchStarted && !bestmoveReceived) {
         recoverAfterSearchFailure(failure);
       }
       throw failure;
     } catch (IOException e) {
       StockfishException failure =
           new StockfishException("Failed to evaluate position with Stockfish", e);
-      if (searchStarted) {
+      if (searchStarted && !bestmoveReceived) {
         recoverAfterSearchFailure(failure);
       }
       throw failure;
@@ -266,6 +272,7 @@ final class StockfishEngine implements StockfishClient {
   private void recoverAfterSearchFailure(StockfishException failure) {
     try {
       sendCommand(UciCommand.stop());
+      waitForToken("bestmove", moveTimeoutSeconds);
       sendCommand(UciCommand.isReady());
       waitForToken("readyok", moveTimeoutSeconds);
     } catch (IOException | RuntimeException recoveryFailure) {
@@ -364,16 +371,21 @@ final class StockfishEngine implements StockfishClient {
                   + "The engine process may be hung or unresponsive.")
               .formatted(waitingFor));
     }
-    Future<String> future = lineReaderExecutor.submit(reader::readLine);
+    if (pendingRead == null) {
+      pendingRead = lineReaderExecutor.submit(reader::readLine);
+    }
+    Future<String> future = pendingRead;
     try {
-      return future.get(timeout, timeUnit);
+      String line = future.get(timeout, timeUnit);
+      pendingRead = null;
+      return line;
     } catch (TimeoutException e) {
-      future.cancel(true);
       throw new StockfishException(
           ("Stockfish did not respond within %d %s while waiting for %s. "
                   + "The engine process may be hung or unresponsive.")
               .formatted(timeout, timeUnit == TimeUnit.SECONDS ? "s" : "ns", waitingFor));
     } catch (ExecutionException e) {
+      pendingRead = null;
       Throwable cause = e.getCause();
       if (cause instanceof IOException ioe) {
         throw ioe;

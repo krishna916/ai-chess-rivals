@@ -5,17 +5,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
@@ -34,9 +35,33 @@ class StockfishEngineRecoveryTest {
       String move = engine.bestMove(Duration.ofMillis(10));
 
       assertThat(move).isEqualTo("e2e4");
-      assertThat(process.commands())
+      assertThat(process.trace())
           .containsSubsequence(
-              "go depth 8 movetime 1", "stop", "isready", "position startpos", "go movetime 10");
+              "IN go depth 8 movetime 1",
+              "IN stop",
+              "OUT bestmove a2a3",
+              "IN isready",
+              "OUT readyok",
+              "IN position startpos",
+              "IN go movetime 10",
+              "OUT bestmove e2e4");
+      engine.close();
+    }
+  }
+
+  @Test
+  void completedEvaluationWithMissingScoreDoesNotWaitForAnotherBestMove() {
+    try (ScriptedUciProcess process = ScriptedUciProcess.bestmoveWithoutScore()) {
+      StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
+
+      engine.setPosition("startpos");
+      assertThatThrownBy(() -> engine.evaluate(8, Duration.ofMillis(10)))
+          .isInstanceOf(StockfishException.class)
+          .hasMessageContaining("without an evaluation score");
+
+      engine.setPosition("startpos");
+      assertThat(engine.bestMove(Duration.ofMillis(10))).isEqualTo("e2e4");
+      assertThat(process.commands()).doesNotContain("stop");
       engine.close();
     }
   }
@@ -69,64 +94,168 @@ class StockfishEngineRecoveryTest {
         new ChessProperties.Stockfish.Evaluation(8, 50, 200, 200));
   }
 
+  private static final class InterruptIgnoringInputStream extends InputStream {
+
+    private final BlockingQueue<Integer> bytes = new LinkedBlockingQueue<>();
+    private volatile boolean closed;
+
+    void emitLine(String line) {
+      byte[] encoded = (line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+      for (byte value : encoded) {
+        bytes.add(value & 0xFF);
+      }
+    }
+
+    @Override
+    public int read() {
+      while (true) {
+        Integer value = bytes.poll();
+        if (value != null) {
+          return value;
+        }
+        if (closed) {
+          return -1;
+        }
+        try {
+          Thread.sleep(5);
+        } catch (InterruptedException ignored) {
+          // Deliberately ignore interruption to model a process-pipe read that
+          // Future.cancel(true) cannot safely detach from the underlying stream.
+        }
+      }
+    }
+
+    @Override
+    public int read(byte[] target, int offset, int length) {
+      int first = read();
+      if (first < 0) {
+        return -1;
+      }
+      target[offset] = (byte) first;
+      int count = 1;
+      while (count < length) {
+        Integer value = bytes.poll();
+        if (value == null) {
+          break;
+        }
+        target[offset + count] = (byte) (int) value;
+        count++;
+      }
+      return count;
+    }
+
+    @Override
+    public void close() {
+      closed = true;
+    }
+  }
+
   private static final class ScriptedUciProcess extends Process implements AutoCloseable {
 
-    private final PipedInputStream clientReads = new PipedInputStream();
-    private final PipedOutputStream engineWrites;
+    private enum Mode {
+      RECOVERABLE_TIMEOUT,
+      UNRECOVERABLE_TIMEOUT,
+      BESTMOVE_WITHOUT_SCORE
+    }
+
+    private final InterruptIgnoringInputStream clientReads = new InterruptIgnoringInputStream();
     private final PipedInputStream engineReads = new PipedInputStream();
     private final PipedOutputStream clientWrites;
     private final List<String> commands = new CopyOnWriteArrayList<>();
-    private final boolean recoverable;
+    private final List<String> trace = new CopyOnWriteArrayList<>();
+    private final Mode mode;
     private final Thread engineThread;
     private volatile boolean alive = true;
 
-    private ScriptedUciProcess(boolean recoverable) {
+    private ScriptedUciProcess(Mode mode) {
       try {
-        engineWrites = new PipedOutputStream(clientReads);
         clientWrites = new PipedOutputStream(engineReads);
       } catch (IOException exception) {
         throw new IllegalStateException(exception);
       }
-      this.recoverable = recoverable;
+      this.mode = mode;
       engineThread = new Thread(this::runEngine, "scripted-uci-engine");
       engineThread.setDaemon(true);
       engineThread.start();
     }
 
     static ScriptedUciProcess recoverable() {
-      return new ScriptedUciProcess(true);
+      return new ScriptedUciProcess(Mode.RECOVERABLE_TIMEOUT);
     }
 
     static ScriptedUciProcess unrecoverable() {
-      return new ScriptedUciProcess(false);
+      return new ScriptedUciProcess(Mode.UNRECOVERABLE_TIMEOUT);
+    }
+
+    static ScriptedUciProcess bestmoveWithoutScore() {
+      return new ScriptedUciProcess(Mode.BESTMOVE_WITHOUT_SCORE);
     }
 
     List<String> commands() {
       return List.copyOf(commands);
     }
 
+    List<String> trace() {
+      return List.copyOf(trace);
+    }
+
     private void runEngine() {
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(engineReads));
-          BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(engineWrites))) {
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(engineReads))) {
         String command;
         while (alive && (command = reader.readLine()) != null) {
           commands.add(command);
+          trace.add("IN " + command);
           switch (command) {
-            case "uci" -> writeLine(writer, "id name ScriptedStockfish", "uciok");
+            case "uci" -> {
+              emitLine("id name ScriptedStockfish");
+              emitLine("uciok");
+            }
             case "isready" -> {
-              if (recoverable || commands.stream().noneMatch("go depth 8 movetime 1"::equals)) {
-                writeLine(writer, "readyok");
+              if (mode != Mode.UNRECOVERABLE_TIMEOUT
+                  || commands.stream().noneMatch("go depth 8 movetime 1"::equals)) {
+                emitLine("readyok");
               } else {
-                engineWrites.close();
+                clientReads.close();
                 alive = false;
               }
             }
             case "stop" -> {
-              if (recoverable) {
-                writeLine(writer, "bestmove a2a3");
+              if (mode == Mode.RECOVERABLE_TIMEOUT) {
+                Thread delayedBestmove =
+                    new Thread(
+                        () -> {
+                          try {
+                            Thread.sleep(75);
+                            emitLine("bestmove a2a3");
+                          } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                          }
+                        },
+                        "scripted-delayed-stale-bestmove");
+                delayedBestmove.setDaemon(true);
+                delayedBestmove.start();
               }
             }
-            case "go movetime 10" -> writeLine(writer, "bestmove e2e4");
+            case "go depth 8 movetime 10" -> {
+              if (mode == Mode.BESTMOVE_WITHOUT_SCORE) {
+                emitLine("bestmove a2a3");
+              }
+            }
+            case "go movetime 10" -> {
+              Thread validBestmove =
+                  new Thread(
+                      () -> {
+                        try {
+                          Thread.sleep(150);
+                          emitLine("bestmove e2e4");
+                        } catch (InterruptedException exception) {
+                          Thread.currentThread().interrupt();
+                        }
+                      },
+                      "scripted-delayed-valid-bestmove");
+              validBestmove.setDaemon(true);
+              validBestmove.start();
+            }
             case "quit" -> alive = false;
             default -> {
               // position/setoption/ucinewgame are accepted without direct output.
@@ -138,12 +267,9 @@ class StockfishEngineRecoveryTest {
       }
     }
 
-    private static void writeLine(BufferedWriter writer, String... lines) throws IOException {
-      for (String line : lines) {
-        writer.write(line);
-        writer.newLine();
-      }
-      writer.flush();
+    private synchronized void emitLine(String line) {
+      trace.add("OUT " + line);
+      clientReads.emitLine(line);
     }
 
     @Override
@@ -198,7 +324,6 @@ class StockfishEngineRecoveryTest {
         clientWrites.close();
         clientReads.close();
         engineReads.close();
-        engineWrites.close();
       } catch (IOException ignored) {
         // Test resource cleanup only.
       }
