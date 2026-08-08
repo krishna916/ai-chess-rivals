@@ -177,8 +177,7 @@ final class StockfishEngine implements StockfishClient {
         }
         if (response.startsWith("bestmove")) {
           if (latestScore == null) {
-            throw new StockfishException(
-                "Stockfish returned bestmove without an evaluation score");
+            throw new StockfishException("Stockfish returned bestmove without an evaluation score");
           }
           return latestScore;
         }

@@ -20,9 +20,7 @@ final class StockfishEvaluationService implements ChessEvaluationService {
   StockfishEvaluationService(StockfishClient client, ChessProperties properties) {
     this.client = Objects.requireNonNull(client, "client must not be null");
     ChessProperties.Stockfish.Evaluation config =
-        Objects.requireNonNull(properties, "properties must not be null")
-            .stockfish()
-            .evaluation();
+        Objects.requireNonNull(properties, "properties must not be null").stockfish().evaluation();
     this.depth = config.depth();
     this.moveTime = Duration.ofMillis(config.moveTimeMillis());
     this.gainThreshold = config.majorGainThresholdCentipawns();

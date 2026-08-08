@@ -18,6 +18,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class MatchStreamMessageMapperTest {
@@ -40,7 +41,8 @@ class MatchStreamMessageMapperTest {
                 ChessPieceType.QUEEN,
                 CastlingSide.KING_SIDE,
                 false,
-                false));
+                false),
+            Optional.empty());
 
     MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(event);
 

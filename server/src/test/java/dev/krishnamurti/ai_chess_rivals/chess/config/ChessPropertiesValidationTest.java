@@ -129,7 +129,8 @@ class ChessPropertiesValidationTest {
 
   @Test
   void whenEvaluationMoveTimeIsTooLow_thenViolation() {
-    ChessProperties.Stockfish.Evaluation invalid = new ChessProperties.Stockfish.Evaluation(8, 0, 200, 200);
+    ChessProperties.Stockfish.Evaluation invalid =
+        new ChessProperties.Stockfish.Evaluation(8, 0, 200, 200);
     assertThat(violationsFor(new ChessProperties.Stockfish("path", 1, 16, 10, 30, invalid)))
         .extracting(ConstraintViolation::getPropertyPath)
         .anyMatch(path -> path.toString().equals("stockfish.evaluation.moveTimeMillis"));
@@ -137,26 +138,32 @@ class ChessPropertiesValidationTest {
 
   @Test
   void whenMajorGainThresholdIsTooLow_thenViolation() {
-    ChessProperties.Stockfish.Evaluation invalid = new ChessProperties.Stockfish.Evaluation(8, 50, 0, 200);
+    ChessProperties.Stockfish.Evaluation invalid =
+        new ChessProperties.Stockfish.Evaluation(8, 50, 0, 200);
     assertThat(violationsFor(new ChessProperties.Stockfish("path", 1, 16, 10, 30, invalid)))
         .extracting(ConstraintViolation::getPropertyPath)
-        .anyMatch(path -> path.toString().equals("stockfish.evaluation.majorGainThresholdCentipawns"));
+        .anyMatch(
+            path -> path.toString().equals("stockfish.evaluation.majorGainThresholdCentipawns"));
   }
 
   @Test
   void whenMajorMistakeThresholdIsTooLow_thenViolation() {
-    ChessProperties.Stockfish.Evaluation invalid = new ChessProperties.Stockfish.Evaluation(8, 50, 200, 0);
+    ChessProperties.Stockfish.Evaluation invalid =
+        new ChessProperties.Stockfish.Evaluation(8, 50, 200, 0);
     assertThat(violationsFor(new ChessProperties.Stockfish("path", 1, 16, 10, 30, invalid)))
         .extracting(ConstraintViolation::getPropertyPath)
-        .anyMatch(path -> path.toString().equals("stockfish.evaluation.majorMistakeThresholdCentipawns"));
+        .anyMatch(
+            path -> path.toString().equals("stockfish.evaluation.majorMistakeThresholdCentipawns"));
   }
 
   @Test
   void whenEvaluationIsNull_thenViolation() {
     Set<ConstraintViolation<ChessProperties>> violations =
-        validator.validate(new ChessProperties(new ChessProperties.Stockfish("path", 1, 16, 10, 30, null)));
+        validator.validate(
+            new ChessProperties(new ChessProperties.Stockfish("path", 1, 16, 10, 30, null)));
 
-    assertThat(violations).extracting(ConstraintViolation::getPropertyPath)
+    assertThat(violations)
+        .extracting(ConstraintViolation::getPropertyPath)
         .anyMatch(path -> path.toString().equals("stockfish.evaluation"));
   }
 

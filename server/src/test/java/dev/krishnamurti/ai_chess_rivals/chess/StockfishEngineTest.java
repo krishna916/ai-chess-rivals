@@ -17,8 +17,7 @@ class StockfishEngineTest {
     Path nonExistentPath = tempDir.resolve("non-existent-stockfish");
     ChessProperties props =
         new ChessProperties(
-            new ChessProperties.Stockfish(
-                nonExistentPath.toString(), 1, 16, 10, 30, evaluation()));
+            new ChessProperties.Stockfish(nonExistentPath.toString(), 1, 16, 10, 30, evaluation()));
 
     assertThatThrownBy(() -> new StockfishEngine(props))
         .isInstanceOf(StockfishException.class)

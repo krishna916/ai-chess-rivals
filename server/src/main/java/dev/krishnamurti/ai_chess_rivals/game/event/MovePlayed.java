@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.game.event;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide;
 import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
@@ -7,9 +8,15 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import java.util.Objects;
+import java.util.Optional;
 
 public record MovePlayed(
-    int ply, PlayerColor player, MoveNotation notation, BoardPosition position, MoveDetails details)
+    int ply,
+    PlayerColor player,
+    MoveNotation notation,
+    BoardPosition position,
+    MoveDetails details,
+    Optional<EvaluationSwing> evaluation)
     implements MatchEvent {
 
   public MovePlayed {
@@ -20,6 +27,7 @@ public record MovePlayed(
     Objects.requireNonNull(notation, "notation must not be null");
     Objects.requireNonNull(position, "position must not be null");
     Objects.requireNonNull(details, "details must not be null");
+    Objects.requireNonNull(evaluation, "evaluation must not be null");
   }
 
   public ChessPieceType movingPiece() {

@@ -1,5 +1,8 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
+import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
@@ -14,35 +17,43 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /** Runs a single synchronous match from start to finish. */
 @Service
+@Slf4j
 public final class MatchEngine {
 
   private final ChessPlayer chessPlayer;
   private final ChessBoardService chessBoardService;
   private final MatchPacing matchPacing;
   private final MatchEventSink matchEventSink;
+  private final ChessEvaluationService chessEvaluationService;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
+  private final AtomicReference<EvaluationBaseline> evaluationBaseline = new AtomicReference<>();
 
   public MatchEngine(
       @Qualifier("stockfishPlayer") ChessPlayer chessPlayer,
       ChessBoardService chessBoardService,
       GameProperties gameProperties,
       MatchPacing matchPacing,
-      MatchEventSink matchEventSink) {
+      MatchEventSink matchEventSink,
+      ChessEvaluationService chessEvaluationService) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
     Objects.requireNonNull(gameProperties, "gameProperties must not be null");
     this.matchPacing = Objects.requireNonNull(matchPacing, "matchPacing must not be null");
     this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
+    this.chessEvaluationService =
+        Objects.requireNonNull(chessEvaluationService, "chessEvaluationService must not be null");
     this.maxPlies = gameProperties.maxPlies();
   }
 
@@ -60,6 +71,12 @@ public final class MatchEngine {
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to initialize a new match", e);
     }
+    evaluationBaseline.set(null);
+    String startingFen = match.currentPosition().fen();
+    safeEvaluate(0, startingFen)
+        .ifPresent(
+            evaluation ->
+                evaluationBaseline.set(new EvaluationBaseline(0, startingFen, evaluation)));
     try {
       matchEventSink.publish(new MatchStarted(match.sideToMove(), match.currentPosition()));
     } catch (RuntimeException e) {
@@ -85,6 +102,7 @@ public final class MatchEngine {
 
       int ply = match.moveCount() + 1;
       GameResult result;
+      Optional<PositionEvaluation> beforeEvaluation = evaluationBefore(match);
       try {
         MoveNotation moveNotation = chessPlayer.chooseMove(match);
         PlayerColor player = match.sideToMove();
@@ -95,13 +113,24 @@ public final class MatchEngine {
         Move recordedMove = nextMatch.moves().getLast();
         match = nextMatch;
         currentMatch.set(match);
+        String committedFen = match.currentPosition().fen();
+        Optional<PositionEvaluation> afterEvaluation =
+            safeEvaluate(recordedMove.sequenceNumber(), committedFen);
+        afterEvaluation.ifPresent(
+            evaluation ->
+                storeBaselineIfAuthoritative(
+                    recordedMove.sequenceNumber(), committedFen, evaluation));
+        Optional<EvaluationSwing> evaluationSwing =
+            beforeEvaluation.flatMap(
+                before -> afterEvaluation.flatMap(after -> safeCompare(before, after)));
         matchEventSink.publish(
             new MovePlayed(
                 recordedMove.sequenceNumber(),
                 player,
                 recordedMove.notation(),
                 recordedMove.positionAfterMove(),
-                recordedMove.details()));
+                recordedMove.details(),
+                evaluationSwing));
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         result =
@@ -178,4 +207,43 @@ public final class MatchEngine {
     return positionOccurrences.merge(
         chessBoardService.normalizedPositionKey(position), 1, Integer::sum);
   }
+
+  private Optional<PositionEvaluation> safeEvaluate(int ply, String fen) {
+    try {
+      return Optional.of(chessEvaluationService.evaluate(fen));
+    } catch (RuntimeException exception) {
+      log.warn("Stockfish evaluation unavailable for ply {} and position {}", ply, fen, exception);
+      return Optional.empty();
+    }
+  }
+
+  private Optional<PositionEvaluation> evaluationBefore(Match match) {
+    EvaluationBaseline baseline = evaluationBaseline.get();
+    String fen = match.currentPosition().fen();
+    if (baseline != null && baseline.ply() == match.moveCount() && baseline.fen().equals(fen)) {
+      return Optional.of(baseline.evaluation());
+    }
+    return safeEvaluate(match.moveCount(), fen);
+  }
+
+  private void storeBaselineIfAuthoritative(int ply, String fen, PositionEvaluation evaluation) {
+    Match authoritative = currentMatch.get();
+    if (authoritative != null
+        && authoritative.moveCount() == ply
+        && authoritative.currentPosition().fen().equals(fen)) {
+      evaluationBaseline.set(new EvaluationBaseline(ply, fen, evaluation));
+    }
+  }
+
+  private Optional<EvaluationSwing> safeCompare(
+      PositionEvaluation before, PositionEvaluation after) {
+    try {
+      return Optional.of(chessEvaluationService.compare(before, after));
+    } catch (RuntimeException exception) {
+      log.warn("Stockfish evaluation swing unavailable", exception);
+      return Optional.empty();
+    }
+  }
+
+  private record EvaluationBaseline(int ply, String fen, PositionEvaluation evaluation) {}
 }
