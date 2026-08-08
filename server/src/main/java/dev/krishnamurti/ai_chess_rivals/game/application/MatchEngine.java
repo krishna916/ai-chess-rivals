@@ -1,7 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
-import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationRequested;
-import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationResult;
+import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
 import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
@@ -19,15 +18,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 /** Runs a single synchronous match from start to finish. */
@@ -39,14 +33,11 @@ public final class MatchEngine {
   private final ChessBoardService chessBoardService;
   private final MatchPacing matchPacing;
   private final MatchEventSink matchEventSink;
-  private final ApplicationEventPublisher eventPublisher;
+  private final ChessEvaluationService chessEvaluationService;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
   private final AtomicReference<EvaluationBaseline> evaluationBaseline = new AtomicReference<>();
-  private final AtomicLong evaluationCorrelation = new AtomicLong();
-  private final ConcurrentHashMap<Long, CompletableFuture<ChessEvaluationResult>>
-      pendingEvaluations = new ConcurrentHashMap<>();
 
   public MatchEngine(
       @Qualifier("stockfishPlayer") ChessPlayer chessPlayer,
@@ -54,14 +45,15 @@ public final class MatchEngine {
       GameProperties gameProperties,
       MatchPacing matchPacing,
       MatchEventSink matchEventSink,
-      ApplicationEventPublisher eventPublisher) {
+      ChessEvaluationService chessEvaluationService) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
     Objects.requireNonNull(gameProperties, "gameProperties must not be null");
     this.matchPacing = Objects.requireNonNull(matchPacing, "matchPacing must not be null");
     this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
-    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
+    this.chessEvaluationService =
+        Objects.requireNonNull(chessEvaluationService, "chessEvaluationService must not be null");
     this.maxPlies = gameProperties.maxPlies();
   }
 
@@ -81,8 +73,7 @@ public final class MatchEngine {
     }
     evaluationBaseline.set(null);
     String startingFen = match.currentPosition().fen();
-    requestEvaluation(0, startingFen, Optional.empty())
-        .evaluation()
+    safeEvaluate(0, startingFen)
         .ifPresent(
             evaluation ->
                 evaluationBaseline.set(new EvaluationBaseline(0, startingFen, evaluation)));
@@ -123,15 +114,15 @@ public final class MatchEngine {
         match = nextMatch;
         currentMatch.set(match);
         String committedFen = match.currentPosition().fen();
-        ChessEvaluationResult evaluationResult =
-            requestEvaluation(recordedMove.sequenceNumber(), committedFen, beforeEvaluation);
-        evaluationResult
-            .evaluation()
-            .ifPresent(
-                evaluation ->
-                    storeBaselineIfAuthoritative(
-                        recordedMove.sequenceNumber(), committedFen, evaluation));
-        Optional<EvaluationSwing> evaluationSwing = evaluationResult.swing();
+        Optional<PositionEvaluation> afterEvaluation =
+            safeEvaluate(recordedMove.sequenceNumber(), committedFen);
+        afterEvaluation.ifPresent(
+            evaluation ->
+                storeBaselineIfAuthoritative(
+                    recordedMove.sequenceNumber(), committedFen, evaluation));
+        Optional<EvaluationSwing> evaluationSwing =
+            beforeEvaluation.flatMap(
+                before -> afterEvaluation.flatMap(after -> safeCompare(before, after)));
         matchEventSink.publish(
             new MovePlayed(
                 recordedMove.sequenceNumber(),
@@ -223,7 +214,7 @@ public final class MatchEngine {
     if (baseline != null && baseline.ply() == match.moveCount() && baseline.fen().equals(fen)) {
       return Optional.of(baseline.evaluation());
     }
-    return requestEvaluation(match.moveCount(), fen, Optional.empty()).evaluation();
+    return safeEvaluate(match.moveCount(), fen);
   }
 
   private void storeBaselineIfAuthoritative(int ply, String fen, PositionEvaluation evaluation) {
@@ -235,44 +226,23 @@ public final class MatchEngine {
     }
   }
 
-  private ChessEvaluationResult requestEvaluation(
-      int ply, String fen, Optional<PositionEvaluation> before) {
-    ChessEvaluationRequested request =
-        new ChessEvaluationRequested(evaluationCorrelation.incrementAndGet(), ply, fen, before);
-    CompletableFuture<ChessEvaluationResult> result = new CompletableFuture<>();
-    pendingEvaluations.put(request.correlationId(), result);
+  private Optional<PositionEvaluation> safeEvaluate(int ply, String fen) {
     try {
-      eventPublisher.publishEvent(request);
-      ChessEvaluationResult evaluationResult = result.getNow(null);
-      if (evaluationResult == null || !matches(request, evaluationResult)) {
-        log.warn(
-            "Chess evaluation result unavailable or mismatched for ply {} and position {}",
-            ply,
-            fen);
-        return ChessEvaluationResult.unavailable(request);
-      }
-      return evaluationResult;
+      return Optional.of(chessEvaluationService.evaluate(fen));
     } catch (RuntimeException exception) {
-      log.warn("Chess evaluation request failed for ply {} and position {}", ply, fen, exception);
-      return ChessEvaluationResult.unavailable(request);
-    } finally {
-      pendingEvaluations.remove(request.correlationId());
+      log.warn("Stockfish evaluation unavailable for ply {} and position {}", ply, fen, exception);
+      return Optional.empty();
     }
   }
 
-  @EventListener
-  void onEvaluationResult(ChessEvaluationResult result) {
-    CompletableFuture<ChessEvaluationResult> pending =
-        pendingEvaluations.get(result.correlationId());
-    if (pending != null) {
-      pending.complete(result);
+  private Optional<EvaluationSwing> safeCompare(
+      PositionEvaluation before, PositionEvaluation after) {
+    try {
+      return Optional.of(chessEvaluationService.compare(before, after));
+    } catch (RuntimeException exception) {
+      log.warn("Stockfish evaluation swing unavailable", exception);
+      return Optional.empty();
     }
-  }
-
-  private static boolean matches(ChessEvaluationRequested request, ChessEvaluationResult result) {
-    return request.correlationId() == result.correlationId()
-        && request.ply() == result.ply()
-        && request.fen().equals(result.fen());
   }
 
   private record EvaluationBaseline(int ply, String fen, PositionEvaluation evaluation) {}
