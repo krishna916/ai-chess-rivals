@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatGateway;
+import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -10,6 +11,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
@@ -27,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
           + "org.springframework.modulith.events.config.EventPublicationAutoConfiguration,"
           + "org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration"
     })
+@Import(PersonalityRepositoryTestConfiguration.class)
 class AiEnabledApplicationContextTest {
 
   @Autowired ApplicationContext context;

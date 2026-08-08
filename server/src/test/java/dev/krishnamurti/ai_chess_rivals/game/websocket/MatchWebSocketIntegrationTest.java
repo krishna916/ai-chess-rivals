@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.game.websocket;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
+import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchNotFoundException;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -32,6 +34,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
           + "org.springframework.modulith.events.config.EventPublicationAutoConfiguration,"
           + "org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration"
     })
+@Import(PersonalityRepositoryTestConfiguration.class)
 class MatchWebSocketIntegrationTest {
 
   @LocalServerPort private int port;
