@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.chess;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +24,10 @@ class StockfishClientIntegrationTest {
   @BeforeEach
   void startEngine() {
     String path = StockfishTestHelper.resolveStockfishPath();
-    ChessProperties props = new ChessProperties(new ChessProperties.Stockfish(path, 1, 16, 10, 30));
+    ChessProperties props =
+        new ChessProperties(
+            new ChessProperties.Stockfish(
+                path, 1, 16, 10, 30, new ChessProperties.Stockfish.Evaluation(8, 50, 200, 200)));
     client = new StockfishEngine(props);
   }
 
@@ -79,6 +83,20 @@ class StockfishClientIntegrationTest {
     String move = client.bestMove(Duration.ofMillis(200));
 
     assertThat(move).isNotBlank();
+  }
+
+  @Test
+  void evaluateReturnsBoundedScoreFromStartingPosition() {
+    client.newGame();
+    client.setPosition("startpos");
+
+    PositionEvaluation evaluation = client.evaluate(8, Duration.ofMillis(50));
+
+    assertThat(evaluation).isNotNull();
+    assertThat(evaluation.comparableCentipawns())
+        .isBetween(
+            -PositionEvaluation.MATE_COMPARABLE_CENTIPAWNS,
+            PositionEvaluation.MATE_COMPARABLE_CENTIPAWNS);
   }
 
   /** AC4: Engine process shuts down cleanly; close() is idempotent. */

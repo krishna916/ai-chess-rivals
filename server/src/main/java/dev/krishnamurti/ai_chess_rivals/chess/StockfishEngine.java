@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.chess;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
 import jakarta.annotation.PreDestroy;
@@ -147,6 +148,43 @@ final class StockfishEngine implements StockfishClient {
               () -> new StockfishException("Unexpected bestmove response: " + response.raw()));
     } catch (IOException e) {
       throw new StockfishException("Failed to obtain best move from Stockfish", e);
+    }
+  }
+
+  @Override
+  public PositionEvaluation evaluate(int depth, Duration moveTime) {
+    if (depth <= 0) {
+      throw new IllegalArgumentException("depth must be positive");
+    }
+    if (moveTime == null || moveTime.isZero() || moveTime.isNegative()) {
+      throw new IllegalArgumentException("moveTime must be positive");
+    }
+
+    try {
+      sendCommand(UciCommand.evaluate(depth, moveTime.toMillis()));
+      long deadlineSeconds = Math.max(1L, moveTime.toSeconds()) + moveTimeoutSeconds;
+      PositionEvaluation latestScore = null;
+
+      while (true) {
+        String rawLine = readLineWithTimeout(deadlineSeconds, "evaluation bestmove");
+        if (rawLine == null) {
+          throw new StockfishException("Stockfish process ended during position evaluation");
+        }
+        UciResponse response = new UciResponse(rawLine);
+        log.debug("<<< {}", rawLine);
+        if (response.startsWith("info ")) {
+          latestScore = response.extractScore().orElse(latestScore);
+        }
+        if (response.startsWith("bestmove")) {
+          if (latestScore == null) {
+            throw new StockfishException(
+                "Stockfish returned bestmove without an evaluation score");
+          }
+          return latestScore;
+        }
+      }
+    } catch (IOException e) {
+      throw new StockfishException("Failed to evaluate position with Stockfish", e);
     }
   }
 

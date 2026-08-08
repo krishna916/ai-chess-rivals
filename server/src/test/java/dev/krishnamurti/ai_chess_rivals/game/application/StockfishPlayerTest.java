@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
@@ -124,6 +125,11 @@ class StockfishPlayerTest {
         throw new IllegalStateException("No fake move configured");
       }
       return moves.removeFirst();
+    }
+
+    @Override
+    public PositionEvaluation evaluate(int depth, Duration moveTime) {
+      throw new UnsupportedOperationException("evaluation is not used by StockfishPlayer tests");
     }
 
     @Override

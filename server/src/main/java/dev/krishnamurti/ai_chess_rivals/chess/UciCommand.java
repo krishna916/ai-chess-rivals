@@ -49,6 +49,11 @@ record UciCommand(String text) {
     return new UciCommand("go movetime " + moveTimeMs);
   }
 
+  /** Asks the engine to evaluate the current position within depth and time bounds. */
+  static UciCommand evaluate(int depth, long moveTimeMs) {
+    return new UciCommand("go depth " + depth + " movetime " + moveTimeMs);
+  }
+
   /**
    * Sets a UCI engine option.
    *
