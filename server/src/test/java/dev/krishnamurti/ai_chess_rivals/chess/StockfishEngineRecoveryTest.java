@@ -18,6 +18,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class StockfishEngineRecoveryTest {
@@ -39,6 +40,7 @@ class StockfishEngineRecoveryTest {
           .containsSubsequence(
               "IN go depth 8 movetime 1",
               "IN stop",
+              "OUT info string bestmove a2a3",
               "OUT bestmove a2a3",
               "IN isready",
               "OUT readyok",
@@ -64,6 +66,63 @@ class StockfishEngineRecoveryTest {
       assertThat(process.commands()).doesNotContain("stop");
       engine.close();
     }
+  }
+
+  @Test
+  void completedBestMoveValidationFailureDoesNotDrainAnotherSearch() {
+    try (ScriptedUciProcess process = ScriptedUciProcess.malformedBestMove()) {
+      StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
+
+      engine.setPosition("startpos");
+      assertThatThrownBy(() -> engine.bestMove(Duration.ofMillis(10)))
+          .isInstanceOf(StockfishException.class)
+          .hasMessageContaining("Unexpected bestmove response");
+
+      engine.setPosition("startpos");
+      assertThat(engine.bestMove(Duration.ofMillis(10))).isEqualTo("e2e4");
+      assertThat(process.commands()).doesNotContain("stop");
+      engine.close();
+    }
+  }
+
+  @Test
+  void interruptedReadFailsClosedWithoutDiscardingPendingRead() throws Exception {
+    try (ScriptedUciProcess process = ScriptedUciProcess.recoverable()) {
+      StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
+      engine.setPosition("startpos");
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      Thread caller =
+          new Thread(
+              () -> {
+                try {
+                  engine.bestMove(Duration.ofMillis(10));
+                } catch (Throwable throwable) {
+                  failure.set(throwable);
+                }
+              },
+              "interrupted-stockfish-caller");
+
+      caller.start();
+      awaitCommand(process, "go movetime 10");
+      caller.interrupt();
+      caller.join(2_000);
+
+      assertThat(caller.isAlive()).isFalse();
+      assertThat(failure.get()).isInstanceOf(StockfishException.class);
+      assertThatThrownBy(() -> engine.bestMove(Duration.ofMillis(10)))
+          .isInstanceOf(StockfishException.class)
+          .hasMessageContaining("not usable");
+      engine.close();
+    }
+  }
+
+  private static void awaitCommand(ScriptedUciProcess process, String expected)
+      throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    while (!process.commands().contains(expected) && System.nanoTime() < deadline) {
+      Thread.sleep(5);
+    }
+    assertThat(process.commands()).contains(expected);
   }
 
   @Test
@@ -155,7 +214,8 @@ class StockfishEngineRecoveryTest {
     private enum Mode {
       RECOVERABLE_TIMEOUT,
       UNRECOVERABLE_TIMEOUT,
-      BESTMOVE_WITHOUT_SCORE
+      BESTMOVE_WITHOUT_SCORE,
+      MALFORMED_BESTMOVE
     }
 
     private final InterruptIgnoringInputStream clientReads = new InterruptIgnoringInputStream();
@@ -191,6 +251,10 @@ class StockfishEngineRecoveryTest {
       return new ScriptedUciProcess(Mode.BESTMOVE_WITHOUT_SCORE);
     }
 
+    static ScriptedUciProcess malformedBestMove() {
+      return new ScriptedUciProcess(Mode.MALFORMED_BESTMOVE);
+    }
+
     List<String> commands() {
       return List.copyOf(commands);
     }
@@ -221,6 +285,7 @@ class StockfishEngineRecoveryTest {
             }
             case "stop" -> {
               if (mode == Mode.RECOVERABLE_TIMEOUT) {
+                emitLine("info string bestmove a2a3");
                 Thread delayedBestmove =
                     new Thread(
                         () -> {
@@ -242,19 +307,24 @@ class StockfishEngineRecoveryTest {
               }
             }
             case "go movetime 10" -> {
-              Thread validBestmove =
-                  new Thread(
-                      () -> {
-                        try {
-                          Thread.sleep(150);
-                          emitLine("bestmove e2e4");
-                        } catch (InterruptedException exception) {
-                          Thread.currentThread().interrupt();
-                        }
-                      },
-                      "scripted-delayed-valid-bestmove");
-              validBestmove.setDaemon(true);
-              validBestmove.start();
+              if (mode == Mode.MALFORMED_BESTMOVE
+                  && commands.stream().filter("go movetime 10"::equals).count() == 1) {
+                emitLine("bestmove");
+              } else {
+                Thread validBestmove =
+                    new Thread(
+                        () -> {
+                          try {
+                            Thread.sleep(150);
+                            emitLine("bestmove e2e4");
+                          } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                          }
+                        },
+                        "scripted-delayed-valid-bestmove");
+                validBestmove.setDaemon(true);
+                validBestmove.start();
+              }
             }
             case "quit" -> alive = false;
             default -> {

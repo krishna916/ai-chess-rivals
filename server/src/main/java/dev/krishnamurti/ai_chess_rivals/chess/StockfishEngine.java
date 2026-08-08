@@ -336,7 +336,8 @@ final class StockfishEngine implements StockfishClient {
       }
       UciResponse response = new UciResponse(rawLine);
       log.debug("<<< {}", rawLine);
-      if (response.contains(expected)) {
+      String normalizedLine = rawLine.trim();
+      if (normalizedLine.equals(expected) || normalizedLine.startsWith(expected + " ")) {
         return response;
       }
     }
