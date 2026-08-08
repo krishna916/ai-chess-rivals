@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationRequested;
+import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationResult;
 import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
 import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwingClassification;
@@ -26,7 +28,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class MatchEngineTest {
 
@@ -72,13 +77,18 @@ class MatchEngineTest {
       MatchPacing matchPacing,
       MatchEventSink eventSink,
       FakeChessEvaluationService evaluationService) {
-    return new MatchEngine(
-        chessPlayer,
-        new ChessBoardService(),
-        gameProperties(moveThinkTimeMillis, maxPlies),
-        matchPacing,
-        eventSink,
-        evaluationService);
+    TestEvaluationEventPublisher eventPublisher =
+        new TestEvaluationEventPublisher(evaluationService);
+    MatchEngine matchEngine =
+        new MatchEngine(
+            chessPlayer,
+            new ChessBoardService(),
+            gameProperties(moveThinkTimeMillis, maxPlies),
+            matchPacing,
+            eventSink,
+            eventPublisher);
+    eventPublisher.onResult(matchEngine::onEvaluationResult);
+    return matchEngine;
   }
 
   @Test
@@ -681,6 +691,41 @@ class MatchEngineTest {
                   ? EvaluationSwingClassification.MAJOR_MISTAKE
                   : EvaluationSwingClassification.STABLE;
       return new EvaluationSwing(beforeCentipawns, afterCentipawns, swing, classification);
+    }
+  }
+
+  private static final class TestEvaluationEventPublisher implements ApplicationEventPublisher {
+
+    private final FakeChessEvaluationService evaluationService;
+    private Consumer<ChessEvaluationResult> resultConsumer = result -> {};
+
+    private TestEvaluationEventPublisher(FakeChessEvaluationService evaluationService) {
+      this.evaluationService = evaluationService;
+    }
+
+    private void onResult(Consumer<ChessEvaluationResult> resultConsumer) {
+      this.resultConsumer = resultConsumer;
+    }
+
+    @Override
+    public void publishEvent(Object event) {
+      if (!(event instanceof ChessEvaluationRequested request)) {
+        return;
+      }
+      try {
+        PositionEvaluation evaluation = evaluationService.evaluate(request.fen());
+        Optional<EvaluationSwing> swing =
+            request.before().map(before -> evaluationService.compare(before, evaluation));
+        resultConsumer.accept(
+            new ChessEvaluationResult(
+                request.correlationId(),
+                request.ply(),
+                request.fen(),
+                Optional.of(evaluation),
+                swing));
+      } catch (RuntimeException exception) {
+        resultConsumer.accept(ChessEvaluationResult.unavailable(request));
+      }
     }
   }
 

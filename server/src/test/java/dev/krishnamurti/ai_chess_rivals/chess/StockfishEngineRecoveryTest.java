@@ -24,6 +24,24 @@ import org.junit.jupiter.api.Test;
 class StockfishEngineRecoveryTest {
 
   @Test
+  void positiveSubMillisecondEvaluationUsesOneMillisecondMovetime() {
+    try (ScriptedUciProcess process = ScriptedUciProcess.subMillisecondEvaluation()) {
+      StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
+
+      engine.setPosition("startpos");
+      assertThat(engine.evaluate(8, Duration.ofNanos(1)))
+          .isEqualTo(
+              new dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation(
+                  dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation.ScoreType
+                      .CENTIPAWNS,
+                  12));
+      assertThat(process.commands()).contains("go depth 8 movetime 1");
+      assertThat(process.commands()).doesNotContain("go depth 8 movetime 0");
+      engine.close();
+    }
+  }
+
+  @Test
   void timedOutEvaluationDoesNotLeakItsBestMoveIntoNextMoveSearch() {
     try (ScriptedUciProcess process = ScriptedUciProcess.recoverable()) {
       StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
@@ -249,7 +267,8 @@ class StockfishEngineRecoveryTest {
       UNRECOVERABLE_TIMEOUT,
       NOISY_TIMEOUT,
       BESTMOVE_WITHOUT_SCORE,
-      MALFORMED_BESTMOVE
+      MALFORMED_BESTMOVE,
+      SUB_MILLISECOND_EVALUATION
     }
 
     private final InterruptIgnoringInputStream clientReads = new InterruptIgnoringInputStream();
@@ -291,6 +310,10 @@ class StockfishEngineRecoveryTest {
 
     static ScriptedUciProcess malformedBestMove() {
       return new ScriptedUciProcess(Mode.MALFORMED_BESTMOVE);
+    }
+
+    static ScriptedUciProcess subMillisecondEvaluation() {
+      return new ScriptedUciProcess(Mode.SUB_MILLISECOND_EVALUATION);
     }
 
     List<String> commands() {
@@ -360,6 +383,9 @@ class StockfishEngineRecoveryTest {
             case "go depth 8 movetime 1" -> {
               if (mode == Mode.RECOVERABLE_TIMEOUT) {
                 emitLine("bestmoveX");
+              } else if (mode == Mode.SUB_MILLISECOND_EVALUATION) {
+                emitLine("info depth 1 score cp 12");
+                emitLine("bestmove a2a3");
               }
             }
             case "go depth 8 movetime 10" -> {

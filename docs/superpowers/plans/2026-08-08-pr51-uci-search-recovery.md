@@ -4,7 +4,7 @@
 
 **Goal:** Make Stockfish evaluation failure truly non-fatal by guaranteeing that a timed-out/failed UCI search cannot leave stale `bestmove` output for the next search, while preserving the existing stop/resume behavior and issue #39 evaluation semantics.
 
-**Architecture:** Keep the existing single Stockfish process. Recover the UCI protocol inside `StockfishEngine` whenever a started search fails: send `stop`, then `isready`, and drain output until the corresponding `readyok`, which necessarily comes after any `bestmove` produced by the stopped search. If that recovery itself fails, mark the engine unusable and fail closed on later commands rather than ever returning a stale move. Do not add another Stockfish process, restart framework, executor, queue, or new public API.
+**Architecture:** Keep the existing single Stockfish process. Recover the UCI protocol inside `StockfishEngine` whenever a started search fails: send `stop`, drain through the stopped search's terminal `bestmove`, then send `isready` and drain through `readyok` before the single recovery deadline expires. If that recovery itself fails, mark the engine unusable and fail closed on later commands rather than ever returning a stale move. Do not add another Stockfish process, restart framework, executor, queue, or new public API.
 
 **Tech Stack:** Java 25, Spring Boot 4.1.0, Stockfish 17.1/UCI, JUnit 5, AssertJ, existing Maven/Spotless/Error Prone/SpotBugs verification.
 
@@ -22,9 +22,9 @@
 - Keep one Stockfish process. Do not create a second engine just for evaluation.
 - Keep evaluation best-effort: a recoverable evaluation failure must still produce the already-committed move with `Optional.empty()` evaluation.
 - Never allow a stale `bestmove` from a failed evaluation/search to satisfy a later move-selection search.
-- UCI recovery order is exactly: `stop` -> `isready` -> drain until `readyok`.
+- UCI recovery order is exactly: `stop` -> drain through terminal `bestmove` -> `isready` -> drain through `readyok`, all within one recovery deadline.
 - Recovery must happen inside `StockfishEngine`; callers must not know raw UCI recovery details.
-- If recovery succeeds, rethrow the original search failure so `MatchEngine.safeEvaluate()` keeps the evaluation unavailable while the engine remains safe to reuse.
+- If recovery succeeds, rethrow the original search failure so the caller keeps the evaluation unavailable while the engine remains safe to reuse.
 - If recovery fails, mark the `StockfishEngine` unusable. Later `newGame`, `setPosition`, `bestMove`, and `evaluate` calls must fail before writing another command.
 - Do not silently restart Stockfish in this PR. Restart orchestration adds complexity and is unnecessary for issue #39.
 - Apply the same search-recovery protection to `bestMove()` as well as `evaluate()`. A failed move search can otherwise poison a later stop/resume attempt in the same way.
@@ -388,10 +388,13 @@ Add this helper inside `StockfishEngine`:
 
 ```java
 private void recoverAfterSearchFailure(StockfishException failure) {
+  long recoveryDeadlineNanos =
+      System.nanoTime() + TimeUnit.SECONDS.toNanos(moveTimeoutSeconds);
   try {
     sendCommand(UciCommand.stop());
+    waitForTokenUntil("bestmove", recoveryDeadlineNanos);
     sendCommand(UciCommand.isReady());
-    waitForToken("readyok", moveTimeoutSeconds);
+    waitForTokenUntil("readyok", recoveryDeadlineNanos);
   } catch (IOException | RuntimeException recoveryFailure) {
     usable.set(false);
     failure.addSuppressed(recoveryFailure);
@@ -402,9 +405,9 @@ private void recoverAfterSearchFailure(StockfishException failure) {
 
 Why this exact order matters:
 
-1. `stop` forces the active search to finish and emit its `bestmove`.
-2. `isready` is queued after `stop` in the same UCI command stream.
-3. Waiting until `readyok` drains any late `info`/`bestmove` lines from the failed search.
+1. `stop` forces the active search to finish and emit its terminal `bestmove`.
+2. Waiting for that `bestmove` drains the stopped search before the next command is sent.
+3. `isready` is queued only after the terminal `bestmove`, and waiting until `readyok` drains any remaining late output within the same recovery deadline.
 4. Only after `readyok` is observed is the shared output stream safe for another search.
 
 Do not merely cancel another reader future. The stale-output bug exists precisely because cancelling a `Future<readLine()>` does not prove the underlying UCI bytes were drained.
@@ -415,22 +418,27 @@ Restructure the body of `evaluate(...)` so recovery runs only after the `go` com
 
 ```java
 boolean searchStarted = false;
+boolean bestmoveReceived = false;
 try {
   sendCommand(UciCommand.evaluate(depth, moveTime.toMillis()));
   searchStarted = true;
 
   // Keep the existing single-deadline evaluation loop unchanged here.
   // It must still return the latest parsed score when bestmove arrives normally.
+  // Set bestmoveReceived as soon as the terminal bestmove is consumed:
+  if (hasToken(response, "bestmove")) {
+    bestmoveReceived = true;
+  }
 
 } catch (StockfishException failure) {
-  if (searchStarted) {
+  if (searchStarted && !bestmoveReceived) {
     recoverAfterSearchFailure(failure);
   }
   throw failure;
 } catch (IOException exception) {
   StockfishException failure =
       new StockfishException("Failed to evaluate position with Stockfish", exception);
-  if (searchStarted) {
+  if (searchStarted && !bestmoveReceived) {
     recoverAfterSearchFailure(failure);
   }
   throw failure;
@@ -447,6 +455,7 @@ Restructure `bestMove(...)` using the same `searchStarted` pattern:
 
 ```java
 boolean searchStarted = false;
+boolean bestmoveReceived = false;
 try {
   sendCommand(UciCommand.go(thinkTime.toMillis()));
   searchStarted = true;
@@ -454,19 +463,20 @@ try {
   long safetyMarginSeconds = moveTimeoutSeconds;
   long deadlineSeconds = thinkTime.toSeconds() + safetyMarginSeconds;
   UciResponse response = waitForToken("bestmove", deadlineSeconds);
+  bestmoveReceived = true;
   return response
       .extractBestMove()
       .orElseThrow(
           () -> new StockfishException("Unexpected bestmove response: " + response.raw()));
 } catch (StockfishException failure) {
-  if (searchStarted) {
+  if (searchStarted && !bestmoveReceived) {
     recoverAfterSearchFailure(failure);
   }
   throw failure;
 } catch (IOException exception) {
   StockfishException failure =
       new StockfishException("Failed to obtain best move from Stockfish", exception);
-  if (searchStarted) {
+  if (searchStarted && !bestmoveReceived) {
     recoverAfterSearchFailure(failure);
   }
   throw failure;
@@ -680,7 +690,7 @@ Append a section like this after the commands above have actually passed:
 ```markdown
 ## Review fixes
 
-- Added UCI search recovery (`stop` -> `isready` -> drain through `readyok`) so a timed-out evaluation cannot leak stale `bestmove` output into the next move search.
+- Added UCI search recovery (`stop` -> terminal `bestmove` -> `isready` -> drain through `readyok`) so a timed-out evaluation cannot leak stale `bestmove` output into the next move search.
 - Added fail-closed engine state when protocol recovery itself fails.
 - Applied the same recovery invariant to failed move searches for safe stop/resume reuse.
 - Added deterministic protocol-level stale-output regression coverage.
@@ -703,7 +713,7 @@ Do not claim the GitHub Actions items passed until those jobs have actually comp
 Before requesting re-review, verify every item explicitly:
 
 - [ ] A timed-out evaluation can no longer leave stale `bestmove` output for the next `bestMove()` call.
-- [ ] Recovery uses `stop` followed by `isready` and drains through `readyok`.
+- [ ] Recovery uses `stop`, drains terminal `bestmove`, then sends `isready` and drains through `readyok` within one recovery deadline.
 - [ ] Recoverable evaluation failure still leaves the committed move valid and emits `MovePlayed` with empty evaluation.
 - [ ] If protocol recovery fails, the engine becomes unusable and later commands fail before writing to the dirty UCI stream.
 - [ ] Failed `bestMove()` searches receive the same recovery protection.

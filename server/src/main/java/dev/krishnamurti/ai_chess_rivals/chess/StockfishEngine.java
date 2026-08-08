@@ -198,14 +198,15 @@ final class StockfishEngine implements StockfishClient {
     if (moveTime == null || moveTime.isZero() || moveTime.isNegative()) {
       throw new IllegalArgumentException("moveTime must be positive");
     }
+    long moveTimeMillis = Math.max(1L, moveTime.toMillis());
 
     boolean searchStarted = false;
     boolean bestmoveReceived = false;
     try {
-      sendCommand(UciCommand.evaluate(depth, moveTime.toMillis()));
+      sendCommand(UciCommand.evaluate(depth, moveTimeMillis));
       searchStarted = true;
       long evaluationTimeoutMillis =
-          Math.max(1_000L, moveTime.toMillis()) + TimeUnit.SECONDS.toMillis(moveTimeoutSeconds);
+          Math.max(1_000L, moveTimeMillis) + TimeUnit.SECONDS.toMillis(moveTimeoutSeconds);
       long deadlineNanos =
           System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(evaluationTimeoutMillis);
       PositionEvaluation latestScore = null;
@@ -270,11 +271,12 @@ final class StockfishEngine implements StockfishClient {
   }
 
   private void recoverAfterSearchFailure(StockfishException failure) {
+    long recoveryDeadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(moveTimeoutSeconds);
     try {
       sendCommand(UciCommand.stop());
-      waitForToken("bestmove", moveTimeoutSeconds);
+      waitForTokenUntil("bestmove", recoveryDeadlineNanos);
       sendCommand(UciCommand.isReady());
-      waitForToken("readyok", moveTimeoutSeconds);
+      waitForTokenUntil("readyok", recoveryDeadlineNanos);
     } catch (IOException | RuntimeException recoveryFailure) {
       usable.set(false);
       failure.addSuppressed(recoveryFailure);
@@ -328,7 +330,11 @@ final class StockfishEngine implements StockfishClient {
    * @throws StockfishException if the deadline expires or the process exits unexpectedly.
    */
   private UciResponse waitForToken(String expected, long timeoutSeconds) throws IOException {
-    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
+    return waitForTokenUntil(
+        expected, System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds));
+  }
+
+  private UciResponse waitForTokenUntil(String expected, long deadlineNanos) throws IOException {
     while (true) {
       long remainingNanos = deadlineNanos - System.nanoTime();
       String rawLine =
