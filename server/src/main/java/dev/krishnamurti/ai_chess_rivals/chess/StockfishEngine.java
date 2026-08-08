@@ -322,14 +322,17 @@ final class StockfishEngine implements StockfishClient {
   }
 
   /**
-   * Reads lines from Stockfish until one containing {@code expected} is found, or until {@code
-   * timeoutSeconds} elapses with no response.
+   * Reads lines from Stockfish until one containing {@code expected} is found, or until the overall
+   * {@code timeoutSeconds} deadline elapses.
    *
    * @throws StockfishException if the deadline expires or the process exits unexpectedly.
    */
   private UciResponse waitForToken(String expected, long timeoutSeconds) throws IOException {
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
     while (true) {
-      String rawLine = readLineWithTimeout(timeoutSeconds, "token '" + expected + "'");
+      long remainingNanos = deadlineNanos - System.nanoTime();
+      String rawLine =
+          readLineWithTimeout(remainingNanos, TimeUnit.NANOSECONDS, "token '" + expected + "'");
       if (rawLine == null) {
         throw new StockfishException(
             "Stockfish process ended before responding with expected token: " + expected);

@@ -116,9 +116,42 @@ class StockfishEngineRecoveryTest {
     }
   }
 
+  @Test
+  void noisyRecoveryStreamStillHonorsItsOverallDeadline() throws Exception {
+    try (ScriptedUciProcess process = ScriptedUciProcess.noisyTimeout()) {
+      StockfishEngine engine = new StockfishEngine(process, stockfishConfig());
+      engine.setPosition("startpos");
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      Thread caller =
+          new Thread(
+              () -> {
+                try {
+                  engine.evaluate(8, Duration.ofMillis(1));
+                } catch (Throwable throwable) {
+                  failure.set(throwable);
+                }
+              },
+              "noisy-recovery-caller");
+
+      caller.start();
+      awaitCommand(process, "stop");
+      long recoveryStartedAt = System.nanoTime();
+      caller.join(4_000);
+
+      assertThat(caller.isAlive()).isFalse();
+      assertThat(failure.get()).isInstanceOf(StockfishException.class);
+      assertThat(System.nanoTime() - recoveryStartedAt).isLessThan(TimeUnit.SECONDS.toNanos(2));
+      List<String> trace = process.trace();
+      int stopIndex = trace.indexOf("IN stop");
+      assertThat(stopIndex).isGreaterThanOrEqualTo(0);
+      assertThat(trace.subList(stopIndex + 1, trace.size())).doesNotContain("IN isready");
+      engine.close();
+    }
+  }
+
   private static void awaitCommand(ScriptedUciProcess process, String expected)
       throws InterruptedException {
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
     while (!process.commands().contains(expected) && System.nanoTime() < deadline) {
       Thread.sleep(5);
     }
@@ -214,6 +247,7 @@ class StockfishEngineRecoveryTest {
     private enum Mode {
       RECOVERABLE_TIMEOUT,
       UNRECOVERABLE_TIMEOUT,
+      NOISY_TIMEOUT,
       BESTMOVE_WITHOUT_SCORE,
       MALFORMED_BESTMOVE
     }
@@ -245,6 +279,10 @@ class StockfishEngineRecoveryTest {
 
     static ScriptedUciProcess unrecoverable() {
       return new ScriptedUciProcess(Mode.UNRECOVERABLE_TIMEOUT);
+    }
+
+    static ScriptedUciProcess noisyTimeout() {
+      return new ScriptedUciProcess(Mode.NOISY_TIMEOUT);
     }
 
     static ScriptedUciProcess bestmoveWithoutScore() {
@@ -299,6 +337,24 @@ class StockfishEngineRecoveryTest {
                         "scripted-delayed-stale-bestmove");
                 delayedBestmove.setDaemon(true);
                 delayedBestmove.start();
+              } else if (mode == Mode.NOISY_TIMEOUT) {
+                Thread noisyOutput =
+                    new Thread(
+                        () -> {
+                          long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1_500);
+                          while (alive && System.nanoTime() < deadline) {
+                            emitLine("info string noise");
+                            try {
+                              Thread.sleep(10);
+                            } catch (InterruptedException exception) {
+                              Thread.currentThread().interrupt();
+                              return;
+                            }
+                          }
+                        },
+                        "scripted-noisy-recovery-output");
+                noisyOutput.setDaemon(true);
+                noisyOutput.start();
               }
             }
             case "go depth 8 movetime 1" -> {
