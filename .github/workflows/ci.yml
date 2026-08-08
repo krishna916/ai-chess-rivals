@@ -40,7 +40,7 @@ jobs:
           fi
 
           if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
-            changed_files="$(git diff-tree --root --no-commit-id --name-only -r "$GITHUB_SHA")"
+            changed_files="$(git ls-tree -r --name-only "$GITHUB_SHA")"
           else
             changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA")"
           fi
