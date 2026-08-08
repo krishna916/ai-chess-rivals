@@ -187,6 +187,51 @@ class MatchEngineTest {
   }
 
   @Test
+  void stopDuringPostMoveEvaluationKeepsCommittedPlyAndResumeBaselineConsistent() {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
+    RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
+    FakeChessEvaluationService evaluationService =
+        new FakeChessEvaluationService().withEvaluations(cp(0), cp(-20), cp(-10));
+    MatchEngine[] engine = new MatchEngine[1];
+    int[] evaluationCalls = new int[1];
+    evaluationService.onEvaluate(
+        () -> {
+          evaluationCalls[0]++;
+          if (evaluationCalls[0] == 2) {
+            engine[0].stopCurrentMatch();
+          }
+        });
+    engine[0] = matchEngine(chessPlayer, 250, 2, NO_OP_PACING, eventSink, evaluationService);
+
+    Match stoppedMatch = engine[0].playUntilFinished();
+    Match resumedMatch = engine[0].playUntilFinished();
+
+    assertTrue(stoppedMatch.isInProgress());
+    assertEquals(1, stoppedMatch.moveCount());
+    assertTrue(resumedMatch.isFinished());
+    assertEquals(2, resumedMatch.moveCount());
+    assertEquals(
+        List.of(1, 2),
+        eventSink.events.stream()
+            .filter(MovePlayed.class::isInstance)
+            .map(MovePlayed.class::cast)
+            .map(MovePlayed::ply)
+            .toList());
+    assertEquals(3, evaluationService.fens.size());
+    EvaluationSwing secondSwing =
+        eventSink.events.stream()
+            .filter(MovePlayed.class::isInstance)
+            .map(MovePlayed.class::cast)
+            .toList()
+            .get(1)
+            .evaluation()
+            .orElseThrow();
+    assertEquals(-20, secondSwing.beforeCentipawns());
+    assertEquals(10, secondSwing.afterCentipawns());
+    assertEquals(30, secondSwing.swingCentipawns());
+  }
+
+  @Test
   void playUntilFinishedReturnsDrawOnThreefoldRepetition() {
     FakeChessPlayer chessPlayer =
         new FakeChessPlayer("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
@@ -592,6 +637,7 @@ class MatchEngineTest {
     private final List<String> fens = new ArrayList<>();
     private int failureOnCall = -1;
     private String failureFen;
+    private Runnable onEvaluate = () -> {};
 
     private FakeChessEvaluationService withEvaluations(PositionEvaluation... values) {
       evaluations.addAll(List.of(values));
@@ -608,9 +654,15 @@ class MatchEngineTest {
       return this;
     }
 
+    private FakeChessEvaluationService onEvaluate(Runnable callback) {
+      onEvaluate = callback;
+      return this;
+    }
+
     @Override
     public PositionEvaluation evaluate(String fen) {
       fens.add(fen);
+      onEvaluate.run();
       if (fens.size() == failureOnCall || fen.equals(failureFen)) {
         throw new IllegalStateException("evaluation failed");
       }
