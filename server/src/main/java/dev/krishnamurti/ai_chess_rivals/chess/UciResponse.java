@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.chess;
 
+import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import java.util.Optional;
 
 /**
@@ -33,6 +34,31 @@ record UciResponse(String raw) {
     }
     String value = raw.substring(prefix.length()).trim();
     return value.isEmpty() ? Optional.empty() : Optional.of(value);
+  }
+
+  /** Extracts the latest position score from a UCI {@code info} response line. */
+  Optional<PositionEvaluation> extractScore() {
+    String[] parts = raw.split("\\s+");
+    for (int i = 0; i <= parts.length - 3; i++) {
+      if (!"score".equals(parts[i])) {
+        continue;
+      }
+      PositionEvaluation.ScoreType type =
+          switch (parts[i + 1]) {
+            case "cp" -> PositionEvaluation.ScoreType.CENTIPAWNS;
+            case "mate" -> PositionEvaluation.ScoreType.MATE;
+            default -> null;
+          };
+      if (type == null) {
+        return Optional.empty();
+      }
+      try {
+        return Optional.of(new PositionEvaluation(type, Integer.parseInt(parts[i + 2])));
+      } catch (NumberFormatException ignored) {
+        return Optional.empty();
+      }
+    }
+    return Optional.empty();
   }
 
   /**
