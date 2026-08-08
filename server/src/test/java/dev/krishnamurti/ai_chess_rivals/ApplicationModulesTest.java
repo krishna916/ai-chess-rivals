@@ -17,7 +17,8 @@ class ApplicationModulesTest {
   void exposesAiApi() {
     ApplicationModules modules = ApplicationModules.of(AiChessRivalsApplication.class);
     var aiModule = modules.getModuleByName("ai").orElseThrow();
+    var aiApi = aiModule.getNamedInterfaces().getByName("api").orElseThrow();
 
-    assertThat(aiModule.isExposed(AiChatGateway.class)).isTrue();
+    assertThat(aiApi.contains(AiChatGateway.class)).isTrue();
   }
 }
