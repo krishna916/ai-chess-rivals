@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/personalities")
 @CrossOrigin(origins = "http://localhost:5173")
-public class PersonalityController {
+class PersonalityController {
 
   private final PersonalityService personalityService;
 
-  public PersonalityController(PersonalityService personalityService) {
+  PersonalityController(PersonalityService personalityService) {
     this.personalityService = personalityService;
   }
 
