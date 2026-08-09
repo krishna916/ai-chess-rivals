@@ -46,6 +46,9 @@ final class DialoguePromptFactory {
       Personality traits: {speakerTraits}
       Style guidance: {speakerStyle}
       Boundary guidance: {speakerBoundary}
+      Move owner: {moverDisplayName}
+      Speaker role: {speakerRole}
+      Perspective: all move flags and evaluation values below describe {moverDisplayName}'s committed move from {moverDisplayName}'s perspective; check=true means the mover gave check to the opponent.
       Ply: {ply}
       Move: {moveNotation}
       Facts: capture={capture}, check={check}, checkmate={checkmate}, promotion={promotion}
@@ -95,6 +98,14 @@ final class DialoguePromptFactory {
       DialogueReactionType reactionType,
       String format) {
     Map<String, Object> variables = baseVariables(speaker, opponent, reactionType, format);
+    boolean speakerIsMover = speaker.key().equals(request.moverPersonalityKey());
+    String moverDisplayName = speakerIsMover ? speaker.displayName() : opponent.displayName();
+    variables.put("moverDisplayName", moverDisplayName);
+    variables.put(
+        "speakerRole",
+        speakerIsMover
+            ? "MOVER (you played this move)"
+            : "OPPONENT (the other personality played this move)");
     variables.put("ply", request.ply());
     variables.put("moveNotation", request.moveNotation());
     variables.put("capture", request.capture());

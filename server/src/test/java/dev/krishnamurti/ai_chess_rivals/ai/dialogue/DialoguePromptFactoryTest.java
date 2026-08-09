@@ -50,6 +50,10 @@ class DialoguePromptFactoryTest {
 
     assertThat(prompt)
         .contains("Blaze", "Competitive", "Dry", "PG-13", "Vesper")
+        .contains("Move owner: Blaze")
+        .contains("Speaker role: MOVER (you played this move)")
+        .contains("from Blaze's perspective")
+        .contains("check=true means the mover gave check to the opponent")
         .contains(
             "Ply: 5",
             "Move: Qxd5+",
@@ -62,6 +66,35 @@ class DialoguePromptFactoryTest {
         .contains("Recent dialogue is optional context")
         .contains("Never calculate, choose, validate, or recommend a chess move")
         .contains("MOVE_REACTION", "FORMAT");
+  }
+
+  @Test
+  void rendersOpponentSpeakingMovePromptWithExplicitMoverPerspective() {
+    DialogueMoveRequest request =
+        new DialogueMoveRequest(
+            5,
+            "blaze",
+            "vesper",
+            "Qxd5+",
+            true,
+            true,
+            false,
+            false,
+            Optional.of(
+                new EvaluationSwing(300, -100, -400, EvaluationSwingClassification.MAJOR_MISTAKE)),
+            List.of());
+
+    String prompt =
+        factory.movePrompt(
+            request, opponent, speaker, DialogueReactionType.MOVE_REACTION, "FORMAT");
+
+    assertThat(prompt)
+        .contains("Move owner: Blaze")
+        .contains("Speaker role: OPPONENT (the other personality played this move)")
+        .contains("Move: Qxd5+")
+        .contains("classification=MAJOR_MISTAKE")
+        .contains("from Blaze's perspective")
+        .contains("check=true means the mover gave check to the opponent");
   }
 
   @Test
