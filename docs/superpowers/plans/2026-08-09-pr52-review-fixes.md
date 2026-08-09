@@ -4,9 +4,9 @@
 
 **Goal:** Address the remaining PR #52 review findings by making personality persistence read-only at the repository boundary, making the selectable roster query database-filtered and index-compatible, proving the V2 migration against PostgreSQL 17, and rerunning repository verification.
 
-**Architecture:** Keep the existing `ai/personality` feature and schema. Replace `JpaRepository` with Spring Data's marker `Repository` so no application mutation API is exposed, derive one read query that filters `system=true` and `active=true` in PostgreSQL, and retain the service's defensive selectable filter so the inactive/non-system regression remains explicit. Do not introduce Testcontainers, new dependencies, new endpoints, seed data, or new infrastructure.
+**Architecture:** Keep the existing `ai/personality` feature and schema. Replace `JpaRepository` with Spring Data's marker `Repository` so no application mutation API is exposed, derive one read query that filters `system=true` and `active=true` in PostgreSQL, and retain the service's defensive selectable filter so the inactive/non-system regression remains explicit. Verify the migration with a disposable PostgreSQL 17 container that cannot touch the normal development database or volume. Do not introduce Testcontainers, new dependencies, new endpoints, seed data, or new infrastructure.
 
-**Tech Stack:** Java 25, Spring Boot 4.1.0, Spring Data JPA, PostgreSQL 17, Flyway, JUnit 5, Mockito, AssertJ, Docker Compose, existing Maven/PowerShell verification scripts.
+**Tech Stack:** Java 25, Spring Boot 4.1.0, Spring Data JPA, PostgreSQL 17, Flyway, JUnit 5, Mockito, AssertJ, Docker, existing Maven/PowerShell verification scripts.
 
 ## Source of Truth
 
@@ -27,6 +27,7 @@
 - The production repository query must filter `system=true` and `active=true` and order by `displayOrder ASC, personalityKey ASC`.
 - The repository must not extend `JpaRepository`, `CrudRepository`, `ListCrudRepository`, or any other interface that exposes persistence mutation methods.
 - Keep the existing SpotBugs exclusion unchanged unless a fresh verification run proves it is no longer needed.
+- The PostgreSQL smoke test must use a disposable container named `ai-chess-pr52-postgres`; do not use the normal Compose database or its persistent volume.
 - Do not mark the PR ready for review or merge it. Stop after pushing fixes, updating verification evidence, and confirming CI on the new head.
 
 ## File Map
@@ -192,54 +193,70 @@ git commit -m "fix: make personality roster persistence read-only"
 
 ---
 
-### Task 2: Prove V2 Against PostgreSQL 17
+### Task 2: Prove V2 Against an Isolated PostgreSQL 17 Container
 
 **Files:** none expected.
 
 **Interfaces:**
 - Verifies: `server/src/main/resources/db/migration/V1__create_event_publication.sql` and `V2__create_personality.sql` execute on PostgreSQL 17.
 - Verifies: table columns, indexes, and speaking-probability constraint.
-- Does not change CI or add a database-testing dependency.
+- Does not touch the normal development database/volume and does not change CI or add a database-testing dependency.
 
-- [ ] **Step 1: Start only the existing PostgreSQL 17 service with deterministic scratch credentials**
+- [ ] **Step 1: Remove any stale disposable smoke-test container, then start a fresh isolated PostgreSQL 17 container**
 
 From the repository root in PowerShell:
 
 ```powershell
-$env:POSTGRES_DB = "aichessrivals"
-$env:POSTGRES_USER = "postgres"
-$env:POSTGRES_PASSWORD = "secretpassword"
-docker compose -f server/docker-compose.yml up -d postgres
-docker compose -f server/docker-compose.yml exec -T postgres pg_isready -U postgres -d aichessrivals
+docker rm -f ai-chess-pr52-postgres 2>$null
+docker run --name ai-chess-pr52-postgres --rm -d -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secretpassword postgres:17-alpine
 ```
 
-Expected final line contains `accepting connections`.
+Expected: the `docker run` command prints a container ID.
 
 If Docker is unavailable, stop this task and report that the required review verification cannot be completed. Do not replace this check with H2, SQLite, static SQL inspection, or a new test dependency.
 
-- [ ] **Step 2: Create a clean scratch database**
+- [ ] **Step 2: Wait synchronously for PostgreSQL readiness and fail if it never becomes ready**
 
 ```powershell
-docker compose -f server/docker-compose.yml exec -T postgres dropdb -U postgres --if-exists aichessrivals_personality_test
-docker compose -f server/docker-compose.yml exec -T postgres createdb -U postgres aichessrivals_personality_test
+$ready = $false
+1..20 | ForEach-Object {
+    docker exec ai-chess-pr52-postgres pg_isready -U postgres -d postgres
+    if ($LASTEXITCODE -eq 0) {
+        $ready = $true
+        return
+    }
+    Start-Sleep -Seconds 1
+}
+if (-not $ready) { throw "Disposable PostgreSQL 17 container did not become ready" }
+```
+
+Expected: output eventually contains `accepting connections` and `$ready` becomes `True`.
+
+- [ ] **Step 3: Create a clean scratch database inside the disposable container**
+
+```powershell
+docker exec ai-chess-pr52-postgres dropdb -U postgres --if-exists aichessrivals_personality_test
+docker exec ai-chess-pr52-postgres createdb -U postgres aichessrivals_personality_test
 ```
 
 Expected: both commands exit successfully.
 
-- [ ] **Step 3: Apply V1 and V2 directly with PostgreSQL stop-on-error enabled**
+- [ ] **Step 4: Apply V1 and V2 directly with PostgreSQL stop-on-error enabled**
 
 ```powershell
-Get-Content -Raw "server/src/main/resources/db/migration/V1__create_event_publication.sql", "server/src/main/resources/db/migration/V2__create_personality.sql" | docker compose -f server/docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d aichessrivals_personality_test
+$sql = (Get-Content -Raw "server/src/main/resources/db/migration/V1__create_event_publication.sql") + "`n" + (Get-Content -Raw "server/src/main/resources/db/migration/V2__create_personality.sql")
+$sql | docker exec -i ai-chess-pr52-postgres psql -v ON_ERROR_STOP=1 -U postgres -d aichessrivals_personality_test
+if ($LASTEXITCODE -ne 0) { throw "V1/V2 PostgreSQL smoke migration failed" }
 ```
 
-Expected: `CREATE TABLE`, constraints/index creation, and exit code `0`; no SQL error.
+Expected: table/index creation succeeds with exit code `0`; no SQL error.
 
-- [ ] **Step 4: Inspect the personality schema and indexes**
+- [ ] **Step 5: Inspect the personality schema and indexes**
 
 ```powershell
-docker compose -f server/docker-compose.yml exec -T postgres psql -U postgres -d aichessrivals_personality_test -c "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'personality' ORDER BY ordinal_position;"
+docker exec ai-chess-pr52-postgres psql -U postgres -d aichessrivals_personality_test -c "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'personality' ORDER BY ordinal_position;"
 
-docker compose -f server/docker-compose.yml exec -T postgres psql -U postgres -d aichessrivals_personality_test -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'personality' ORDER BY indexname;"
+docker exec ai-chess-pr52-postgres psql -U postgres -d aichessrivals_personality_test -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'personality' ORDER BY indexname;"
 ```
 
 Expected personality columns, in order:
@@ -269,33 +286,25 @@ personality_selectable_order_idx
 
 The `personality_selectable_order_idx` definition must contain `(display_order, personality_key)` and the predicate `is_system = true AND is_active = true` (PostgreSQL may render equivalent boolean syntax).
 
-- [ ] **Step 5: Prove the probability constraint rejects an invalid row**
+- [ ] **Step 6: Prove the probability constraint rejects an invalid row**
 
 Run:
 
 ```powershell
-docker compose -f server/docker-compose.yml exec -T postgres psql -U postgres -d aichessrivals_personality_test -c "INSERT INTO personality (personality_key, display_name, description, prompt_traits, speaking_probability, style_guidance, boundary_guidance, display_order, is_system, is_active) VALUES ('invalid-probability', 'Invalid', 'Invalid test row', 'traits', 1.100, 'style', 'boundary', 0, true, true);"
+docker exec ai-chess-pr52-postgres psql -U postgres -d aichessrivals_personality_test -c "INSERT INTO personality (personality_key, display_name, description, prompt_traits, speaking_probability, style_guidance, boundary_guidance, display_order, is_system, is_active) VALUES ('invalid-probability', 'Invalid', 'Invalid test row', 'traits', 1.100, 'style', 'boundary', 0, true, true);"
+$constraintExit = $LASTEXITCODE
+if ($constraintExit -eq 0) { throw "Expected personality_speaking_probability_check to reject 1.100" }
 ```
 
-Expected: command fails with `personality_speaking_probability_check`.
+Expected: PostgreSQL reports violation of `personality_speaking_probability_check`; `$constraintExit` is non-zero.
 
-This failure is the expected result. Verify PowerShell reports a non-zero external command exit code:
+- [ ] **Step 7: Remove the disposable PostgreSQL container**
 
 ```powershell
-$LASTEXITCODE
+docker rm -f ai-chess-pr52-postgres
 ```
 
-Expected: non-zero.
-
-- [ ] **Step 6: Drop the scratch database**
-
-```powershell
-docker compose -f server/docker-compose.yml exec -T postgres dropdb -U postgres --if-exists aichessrivals_personality_test
-```
-
-Expected: exit code `0`.
-
-Do not delete the normal `aichessrivals` database or Docker volume.
+Expected: the container name is printed and the container is removed. Because it was started with `--rm` and no volume, no database state remains.
 
 ---
 
@@ -355,7 +364,7 @@ In the existing PR description, replace:
 with:
 
 ```text
-- PostgreSQL 17 scratch-database smoke test — V1 + V2 applied successfully; personality columns/indexes verified; invalid speaking probability correctly rejected by `personality_speaking_probability_check`
+- PostgreSQL 17 disposable-container smoke test — V1 + V2 applied successfully; personality columns/indexes verified; invalid speaking probability correctly rejected by `personality_speaking_probability_check`
 ```
 
 Also add one summary bullet:
@@ -366,7 +375,7 @@ Also add one summary bullet:
 
 Do not claim GitHub CI is green until the new-head workflow has actually completed successfully.
 
-- [ ] **Step 6: Wait only for GitHub's new-head CI result, then report evidence**
+- [ ] **Step 6: Inspect the fresh GitHub Actions checks for the new PR head and report only completed evidence**
 
 Required successful jobs for this server-side change:
 
@@ -385,7 +394,7 @@ If any required job fails, inspect and fix that failure before declaring PR #52 
 - `System personalities cannot be mutated through any exposed endpoint/application persistence boundary` → repository extends only marker `Repository` and declares one read query; controller remains GET-only.
 - `Active personalities can be listed through a stable read-only API` → DB query filters `system=true` + `active=true` and orders by `displayOrder`, then `personalityKey`.
 - `Inactive-record behavior is tested` → service test still injects inactive and non-system records and confirms they are excluded by the defensive service invariant.
-- `Migration creates the minimal personality schema` → PostgreSQL 17 scratch-database V1/V2 execution plus schema/index inspection.
+- `Migration creates the minimal personality schema` → PostgreSQL 17 disposable-container V1/V2 execution plus schema/index inspection.
 - `Database constraints are real` → invalid `speaking_probability=1.100` is rejected by PostgreSQL.
 - `Modulith boundaries and repository verification pass` → Maven `verify`, root `verify.ps1`, and fresh GitHub Actions backend/native jobs.
 
