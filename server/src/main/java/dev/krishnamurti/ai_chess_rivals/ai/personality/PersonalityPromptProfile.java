@@ -16,6 +16,10 @@ public record PersonalityPromptProfile(
     requireText(displayName, "displayName");
     requireText(promptTraits, "promptTraits");
     Objects.requireNonNull(speakingProbability, "speakingProbability must not be null");
+    if (speakingProbability.compareTo(BigDecimal.ZERO) < 0
+        || speakingProbability.compareTo(BigDecimal.ONE) > 0) {
+      throw new IllegalArgumentException("speakingProbability must be between 0 and 1");
+    }
     requireText(styleGuidance, "styleGuidance");
     requireText(boundaryGuidance, "boundaryGuidance");
   }
