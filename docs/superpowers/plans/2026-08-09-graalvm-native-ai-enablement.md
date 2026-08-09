@@ -299,7 +299,11 @@ Immediately after `Build production native image`, add this step exactly, adjust
             sleep 2
           done
 
-          curl -fsS http://localhost:8081/actuator/health
+          if ! curl -fsS http://localhost:8081/actuator/health; then
+            docker logs "$app"
+            exit 1
+          fi
+
           curl -fsS http://localhost:8081/actuator/beans > /tmp/native-ai-beans.json
 
           grep -q '"groqChatModel"' /tmp/native-ai-beans.json
@@ -393,7 +397,7 @@ with:
 AI_ENABLED=false
 ```
 
-Keep all existing provider variable names and placeholders unchanged.
+Keep all existing provider variable names and existing example placeholders unchanged.
 
 - [ ] **Step 2: Add a `Native AI build/runtime contract` subsection to `server/README.md`**
 
@@ -407,15 +411,10 @@ production Dockerfile therefore compiles with the AI-enabled topology by default
 non-secret placeholder provider values. Those placeholders exist only for AOT processing; real
 Groq/Gemini credentials are not Docker build inputs and are not copied into the runtime image.
 
-At runtime on Render, set:
-
-- `AI_ENABLED=true`
-- `AI_GROQ_API_KEY=<real Groq key>`
-- `AI_GROQ_MODEL=<deployed Groq model>`
-- `AI_GEMINI_API_KEY=<real Gemini key>`
-- `AI_GEMINI_MODEL=<deployed Gemini model>`
-
-`AI_GROQ_BASE_URL` may keep its existing default unless Groq-compatible routing changes.
+At runtime on Render, configure `AI_ENABLED=true`, then set `AI_GROQ_API_KEY` and
+`AI_GEMINI_API_KEY` to the real provider secrets stored in Render and set `AI_GROQ_MODEL` and
+`AI_GEMINI_MODEL` to the model names selected for deployment. `AI_GROQ_BASE_URL` may keep its
+existing default unless Groq-compatible routing changes.
 
 For JVM development, `AI_ENABLED=false` remains the default and no provider credentials are
 required. Docker Compose maps `AI_ENABLED` to both the native build topology and runtime value;
@@ -424,7 +423,17 @@ mode. A native image compiled with one topology must not be treated as runtime-s
 other topology.
 ```
 
-Also add the five Phase 2 AI runtime variables to the existing Render `Production Configuration` list. Do not document `AI_NATIVE_BUILD_ENABLED` as a Render runtime variable; it is a Docker build contract, not application configuration.
+Also add these exact variable names to the existing Render `Production Configuration` list, with prose saying that secrets/models are configured in Render rather than committed:
+
+```text
+AI_ENABLED
+AI_GROQ_API_KEY
+AI_GROQ_MODEL
+AI_GEMINI_API_KEY
+AI_GEMINI_MODEL
+```
+
+Do not document `AI_NATIVE_BUILD_ENABLED` as a Render runtime variable; it is a Docker build contract, not application configuration.
 
 - [ ] **Step 3: Document the automated gate in `docs/BUILD_AND_VERIFY.md`**
 
@@ -592,14 +601,20 @@ There must be no changes under `server/src/main/java/**`, `server/src/test/java/
 
 - [ ] **Step 7: Commit any verification-only corrections, if needed**
 
-Only if Tasks 1-3 required a correction after full verification:
+Only if Tasks 1-3 required a correction after full verification, stage the same bounded issue files rather than using a wildcard:
 
 ```bash
-git add <only-the-files-corrected-for-this-issue>
+git add .github/workflows/ci.yml \
+        server/Dockerfile \
+        server/docker-compose.yml \
+        server/.env.example \
+        server/README.md \
+        docs/BUILD_AND_VERIFY.md \
+        "docs/AI Chess Rivals - Tech Stack.md"
 git commit -m "fix: complete native AI topology verification"
 ```
 
-Do not create an empty commit.
+If `git status --short` shows none of those files modified, do not create an empty commit.
 
 - [ ] **Step 8: Open/update the PR with issue linkage and verification evidence**
 
