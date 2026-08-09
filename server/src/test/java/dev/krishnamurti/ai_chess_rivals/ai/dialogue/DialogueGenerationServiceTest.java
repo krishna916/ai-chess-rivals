@@ -91,6 +91,39 @@ class DialogueGenerationServiceTest {
         .get()
         .extracting(GeneratedDialogue::personalityKey)
         .isEqualTo("vesper");
+    assertThat(requests).hasSize(1);
+    assertThat(requests.getFirst().prompt())
+        .contains("Move owner: Blaze")
+        .contains("Speaker role: OPPONENT (the other personality played this move)")
+        .contains("classification=MAJOR_MISTAKE")
+        .contains("from Blaze's perspective");
+  }
+
+  @Test
+  void checkMakesOpponentSpeakWithoutClaimingTheOpponentDeliveredCheck() {
+    gatewayReturnsValidProviderOutput();
+    DialogueGenerationService service = service(new DialogueSpeakingPolicy(() -> 0.0));
+    DialogueMoveRequest request =
+        new DialogueMoveRequest(
+            5,
+            "blaze",
+            "vesper",
+            "Qh5+",
+            false,
+            true,
+            false,
+            false,
+            Optional.empty(),
+            List.of());
+
+    GeneratedDialogue result = service.generateMove(request).orElseThrow();
+
+    assertThat(result.personalityKey()).isEqualTo("vesper");
+    assertThat(requests).hasSize(1);
+    assertThat(requests.getFirst().prompt())
+        .contains("Move owner: Blaze")
+        .contains("Speaker role: OPPONENT (the other personality played this move)")
+        .contains("check=true means the mover gave check to the opponent");
   }
 
   @Test
@@ -107,6 +140,10 @@ class DialogueGenerationServiceTest {
     assertThat(result.emotion()).isEqualTo(DialogueEmotion.CALM);
     assertThat(result.reactionType()).isEqualTo(DialogueReactionType.MOVE_REACTION);
     assertThat(result.source()).isEqualTo(AiResponseSource.GROQ);
+    assertThat(requests).hasSize(1);
+    assertThat(requests.getFirst().prompt())
+        .contains("Move owner: Blaze")
+        .contains("Speaker role: MOVER (you played this move)");
   }
 
   @Test
