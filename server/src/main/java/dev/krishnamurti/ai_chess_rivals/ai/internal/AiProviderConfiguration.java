@@ -31,8 +31,10 @@ class AiProviderConfiguration {
   }
 
   @Bean("groqChatClient")
-  ChatClient groqChatClient(@Qualifier("groqChatModel") ChatModel chatModel) {
-    return ChatClient.builder(chatModel).build();
+  ChatClient groqChatClient(
+      @Qualifier("groqChatModel") ChatModel chatModel,
+      DialogueBoundaryAdvisor dialogueBoundaryAdvisor) {
+    return ChatClient.builder(chatModel).defaultAdvisors(dialogueBoundaryAdvisor).build();
   }
 
   @Bean("groqProviderChatClient")
@@ -57,8 +59,15 @@ class AiProviderConfiguration {
   }
 
   @Bean("geminiChatClient")
-  ChatClient geminiChatClient(@Qualifier("geminiChatModel") ChatModel chatModel) {
-    return ChatClient.builder(chatModel).build();
+  ChatClient geminiChatClient(
+      @Qualifier("geminiChatModel") ChatModel chatModel,
+      DialogueBoundaryAdvisor dialogueBoundaryAdvisor) {
+    return ChatClient.builder(chatModel).defaultAdvisors(dialogueBoundaryAdvisor).build();
+  }
+
+  @Bean
+  DialogueBoundaryAdvisor dialogueBoundaryAdvisor() {
+    return new DialogueBoundaryAdvisor();
   }
 
   @Bean("geminiProviderChatClient")

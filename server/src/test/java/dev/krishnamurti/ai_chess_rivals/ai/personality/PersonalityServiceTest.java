@@ -1,11 +1,13 @@
 package dev.krishnamurti.ai_chess_rivals.ai.personality;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -45,6 +47,34 @@ class PersonalityServiceTest {
         .thenReturn(List.of());
 
     assertThat(service.listSelectable()).isEmpty();
+  }
+
+  @Test
+  void returnsPromptProfileForSelectableSystemPersonality() {
+    PersonalityEntity blaze = personality("blaze", "Blaze", 10, true, true);
+    when(personalityRepository.findByPersonalityKeyAndSystemTrueAndActiveTrue("blaze"))
+        .thenReturn(Optional.of(blaze));
+
+    PersonalityPromptProfile profile =
+        new PersonalityService(personalityRepository).requirePromptProfile("blaze");
+
+    assertThat(profile.key()).isEqualTo("blaze");
+    assertThat(profile.displayName()).isEqualTo("Blaze");
+    assertThat(profile.promptTraits()).contains("Competitive");
+    assertThat(profile.speakingProbability()).isEqualByComparingTo("0.650");
+    assertThat(profile.styleGuidance()).contains("Dry");
+    assertThat(profile.boundaryGuidance()).contains("PG-13");
+  }
+
+  @Test
+  void rejectsUnknownOrNonSelectablePromptProfile() {
+    when(personalityRepository.findByPersonalityKeyAndSystemTrueAndActiveTrue("missing"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> new PersonalityService(personalityRepository).requirePromptProfile("missing"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Unknown selectable personality: missing");
   }
 
   private static PersonalityEntity personality(
