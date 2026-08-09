@@ -109,6 +109,10 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 Spring AI 2.0.0 is the current Phase 2 provider layer added by issue #38. The BOM manages the
 provider starter versions used for Groq primary access and Gemini fallback.
 
+### Phase 2 Dialogue Generation
+
+The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs Groq → Gemini → deterministic fallback. Dialogue persistence and match-lifecycle wiring remain separate work in issue #43.
+
 ### Web & API Communication
 *   **Spring Boot Starter WebMVC**: Configures REST APIs and synchronous web endpoints.
 *   **Spring Boot Starter WebSocket**: Handles real-time, bi-directional communication between client and server (crucial for streaming chess matches, live evaluations, and real-time trash talk).

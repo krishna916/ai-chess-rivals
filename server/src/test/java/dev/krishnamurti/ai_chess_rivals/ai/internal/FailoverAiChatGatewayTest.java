@@ -8,6 +8,7 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseValidator;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.converter.BeanOutputConverter;
 
 class FailoverAiChatGatewayTest {
 
@@ -112,6 +113,51 @@ class FailoverAiChatGatewayTest {
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(1);
   }
+
+  @Test
+  void malformedGroqStructuredOutputFallsThroughToValidGemini() {
+    AtomicInteger groqCalls = new AtomicInteger();
+    AtomicInteger geminiCalls = new AtomicInteger();
+    BeanOutputConverter<StructuredDialogue> converter =
+        new BeanOutputConverter<>(StructuredDialogue.class);
+    FailoverAiChatGateway gateway =
+        new FailoverAiChatGateway(
+            returning("not-json", groqCalls),
+            returning(
+                "{\"text\":\"A measured reply.\",\"emotion\":\"CALM\",\"reactionType\":\"MOVE_REACTION\"}",
+                geminiCalls));
+
+    AiChatResult result =
+        gateway.generate(
+            REQUEST,
+            response -> {
+              try {
+                StructuredDialogue dialogue = converter.convert(response);
+                return dialogue != null
+                    && !dialogue.text().isBlank()
+                    && dialogue.emotion() == StructuredEmotion.CALM
+                    && dialogue.reactionType() == StructuredReactionType.MOVE_REACTION;
+              } catch (RuntimeException ignored) {
+                return false;
+              }
+            });
+
+    assertThat(result.content()).contains("A measured reply.");
+    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
+    assertThat(groqCalls).hasValue(1);
+    assertThat(geminiCalls).hasValue(1);
+  }
+
+  public enum StructuredEmotion {
+    CALM
+  }
+
+  public enum StructuredReactionType {
+    MOVE_REACTION
+  }
+
+  public record StructuredDialogue(
+      String text, StructuredEmotion emotion, StructuredReactionType reactionType) {}
 
   private static ProviderChatClient returning(String response, AtomicInteger calls) {
     return prompt -> {
