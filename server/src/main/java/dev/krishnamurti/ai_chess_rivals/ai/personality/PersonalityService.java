@@ -13,7 +13,9 @@ class PersonalityService {
   }
 
   List<PersonalityRosterItem> listSelectable() {
-    return personalityRepository.findAllByOrderByDisplayOrderAscPersonalityKeyAsc().stream()
+    return personalityRepository
+        .findAllBySystemTrueAndActiveTrueOrderByDisplayOrderAscPersonalityKeyAsc()
+        .stream()
         .filter(PersonalityEntity::selectableSystem)
         .map(PersonalityRosterItem::from)
         .toList();

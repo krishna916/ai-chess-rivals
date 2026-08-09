@@ -19,7 +19,8 @@ class PersonalityServiceTest {
   @Test
   void listsOnlyActiveSystemPersonalitiesInRepositoryOrder() {
     PersonalityService service = new PersonalityService(personalityRepository);
-    when(personalityRepository.findAllByOrderByDisplayOrderAscPersonalityKeyAsc())
+    when(personalityRepository
+            .findAllBySystemTrueAndActiveTrueOrderByDisplayOrderAscPersonalityKeyAsc())
         .thenReturn(
             List.of(
                 personality("archived", "Archived", 5, true, false),
@@ -32,13 +33,15 @@ class PersonalityServiceTest {
             new PersonalityRosterItem("alpha", "Alpha", "Alpha description", "/avatars/alpha.svg"),
             new PersonalityRosterItem("zeta", "Zeta", "Zeta description", "/avatars/zeta.svg"));
 
-    verify(personalityRepository).findAllByOrderByDisplayOrderAscPersonalityKeyAsc();
+    verify(personalityRepository)
+        .findAllBySystemTrueAndActiveTrueOrderByDisplayOrderAscPersonalityKeyAsc();
   }
 
   @Test
   void returnsEmptyRosterWhenRepositoryHasNoRecords() {
     PersonalityService service = new PersonalityService(personalityRepository);
-    when(personalityRepository.findAllByOrderByDisplayOrderAscPersonalityKeyAsc())
+    when(personalityRepository
+            .findAllBySystemTrueAndActiveTrueOrderByDisplayOrderAscPersonalityKeyAsc())
         .thenReturn(List.of());
 
     assertThat(service.listSelectable()).isEmpty();
