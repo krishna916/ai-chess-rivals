@@ -81,6 +81,27 @@ class DialogueSpeakingPolicyTest {
   }
 
   @Test
+  void captureUsesImportantEventProbabilityAndMoverSpeaker() {
+    DialogueMoveRequest capture =
+        new DialogueMoveRequest(
+            6,
+            "mover",
+            "opponent",
+            "exd5",
+            true,
+            false,
+            false,
+            false,
+            Optional.empty(),
+            List.of(new DialogueHistoryLine(5, "opponent", "Opponent", "previous line")));
+    DialogueSpeakingPolicy speak = new DialogueSpeakingPolicy(() -> 0.849);
+    DialogueSpeakingPolicy silent = new DialogueSpeakingPolicy(() -> 0.850);
+
+    assertThat(speak.selectMoveSpeaker(capture, mover, opponent)).contains("mover");
+    assertThat(silent.selectMoveSpeaker(capture, mover, opponent)).isEmpty();
+  }
+
+  @Test
   void appliesSpeakerPrecedenceForMoveSemantics() {
     DialogueSpeakingPolicy policy = new DialogueSpeakingPolicy(() -> 0.0);
 

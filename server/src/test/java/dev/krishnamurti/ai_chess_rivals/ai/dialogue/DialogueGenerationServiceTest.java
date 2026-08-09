@@ -105,16 +105,7 @@ class DialogueGenerationServiceTest {
     DialogueGenerationService service = service(new DialogueSpeakingPolicy(() -> 0.0));
     DialogueMoveRequest request =
         new DialogueMoveRequest(
-            5,
-            "blaze",
-            "vesper",
-            "Qh5+",
-            false,
-            true,
-            false,
-            false,
-            Optional.empty(),
-            List.of());
+            5, "blaze", "vesper", "Qh5+", false, true, false, false, Optional.empty(), List.of());
 
     GeneratedDialogue result = service.generateMove(request).orElseThrow();
 
