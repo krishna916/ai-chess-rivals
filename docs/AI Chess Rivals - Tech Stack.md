@@ -116,7 +116,8 @@ production Docker builds compile the Groq/Gemini + enabled `AiChatGateway` topol
 non-secret placeholders only for AOT processing; real provider keys and model names are supplied
 at runtime. Docker Compose maps its existing `AI_ENABLED` value into the native build argument so
 local AI-disabled images remain straightforward. CI starts the actual native image and verifies
-the application-owned provider/gateway beans through a CI-only Actuator `beans` exposure.
+the application-owned provider/gateway bean creation through CI-only BeanFactory DEBUG startup
+logs without exposing an additional Actuator endpoint.
 
 ### Phase 2 Dialogue Generation
 

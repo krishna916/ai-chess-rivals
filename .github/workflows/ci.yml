@@ -199,7 +199,7 @@ jobs:
             -e AI_GROQ_MODEL=ci-runtime-groq-model \
             -e AI_GEMINI_API_KEY=ci-runtime-gemini-key \
             -e AI_GEMINI_MODEL=ci-runtime-gemini-model \
-            -e MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,beans \
+            -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_BEANS_FACTORY_SUPPORT=DEBUG \
             ai-chess-rivals:native-ci
 
           for attempt in {1..60}; do
@@ -220,14 +220,35 @@ jobs:
             exit 1
           fi
 
-          curl -fsS http://localhost:8081/actuator/beans > /tmp/native-ai-beans.json
+          log_file="/tmp/native-ai-app.log"
+          docker logs "$app" > "$log_file" 2>&1
 
-          grep -q '"groqChatModel"' /tmp/native-ai-beans.json
-          grep -q '"geminiChatModel"' /tmp/native-ai-beans.json
-          grep -q '"enabledAiChatGateway"' /tmp/native-ai-beans.json
+          if ! grep -Fq "Creating shared instance of singleton bean" "$log_file"; then
+            echo "BeanFactory DEBUG logging produced no singleton-creation lines; native AI topology cannot be verified"
+            docker logs "$app"
+            exit 1
+          fi
 
-          if grep -q '"disabledAiChatGateway"' /tmp/native-ai-beans.json; then
-            echo "disabledAiChatGateway is present in the AI-enabled native artifact"
+          assert_created() {
+            local bean="$1"
+            local pattern="Creating shared instance of singleton bean '$bean'"
+
+            if ! grep -Fq "$pattern" "$log_file"; then
+              echo "Expected native bean '$bean' was not created"
+              echo "Relevant AI bean creation lines:"
+              grep -E "groqChatModel|geminiChatModel|enabledAiChatGateway|disabledAiChatGateway" "$log_file" || true
+              docker logs "$app"
+              exit 1
+            fi
+          }
+
+          assert_created "groqChatModel"
+          assert_created "geminiChatModel"
+          assert_created "enabledAiChatGateway"
+
+          if grep -Fq "Creating shared instance of singleton bean 'disabledAiChatGateway'" "$log_file"; then
+            echo "disabledAiChatGateway was created in the AI-enabled native artifact"
+            docker logs "$app"
             exit 1
           fi
 

@@ -53,13 +53,14 @@ Render; image publication and deployment remain separate work.
 
 The GitHub Actions native job does more than compile the GraalVM image. It builds the production
 Dockerfile with the AI-enabled AOT topology, loads the resulting image, starts it against a
-disposable PostgreSQL 17 container using fake runtime provider values, and temporarily exposes
-Actuator `beans` for that verification container only.
+disposable PostgreSQL 17 container using fake runtime provider values, and enables Spring
+BeanFactory DEBUG logging for that verification container only.
 
-The gate requires `groqChatModel`, `geminiChatModel`, and `enabledAiChatGateway` to exist and
-requires `disabledAiChatGateway` to be absent. It also verifies that provider key/model
-environment values are not present in the final image configuration. The check performs no real
-Groq/Gemini request and requires no provider secret.
+After the native application becomes healthy, CI captures its startup logs and requires creation
+of `groqChatModel`, `geminiChatModel`, and `enabledAiChatGateway`, while requiring
+`disabledAiChatGateway` not to be created. It also verifies that provider key/model environment
+values are not present in the final image configuration. The check performs no real Groq/Gemini
+request, requires no provider secret, and does not expose an additional Actuator endpoint.
 
 Normal JVM verification continues to use the default AI-disabled mode. For Docker Compose,
 changing `AI_ENABLED` requires rebuilding the backend because the native bean topology is selected
