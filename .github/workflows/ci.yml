@@ -199,7 +199,6 @@ jobs:
             -e AI_GROQ_MODEL=ci-runtime-groq-model \
             -e AI_GEMINI_API_KEY=ci-runtime-gemini-key \
             -e AI_GEMINI_MODEL=ci-runtime-gemini-model \
-            -e LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_BEANS_FACTORY_SUPPORT=DEBUG \
             ai-chess-rivals:native-ci
 
           for attempt in {1..60}; do
@@ -223,31 +222,21 @@ jobs:
           log_file="/tmp/native-ai-app.log"
           docker logs "$app" > "$log_file" 2>&1
 
-          if ! grep -Fq "Creating shared instance of singleton bean" "$log_file"; then
-            echo "BeanFactory DEBUG logging produced no singleton-creation lines; native AI topology cannot be verified"
+          enabled_marker="AI gateway topology: enabled (Groq -> Gemini)"
+          disabled_marker="AI gateway topology: disabled"
+
+          if ! grep -Fq "$enabled_marker" "$log_file"; then
+            echo "Expected AI-enabled native topology marker was not emitted"
+            echo "AI topology markers found in application logs:"
+            grep -F "AI gateway topology:" "$log_file" || true
             docker logs "$app"
             exit 1
           fi
 
-          assert_created() {
-            local bean="$1"
-            local pattern="Creating shared instance of singleton bean '$bean'"
-
-            if ! grep -Fq "$pattern" "$log_file"; then
-              echo "Expected native bean '$bean' was not created"
-              echo "Relevant AI bean creation lines:"
-              grep -E "groqChatModel|geminiChatModel|enabledAiChatGateway|disabledAiChatGateway" "$log_file" || true
-              docker logs "$app"
-              exit 1
-            fi
-          }
-
-          assert_created "groqChatModel"
-          assert_created "geminiChatModel"
-          assert_created "enabledAiChatGateway"
-
-          if grep -Fq "Creating shared instance of singleton bean 'disabledAiChatGateway'" "$log_file"; then
-            echo "disabledAiChatGateway was created in the AI-enabled native artifact"
+          if grep -Fq "$disabled_marker" "$log_file"; then
+            echo "AI-disabled topology marker was emitted by the AI-enabled native artifact"
+            echo "AI topology markers found in application logs:"
+            grep -F "AI gateway topology:" "$log_file" || true
             docker logs "$app"
             exit 1
           fi
