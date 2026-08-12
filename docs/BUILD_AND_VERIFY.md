@@ -52,15 +52,17 @@ Render; image publication and deployment remain separate work.
 ## Native AI topology verification
 
 The GitHub Actions native job does more than compile the GraalVM image. It builds the production
-Dockerfile with the AI-enabled AOT topology, loads the resulting image, starts it against a
-disposable PostgreSQL 17 container using fake runtime provider values, and enables Spring
-BeanFactory DEBUG logging for that verification container only.
+Dockerfile with the AI-enabled AOT topology, loads the resulting image, and starts it against a
+disposable PostgreSQL 17 container using fake runtime provider values.
 
-After the native application becomes healthy, CI captures its startup logs and requires creation
-of `groqChatModel`, `geminiChatModel`, and `enabledAiChatGateway`, while requiring
-`disabledAiChatGateway` not to be created. It also verifies that provider key/model environment
-values are not present in the final image configuration. The check performs no real Groq/Gemini
-request, requires no provider secret, and does not expose an additional Actuator endpoint.
+`AiGatewayConfiguration` emits a small application-owned startup marker for the topology that was
+constructed. After the native application becomes healthy, CI captures its container logs,
+requires the AI-enabled gateway marker, and requires the AI-disabled gateway marker to be absent.
+Because construction of the enabled gateway requires both qualified provider clients to resolve,
+this verifies the enabled provider/gateway chain without depending on Spring Framework internal
+bean-creation logs or exposing an additional Actuator endpoint. CI also verifies that provider
+key/model environment values are not present in the final image configuration. The check performs
+no real Groq/Gemini request and requires no provider secret.
 
 Normal JVM verification continues to use the default AI-disabled mode. For Docker Compose,
 changing `AI_ENABLED` requires rebuilding the backend because the native bean topology is selected
