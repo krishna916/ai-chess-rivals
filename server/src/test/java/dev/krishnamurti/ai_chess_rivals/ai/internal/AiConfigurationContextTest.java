@@ -8,13 +8,17 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseValidator;
 import dev.krishnamurti.ai_chess_rivals.ai.config.AiConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AiConfigurationContextTest {
 
   private final ApplicationContextRunner contextRunner =
@@ -31,7 +35,7 @@ class AiConfigurationContextTest {
               "app.ai.gemini.timeout=12s");
 
   @Test
-  void disabledModeCreatesOnlyFallbackGateway() {
+  void disabledModeCreatesOnlyFallbackGateway(CapturedOutput output) {
     contextRunner
         .withPropertyValues("app.ai.enabled=false")
         .run(
@@ -49,11 +53,14 @@ class AiConfigurationContextTest {
                           AiResponseValidator.nonBlank());
               assertThat(result.content()).isEqualTo("offline fallback");
               assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
+              assertThat(output.getAll())
+                  .contains("AI gateway topology: disabled")
+                  .doesNotContain("AI gateway topology: enabled (Groq -> Gemini)");
             });
   }
 
   @Test
-  void enabledModeCreatesBothNamedProviderModelsAndClientsAndOneGateway() {
+  void enabledModeCreatesBothNamedProviderModelsAndClientsAndOneGateway(CapturedOutput output) {
     contextRunner
         .withPropertyValues(
             "app.ai.enabled=true",
@@ -69,6 +76,9 @@ class AiConfigurationContextTest {
               assertThat(context).hasBean("geminiChatModel");
               assertThat(context).hasBean("geminiChatClient");
               assertThat(context).hasSingleBean(AiChatGateway.class);
+              assertThat(output.getAll())
+                  .contains("AI gateway topology: enabled (Groq -> Gemini)")
+                  .doesNotContain("AI gateway topology: disabled");
             });
   }
 }
