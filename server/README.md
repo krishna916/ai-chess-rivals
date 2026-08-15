@@ -289,8 +289,28 @@ Connect to the PostgreSQL instance using any database client (such as DBeaver, p
   - The PostgreSQL service container is **not** deployed to Render.
   - Transitioning from local development to production requires **only configuration changes** (no code changes or Spring profile changes).
 
+### Native AI build/runtime contract
+
+Spring AOT fixes `@ConditionalOnProperty` bean presence while the native image is built. The
+production Dockerfile therefore compiles with the AI-enabled topology by default using fixed,
+non-secret placeholder provider values. Those placeholders exist only for AOT processing; real
+Groq/Gemini credentials are not Docker build inputs and are not copied into the runtime image.
+
+At runtime on Render, configure `AI_ENABLED=true`, then set `AI_GROQ_API_KEY` and
+`AI_GEMINI_API_KEY` to the real provider secrets stored in Render and set `AI_GROQ_MODEL` and
+`AI_GEMINI_MODEL` to the model names selected for deployment. `AI_GROQ_BASE_URL` may keep its
+existing default unless Groq-compatible routing changes.
+
+For JVM development, `AI_ENABLED=false` remains the default and no provider credentials are
+required. Docker Compose maps `AI_ENABLED` to both the native build topology and runtime value;
+when changing it, rebuild the backend (`docker compose up -d --build`) before testing the new
+mode. A native image compiled with one topology must not be treated as runtime-switchable to the
+other topology.
+
 ### Production Configuration
-In Render, set the following environment variables in your web service dashboard to point to Neon:
+In Render, set the following environment variables in your web service dashboard to point to Neon
+and configure the application. Keep provider secrets and model values in Render rather than in
+committed files:
 - `SPRING_DATASOURCE_URL`: (Your Neon JDBC connection string)
 - `SPRING_DATASOURCE_USERNAME`: (Your Neon database username)
 - `SPRING_DATASOURCE_PASSWORD`: (Your Neon database password)
@@ -300,4 +320,9 @@ In Render, set the following environment variables in your web service dashboard
 - `OWNER_CONTROL_TOKEN`: (A generated 32-byte hex token; store the same value in a password manager)
 - `MATCH_COOLDOWN`: `60s` (or the desired Spring duration)
 - `MATCH_DAILY_START_LIMIT`: `12` (or the desired positive limit)
+- `AI_ENABLED`: `true` for the production AI-enabled native image
+- `AI_GROQ_API_KEY`: (Groq API key stored as a Render secret)
+- `AI_GROQ_MODEL`: (Groq model name selected for deployment)
+- `AI_GEMINI_API_KEY`: (Gemini API key stored as a Render secret)
+- `AI_GEMINI_MODEL`: (Gemini model name selected for deployment)
 

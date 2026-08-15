@@ -1,5 +1,7 @@
 package dev.krishnamurti.ai_chess_rivals.game.config;
 
+import java.util.List;
+import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
@@ -11,8 +13,40 @@ public class GameNativeRuntimeHints implements RuntimeHintsRegistrar {
 
   @Override
   public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
-    hints.reflection().registerType(GameProperties.class, MemberCategory.DECLARED_FIELDS);
-    hints.reflection().registerType(GameProperties.MoveDelay.class, MemberCategory.DECLARED_FIELDS);
+    // Hibernate Validator reflectively reads configuration-record backing fields and invokes
+    // application @AssertTrue methods while evaluating Jakarta Bean Validation constraints.
+    hints.reflection().registerType(GameProperties.class, MemberCategory.ACCESS_DECLARED_FIELDS);
+
+    hints
+        .reflection()
+        .registerType(
+            GameProperties.MoveDelay.class,
+            typeHint ->
+                typeHint
+                    .withMembers(MemberCategory.ACCESS_DECLARED_FIELDS)
+                    .withMethod("isMinimumNonNegative", List.of(), ExecutableMode.INVOKE)
+                    .withMethod("isMaximumNonNegative", List.of(), ExecutableMode.INVOKE)
+                    .withMethod("isValidRange", List.of(), ExecutableMode.INVOKE));
+
+    hints
+        .reflection()
+        .registerType(
+            MatchGuardProperties.class,
+            typeHint ->
+                typeHint
+                    .withMembers(MemberCategory.ACCESS_DECLARED_FIELDS)
+                    .withMethod("isCooldownNonNegative", List.of(), ExecutableMode.INVOKE));
+
+    hints
+        .reflection()
+        .registerType(OwnerControlProperties.class, MemberCategory.ACCESS_DECLARED_FIELDS);
+
+    hints
+        .reflection()
+        .registerTypeIfPresent(
+            classLoader,
+            "dev.krishnamurti.ai_chess_rivals.game.websocket.WebSocketProperties",
+            typeHint -> typeHint.withMembers(MemberCategory.ACCESS_DECLARED_FIELDS));
 
     // Register Web endpoints & configs for Native Image since they were missed during AOT
     hints

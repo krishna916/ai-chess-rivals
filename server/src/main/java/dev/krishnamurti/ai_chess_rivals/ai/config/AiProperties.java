@@ -5,11 +5,9 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
 
 /** Strongly typed configuration for the bounded Phase 2 AI provider chain. */
 @ConfigurationProperties(prefix = "app.ai")
-@Validated
 public record AiProperties(
     boolean enabled, @Valid @NotNull Groq groq, @Valid @NotNull Gemini gemini) {
 

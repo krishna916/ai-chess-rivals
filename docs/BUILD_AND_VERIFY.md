@@ -49,6 +49,25 @@ rather than real API calls.
 The native CI job is verification only. It does not publish an image, log into GHCR, or deploy to
 Render; image publication and deployment remain separate work.
 
+## Native AI topology verification
+
+The GitHub Actions native job does more than compile the GraalVM image. It builds the production
+Dockerfile with the AI-enabled AOT topology, loads the resulting image, and starts it against a
+disposable PostgreSQL 17 container using fake runtime provider values.
+
+`AiGatewayConfiguration` emits a small application-owned startup marker for the topology that was
+constructed. After the native application becomes healthy, CI captures its container logs,
+requires the AI-enabled gateway marker, and requires the AI-disabled gateway marker to be absent.
+Because construction of the enabled gateway requires both qualified provider clients to resolve,
+this verifies the enabled provider/gateway chain without depending on Spring Framework internal
+bean-creation logs or exposing an additional Actuator endpoint. CI also verifies that provider
+key/model environment values are not present in the final image configuration. The check performs
+no real Groq/Gemini request and requires no provider secret.
+
+Normal JVM verification continues to use the default AI-disabled mode. For Docker Compose,
+changing `AI_ENABLED` requires rebuilding the backend because the native bean topology is selected
+during AOT compilation.
+
 If branch protection is enabled later, the checks produced by this workflow are:
 `CI / Detect changes`, `CI / Backend verification`, `CI / Frontend verification`, and
 `CI / Native image verification`. Job-level conditions intentionally report irrelevant jobs as

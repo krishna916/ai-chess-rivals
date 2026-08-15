@@ -13,13 +13,15 @@ public class NativeRuntimeHints implements RuntimeHintsRegistrar {
     // Register UUID[] for reflection instantiation
     hints.reflection().registerType(UUID[].class);
 
-    // Hibernate Validator's JPATraversableResolver reflectively reads fields of
-    // validated @ConfigurationProperties objects to check JPA lazy-loading state.
-    // Without these registrations, the native image throws MissingReflectionRegistrationError
-    // for every field in ChessProperties and its nested Stockfish record.
-    hints.reflection().registerType(ChessProperties.class, MemberCategory.DECLARED_FIELDS);
+    // Hibernate Validator reflectively reads configuration-record backing fields when evaluating
+    // Jakarta Bean Validation constraints in the native runtime.
+    hints.reflection().registerType(ChessProperties.class, MemberCategory.ACCESS_DECLARED_FIELDS);
     hints
         .reflection()
-        .registerType(ChessProperties.Stockfish.class, MemberCategory.DECLARED_FIELDS);
+        .registerType(ChessProperties.Stockfish.class, MemberCategory.ACCESS_DECLARED_FIELDS);
+    hints
+        .reflection()
+        .registerType(
+            ChessProperties.Stockfish.Evaluation.class, MemberCategory.ACCESS_DECLARED_FIELDS);
   }
 }

@@ -13,8 +13,18 @@ RUN ./mvnw dependency:go-offline -B -Plinux -Pnative
 # Copy source code
 COPY src/ ./src/
 
+# Spring AOT fixes conditional bean topology at build time.
+# Direct/production Docker builds therefore compile the AI-enabled topology by default.
+# Docker Compose overrides this arg from AI_ENABLED so local disabled mode remains available.
+ARG AI_NATIVE_BUILD_ENABLED=true
+
 # Package application as native image & download linux stockfish binary
-RUN ./mvnw clean package native:compile -B -DskipTests -Pnative -Plinux
+RUN AI_ENABLED="${AI_NATIVE_BUILD_ENABLED}" \
+    AI_GROQ_API_KEY="aot-build-placeholder-groq-key" \
+    AI_GROQ_MODEL="aot-build-placeholder-groq-model" \
+    AI_GEMINI_API_KEY="aot-build-placeholder-gemini-key" \
+    AI_GEMINI_MODEL="aot-build-placeholder-gemini-model" \
+    ./mvnw clean package native:compile -B -DskipTests -Pnative -Plinux
 
 # --- Runtime Stage ---
 FROM debian:bookworm-slim

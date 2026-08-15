@@ -148,5 +148,108 @@ jobs:
           file: ./server/Dockerfile
           platforms: linux/amd64
           push: false
+          load: true
+          tags: ai-chess-rivals:native-ci
+          build-args: |
+            AI_NATIVE_BUILD_ENABLED=true
           cache-from: type=gha,scope=server-native
           cache-to: type=gha,mode=max,scope=server-native
+
+      - name: Verify AI-enabled topology in native image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          network="native-ai-verify"
+          postgres="native-ai-postgres"
+          app="native-ai-app"
+
+          docker network create "$network"
+
+          docker run -d \
+            --name "$postgres" \
+            --network "$network" \
+            -e POSTGRES_DB=aichessrivals \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=secretpassword \
+            postgres:17-alpine
+
+          for attempt in {1..30}; do
+            if docker exec "$postgres" pg_isready -U postgres -d aichessrivals >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$postgres" pg_isready -U postgres -d aichessrivals
+
+          docker run -d \
+            --name "$app" \
+            --network "$network" \
+            -p 8081:8081 \
+            -e SERVER_PORT=8080 \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://native-ai-postgres:5432/aichessrivals \
+            -e SPRING_DATASOURCE_USERNAME=postgres \
+            -e SPRING_DATASOURCE_PASSWORD=secretpassword \
+            -e SPRING_FLYWAY_URL=jdbc:postgresql://native-ai-postgres:5432/aichessrivals \
+            -e SPRING_FLYWAY_USER=postgres \
+            -e SPRING_FLYWAY_PASSWORD=secretpassword \
+            -e OWNER_CONTROL_TOKEN=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+            -e AI_ENABLED=true \
+            -e AI_GROQ_API_KEY=ci-runtime-groq-key \
+            -e AI_GROQ_MODEL=ci-runtime-groq-model \
+            -e AI_GEMINI_API_KEY=ci-runtime-gemini-key \
+            -e AI_GEMINI_MODEL=ci-runtime-gemini-model \
+            ai-chess-rivals:native-ci
+
+          for attempt in {1..60}; do
+            if curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1; then
+              break
+            fi
+
+            if [[ "$(docker inspect -f '{{.State.Running}}' "$app")" != "true" ]]; then
+              docker logs "$app"
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          if ! curl -fsS http://localhost:8081/actuator/health; then
+            docker logs "$app"
+            exit 1
+          fi
+
+          log_file="/tmp/native-ai-app.log"
+          docker logs "$app" > "$log_file" 2>&1
+
+          enabled_marker="AI gateway topology: enabled (Groq -> Gemini)"
+          disabled_marker="AI gateway topology: disabled"
+
+          if ! grep -Fq "$enabled_marker" "$log_file"; then
+            echo "Expected AI-enabled native topology marker was not emitted"
+            echo "AI topology markers found in application logs:"
+            grep -F "AI gateway topology:" "$log_file" || true
+            docker logs "$app"
+            exit 1
+          fi
+
+          if grep -Fq "$disabled_marker" "$log_file"; then
+            echo "AI-disabled topology marker was emitted by the AI-enabled native artifact"
+            echo "AI topology markers found in application logs:"
+            grep -F "AI gateway topology:" "$log_file" || true
+            docker logs "$app"
+            exit 1
+          fi
+
+          image_env="$(docker image inspect ai-chess-rivals:native-ci --format '{{range .Config.Env}}{{println .}}{{end}}')"
+          if grep -Eq '^AI_(GROQ|GEMINI)_(API_KEY|MODEL)=' <<< "$image_env"; then
+            echo "Provider credential/model environment values are baked into the final image"
+            exit 1
+          fi
+
+      - name: Clean up native topology verification
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          docker rm -f native-ai-app native-ai-postgres 2>/dev/null || true
+          docker network rm native-ai-verify 2>/dev/null || true

@@ -109,6 +109,17 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 Spring AI 2.0.0 is the current Phase 2 provider layer added by issue #38. The BOM manages the
 provider starter versions used for Groq primary access and Gemini fallback.
 
+### Native AI topology
+
+The production GraalVM artifact treats AI enablement as a build-time Spring AOT choice. Direct
+production Docker builds compile the Groq/Gemini + enabled `AiChatGateway` topology using
+non-secret placeholders only for AOT processing; real provider keys and model names are supplied
+at runtime. Docker Compose maps its existing `AI_ENABLED` value into the native build argument so
+local AI-disabled images remain straightforward. CI starts the actual native image and verifies
+the enabled application-owned provider/gateway chain through a stable startup marker emitted by
+`AiGatewayConfiguration`, without depending on Spring Framework internal bean-creation logs or exposing
+an additional Actuator endpoint.
+
 ### Phase 2 Dialogue Generation
 
 The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs Groq → Gemini → deterministic fallback. Dialogue persistence and match-lifecycle wiring remain separate work in issue #43.

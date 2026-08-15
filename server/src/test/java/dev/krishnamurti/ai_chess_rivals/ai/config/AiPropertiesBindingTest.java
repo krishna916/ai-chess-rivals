@@ -2,6 +2,7 @@ package dev.krishnamurti.ai_chess_rivals.ai.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.krishnamurti.ai_chess_rivals.ValidationConfiguration;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -17,7 +18,7 @@ class AiPropertiesBindingTest {
               AutoConfigurations.of(
                   ConfigurationPropertiesAutoConfiguration.class,
                   ValidationAutoConfiguration.class))
-          .withUserConfiguration(AiConfig.class)
+          .withUserConfiguration(ValidationConfiguration.class, AiConfig.class)
           .withPropertyValues(
               "app.ai.groq.base-url=https://api.groq.com/openai/v1",
               "app.ai.groq.timeout=8s",
