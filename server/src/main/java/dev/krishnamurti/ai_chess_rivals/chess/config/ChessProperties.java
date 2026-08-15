@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
 
 /**
  * Strongly-typed configuration properties for the chess module.
@@ -30,7 +29,6 @@ import org.springframework.validation.annotation.Validated;
  * @param stockfish Stockfish engine settings.
  */
 @ConfigurationProperties(prefix = "app.chess")
-@Validated
 public record ChessProperties(@NotNull @Valid Stockfish stockfish) {
 
   /**

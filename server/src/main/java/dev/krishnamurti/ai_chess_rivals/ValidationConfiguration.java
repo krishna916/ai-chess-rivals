@@ -1,20 +1,24 @@
 package dev.krishnamurti.ai_chess_rivals;
 
-import org.springframework.boot.validation.autoconfigure.ValidationConfigurationCustomizer;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 /**
- * Keeps configuration-property validation independent of JPA persistence reachability.
+ * Provides the validator used directly by Spring Boot configuration-properties binding.
  *
- * <p>The application currently uses Jakarta Bean Validation for configuration properties, not for
- * lazy JPA entity associations. Revisit this customization if entity validation is introduced.
+ * <p>Configuration properties are ordinary application configuration, not lazy JPA entities, so
+ * validation must not consult persistence reachability. Revisit this boundary if configuration
+ * validation is ever replaced with entity validation.
  */
 @Configuration(proxyBeanMethods = false)
 public class ValidationConfiguration {
 
-  @Bean
-  ValidationConfigurationCustomizer validationConfigurationCustomizer() {
-    return configuration -> configuration.traversableResolver(AlwaysTraversableResolver.INSTANCE);
+  @Bean(name = EnableConfigurationProperties.VALIDATOR_BEAN_NAME)
+  static LocalValidatorFactoryBean configurationPropertiesValidator() {
+    LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+    validator.setTraversableResolver(AlwaysTraversableResolver.INSTANCE);
+    return validator;
   }
 }

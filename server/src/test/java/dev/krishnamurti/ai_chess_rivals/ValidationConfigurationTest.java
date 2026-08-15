@@ -2,53 +2,66 @@ package dev.krishnamurti.ai_chess_rivals;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.krishnamurti.ai_chess_rivals.chess.config.ChessConfig;
 import dev.krishnamurti.ai_chess_rivals.chess.config.ChessProperties;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 class ValidationConfigurationTest {
 
   private final ApplicationContextRunner contextRunner =
       new ApplicationContextRunner()
-          .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
-          .withUserConfiguration(ValidationConfiguration.class);
+          .withConfiguration(
+              AutoConfigurations.of(
+                  ConfigurationPropertiesAutoConfiguration.class,
+                  ValidationAutoConfiguration.class))
+          .withUserConfiguration(ValidationConfiguration.class, ChessConfig.class)
+          .withPropertyValues(
+              "app.chess.stockfish.path=stockfish/stockfish",
+              "app.chess.stockfish.threads=1",
+              "app.chess.stockfish.hash-mb=16",
+              "app.chess.stockfish.startup-timeout-seconds=10",
+              "app.chess.stockfish.move-timeout-seconds=30",
+              "app.chess.stockfish.evaluation.depth=8",
+              "app.chess.stockfish.evaluation.move-time-millis=50",
+              "app.chess.stockfish.evaluation.major-gain-threshold-centipawns=200",
+              "app.chess.stockfish.evaluation.major-mistake-threshold-centipawns=200");
 
   @Test
-  void configuresAlwaysTraversableResolver() {
+  void exposesNativeSafeConfigurationPropertiesValidator() {
     contextRunner.run(
         context -> {
           assertThat(context).hasNotFailed();
-          ValidatorFactory validatorFactory = context.getBean(ValidatorFactory.class);
+          LocalValidatorFactoryBean validator =
+              context.getBean(
+                  EnableConfigurationProperties.VALIDATOR_BEAN_NAME,
+                  LocalValidatorFactoryBean.class);
 
-          assertThat(validatorFactory.getTraversableResolver())
+          assertThat(validator.getTraversableResolver())
               .isSameAs(AlwaysTraversableResolver.INSTANCE);
         });
   }
 
   @Test
-  void keepsNestedConfigurationValidationActive() {
+  void bindsValidNestedChessConfiguration() {
     contextRunner.run(
         context -> {
           assertThat(context).hasNotFailed();
-          Validator validator = context.getBean(Validator.class);
-          ChessProperties.Stockfish.Evaluation invalidEvaluation =
-              new ChessProperties.Stockfish.Evaluation(8, 50, 0, 200);
-          ChessProperties properties =
-              new ChessProperties(
-                  new ChessProperties.Stockfish(
-                      "stockfish/stockfish", 1, 16, 10, 30, invalidEvaluation));
-
-          Set<ConstraintViolation<ChessProperties>> violations = validator.validate(properties);
-
-          assertThat(violations)
-              .extracting(violation -> violation.getPropertyPath().toString())
-              .contains("stockfish.evaluation.majorGainThresholdCentipawns");
+          ChessProperties properties = context.getBean(ChessProperties.class);
+          assertThat(properties.stockfish().evaluation().majorGainThresholdCentipawns())
+              .isEqualTo(200);
         });
+  }
+
+  @Test
+  void rejectsInvalidNestedChessThresholdThroughConfigurationBinding() {
+    contextRunner
+        .withPropertyValues("app.chess.stockfish.evaluation.major-gain-threshold-centipawns=0")
+        .run(context -> assertThat(context).hasFailed());
   }
 }

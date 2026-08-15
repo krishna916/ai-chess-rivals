@@ -2,6 +2,7 @@ package dev.krishnamurti.ai_chess_rivals.ai.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.krishnamurti.ai_chess_rivals.ValidationConfiguration;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatGateway;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatRequest;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
@@ -28,7 +29,10 @@ class AiConfigurationContextTest {
                   ConfigurationPropertiesAutoConfiguration.class,
                   ValidationAutoConfiguration.class))
           .withUserConfiguration(
-              AiConfig.class, AiProviderConfiguration.class, AiGatewayConfiguration.class)
+              ValidationConfiguration.class,
+              AiConfig.class,
+              AiProviderConfiguration.class,
+              AiGatewayConfiguration.class)
           .withPropertyValues(
               "app.ai.groq.base-url=https://api.groq.com/openai/v1",
               "app.ai.groq.timeout=8s",

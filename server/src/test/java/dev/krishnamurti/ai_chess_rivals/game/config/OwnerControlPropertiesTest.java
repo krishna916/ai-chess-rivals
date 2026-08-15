@@ -2,6 +2,7 @@ package dev.krishnamurti.ai_chess_rivals.game.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.krishnamurti.ai_chess_rivals.ValidationConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
@@ -16,7 +17,7 @@ class OwnerControlPropertiesTest {
               AutoConfigurations.of(
                   ConfigurationPropertiesAutoConfiguration.class,
                   ValidationAutoConfiguration.class))
-          .withUserConfiguration(GameConfig.class)
+          .withUserConfiguration(ValidationConfiguration.class, GameConfig.class)
           .withPropertyValues(
               "app.game.move-think-time-millis=250",
               "app.game.max-plies=300",
