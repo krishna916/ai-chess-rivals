@@ -34,6 +34,7 @@ const allowed = {
 } as const;
 
 const snapshot = {
+  matchId: "match-1",
   sideToMove: "WHITE" as const,
   fen: "start",
   moves: [],
@@ -45,6 +46,7 @@ const snapshot = {
     allowed: false,
     blockedBy: "MATCH_ALREADY_RUNNING" as const,
   },
+  dialogue: [],
 };
 
 describe("MatchAdminControls", () => {

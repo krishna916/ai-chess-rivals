@@ -5,6 +5,7 @@ import type {
   MatchStreamMessage,
   MatchActivityItem,
   StartAvailability,
+  DialogueResponse,
 } from "../types/match";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -46,6 +47,8 @@ interface MatchViewerState {
   activeTurn: "WHITE" | "BLACK";
   moveCount: number;
   activities: MatchActivityItem[];
+  currentMatchId?: string;
+  dialogue: DialogueResponse[];
   result?: string;
   error?: string;
   startAvailability?: StartAvailability;
@@ -61,6 +64,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
   activeTurn: "WHITE",
   moveCount: 0,
   activities: [],
+  currentMatchId: undefined,
+  dialogue: [],
 
   setConnectionStatus: (status) =>
     set({
@@ -79,6 +84,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           result: undefined,
           moveCount: 0,
           activities: [],
+          currentMatchId: undefined,
+          dialogue: [],
           error: undefined,
           startAvailability: undefined,
         });
@@ -97,6 +104,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
               sequence: 0,
             },
           ],
+          currentMatchId: msg.payload.matchId,
+          dialogue: [],
         });
         break;
       case "MATCH_STATE": {
@@ -138,6 +147,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           moveCount: lastPly,
           result: msg.payload.result || undefined,
           activities,
+          currentMatchId: msg.payload.matchId,
+          dialogue: [...msg.payload.dialogue].sort((a, b) => a.id - b.id),
           startAvailability: msg.payload.startAvailability,
         });
         break;
@@ -176,6 +187,26 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
             activeTurn: msg.payload.player === "WHITE" ? "BLACK" : "WHITE",
             moveCount: msg.payload.ply,
             activities: updatedActivities,
+          };
+        });
+        break;
+      case "DIALOGUE_PLAYED":
+        set((state) => {
+          if (
+            state.currentMatchId !== undefined &&
+            msg.payload.matchId !== state.currentMatchId
+          ) {
+            return state;
+          }
+
+          const withoutDuplicate = state.dialogue.filter(
+            (line) => line.id !== msg.payload.id,
+          );
+          return {
+            currentMatchId: state.currentMatchId ?? msg.payload.matchId,
+            dialogue: [...withoutDuplicate, msg.payload].sort(
+              (a, b) => a.id - b.id,
+            ),
           };
         });
         break;

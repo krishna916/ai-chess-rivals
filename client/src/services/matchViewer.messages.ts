@@ -19,6 +19,23 @@ function isSnapshotMove(value: unknown): boolean {
   );
 }
 
+function isDialogue(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === "number" &&
+    typeof value.matchId === "string" &&
+    typeof value.triggerType === "string" &&
+    typeof value.triggerPly === "number" &&
+    typeof value.personalityKey === "string" &&
+    typeof value.personalityDisplayName === "string" &&
+    typeof value.text === "string" &&
+    typeof value.emotion === "string" &&
+    typeof value.reactionType === "string" &&
+    typeof value.source === "string" &&
+    typeof value.createdAt === "string"
+  );
+}
+
 function isStartAvailability(value: unknown): boolean {
   if (!isRecord(value)) return false;
   const validBlockReasons = [
@@ -44,6 +61,7 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
     "MATCH_STATE",
     "MATCH_STARTED",
     "MOVE_PLAYED",
+    "DIALOGUE_PLAYED",
     "MATCH_STOPPED",
     "MATCH_FINISHED",
     "NO_MATCH",
@@ -58,6 +76,7 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
     case "MATCH_STARTED":
       if (
         !hasFen(msg.payload) ||
+        typeof msg.payload.matchId !== "string" ||
         (msg.payload.sideToMove !== "WHITE" &&
           msg.payload.sideToMove !== "BLACK")
       ) {
@@ -67,14 +86,22 @@ export function parseMatchMessage(data: unknown): MatchStreamMessage | null {
     case "MATCH_STATE":
       if (
         !hasFen(msg.payload) ||
+        typeof msg.payload.matchId !== "string" ||
         (msg.payload.sideToMove !== "WHITE" &&
           msg.payload.sideToMove !== "BLACK") ||
         !Array.isArray(msg.payload.moves) ||
         !msg.payload.moves.every(isSnapshotMove) ||
+        !Array.isArray(msg.payload.dialogue) ||
+        !msg.payload.dialogue.every(isDialogue) ||
         typeof msg.payload.status !== "string" ||
         typeof msg.payload.running !== "boolean" ||
         !isStartAvailability(msg.payload.startAvailability)
       ) {
+        return null;
+      }
+      break;
+    case "DIALOGUE_PLAYED":
+      if (!isDialogue(msg.payload)) {
         return null;
       }
       break;
