@@ -214,13 +214,25 @@ describe("MatchAdminControls", () => {
   });
 
   it("resumes a stopped match with stored identities when roster loading fails", async () => {
+    const storedWhite = { key: "stored-white", displayName: "Stored White" };
+    const storedBlack = { key: "stored-black", displayName: "Stored Black" };
+
     vi.mocked(personalityApi.listSelectable).mockRejectedValue(
       new Error("offline"),
     );
     useMatchViewerStore.setState({
       matchStatus: "STOPPED",
-      whitePersonality: { key: "stored-white", displayName: "Stored White" },
-      blackPersonality: { key: "stored-black", displayName: "Stored Black" },
+      startAvailability: allowed,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+    });
+    vi.mocked(matchApi.getCurrentMatch).mockResolvedValue({
+      ...snapshot,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+      running: false,
+      status: "STOPPED",
+      startAvailability: allowed,
     });
     vi.mocked(adminMatchApi.startMatch).mockResolvedValue(snapshot);
     render(
@@ -241,6 +253,45 @@ describe("MatchAdminControls", () => {
         blackPersonalityKey: "stored-black",
       }),
     );
+  });
+
+  it("keeps Resume disabled while the server blocks a stopped match", () => {
+    const blocked = {
+      ...allowed,
+      allowed: false,
+      blockedBy: "MATCH_COOLDOWN_ACTIVE" as const,
+      retryAfterSeconds: 60,
+    };
+    const storedWhite = { key: "stored-white", displayName: "Stored White" };
+    const storedBlack = { key: "stored-black", displayName: "Stored Black" };
+
+    useMatchViewerStore.setState({
+      matchStatus: "STOPPED",
+      startAvailability: blocked,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+    });
+    vi.mocked(matchApi.getCurrentMatch).mockResolvedValue({
+      ...snapshot,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+      running: false,
+      status: "STOPPED",
+      startAvailability: blocked,
+    });
+
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    const resume = screen.getByRole("button", { name: "Resume Match" });
+    expect(resume).toBeDisabled();
+    fireEvent.click(resume);
+    expect(adminMatchApi.startMatch).not.toHaveBeenCalled();
   });
 
   it("shows pending Stop and sends one stop request", async () => {

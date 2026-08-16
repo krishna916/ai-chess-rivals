@@ -213,12 +213,17 @@ export function MatchAdminControls({
           blackPersonalityKey: blackPersonality.key,
         }
       : { whitePersonalityKey, blackPersonalityKey };
+  const canResume =
+    stopped &&
+    startAvailability?.allowed === true &&
+    whitePersonality !== undefined &&
+    blackPersonality !== undefined;
   const canCreateNewMatch =
     !rosterLoading &&
     rosterError === undefined &&
     roster.length >= 2 &&
     validSelection;
-  const canStartOrResume = stopped || canCreateNewMatch;
+  const canStartOrResume = stopped ? canResume : canCreateNewMatch;
   const cooldownSeconds =
     cooldownCountdown &&
     cooldownCountdown.sourceSeconds === startAvailability?.retryAfterSeconds
