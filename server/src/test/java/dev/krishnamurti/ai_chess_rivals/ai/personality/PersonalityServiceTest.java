@@ -3,8 +3,10 @@ package dev.krishnamurti.ai_chess_rivals.ai.personality;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import dev.krishnamurti.ai_chess_rivals.ai.api.SelectablePersonality;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -75,6 +77,36 @@ class PersonalityServiceTest {
             () -> new PersonalityService(personalityRepository).requirePromptProfile("missing"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unknown selectable personality: missing");
+  }
+
+  @Test
+  void findsSelectablePersonalityByStableKey() {
+    PersonalityEntity blaze = personality("blaze", "Blaze", 10, true, true);
+    when(personalityRepository.findByPersonalityKeyAndSystemTrueAndActiveTrue("blaze"))
+        .thenReturn(Optional.of(blaze));
+
+    PersonalityService service = new PersonalityService(personalityRepository);
+
+    assertThat(service.findSelectable("blaze"))
+        .contains(new SelectablePersonality("blaze", "Blaze"));
+  }
+
+  @Test
+  void returnsEmptyWhenPersonalityIsNotSelectable() {
+    when(personalityRepository.findByPersonalityKeyAndSystemTrueAndActiveTrue("retired"))
+        .thenReturn(Optional.empty());
+
+    PersonalityService service = new PersonalityService(personalityRepository);
+
+    assertThat(service.findSelectable("retired")).isEmpty();
+  }
+
+  @Test
+  void returnsEmptyForBlankLookupKey() {
+    PersonalityService service = new PersonalityService(personalityRepository);
+
+    assertThat(service.findSelectable(" ")).isEmpty();
+    verifyNoInteractions(personalityRepository);
   }
 
   private static PersonalityEntity personality(
