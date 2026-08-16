@@ -206,6 +206,13 @@ export function MatchAdminControls({
     whitePersonalityKey !== "" &&
     blackPersonalityKey !== "" &&
     whitePersonalityKey !== blackPersonalityKey;
+  const startRequest =
+    stopped && whitePersonality && blackPersonality
+      ? {
+          whitePersonalityKey: whitePersonality.key,
+          blackPersonalityKey: blackPersonality.key,
+        }
+      : { whitePersonalityKey, blackPersonalityKey };
   const canCreateNewMatch =
     !rosterLoading &&
     rosterError === undefined &&
@@ -305,10 +312,7 @@ export function MatchAdminControls({
               disabled={isPending || !canStartOrResume}
               onClick={() =>
                 void runOperation("start", (ownerToken) =>
-                  adminMatchApi.startMatch(ownerToken, {
-                    whitePersonalityKey,
-                    blackPersonalityKey,
-                  }),
+                  adminMatchApi.startMatch(ownerToken, startRequest),
                 )
               }
             >

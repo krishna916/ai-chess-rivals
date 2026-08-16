@@ -231,7 +231,7 @@ describe("MatchAdminControls", () => {
       />,
     );
 
-    const resume = await screen.findByRole("button", { name: "Resume Match" });
+    const resume = screen.getByRole("button", { name: "Resume Match" });
     expect(resume).not.toBeDisabled();
     fireEvent.click(resume);
 
