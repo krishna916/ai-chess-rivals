@@ -94,11 +94,9 @@ class MatchStreamMessageMapperTest {
     MatchStartedMessage payload = (MatchStartedMessage) message.payload();
     assertEquals(matchId, payload.matchId());
     assertEquals(
-        new MatchPersonalityResponse("white-test", "White Test"),
-        payload.whitePersonality());
+        new MatchPersonalityResponse("white-test", "White Test"), payload.whitePersonality());
     assertEquals(
-        new MatchPersonalityResponse("black-test", "Black Test"),
-        payload.blackPersonality());
+        new MatchPersonalityResponse("black-test", "Black Test"), payload.blackPersonality());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(BoardPosition.STARTING_POSITION.fen(), payload.fen());
   }
