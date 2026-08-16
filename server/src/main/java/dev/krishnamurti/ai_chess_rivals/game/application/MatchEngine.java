@@ -19,7 +19,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -34,9 +36,11 @@ public final class MatchEngine {
   private final MatchPacing matchPacing;
   private final MatchEventSink matchEventSink;
   private final ChessEvaluationService chessEvaluationService;
+  private final MatchDialogueCoordinator matchDialogueCoordinator;
   private final int maxPlies;
   private final AtomicReference<Match> currentMatch = new AtomicReference<>();
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
+  private final AtomicLong executionGeneration = new AtomicLong();
   private final AtomicReference<EvaluationBaseline> evaluationBaseline = new AtomicReference<>();
 
   public MatchEngine(
@@ -45,7 +49,8 @@ public final class MatchEngine {
       GameProperties gameProperties,
       MatchPacing matchPacing,
       MatchEventSink matchEventSink,
-      ChessEvaluationService chessEvaluationService) {
+      ChessEvaluationService chessEvaluationService,
+      MatchDialogueCoordinator matchDialogueCoordinator) {
     this.chessPlayer = Objects.requireNonNull(chessPlayer, "chessPlayer must not be null");
     this.chessBoardService =
         Objects.requireNonNull(chessBoardService, "chessBoardService must not be null");
@@ -54,6 +59,9 @@ public final class MatchEngine {
     this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
     this.chessEvaluationService =
         Objects.requireNonNull(chessEvaluationService, "chessEvaluationService must not be null");
+    this.matchDialogueCoordinator =
+        Objects.requireNonNull(
+            matchDialogueCoordinator, "matchDialogueCoordinator must not be null");
     this.maxPlies = gameProperties.maxPlies();
   }
 
@@ -78,7 +86,8 @@ public final class MatchEngine {
             evaluation ->
                 evaluationBaseline.set(new EvaluationBaseline(0, startingFen, evaluation)));
     try {
-      matchEventSink.publish(new MatchStarted(match.sideToMove(), match.currentPosition()));
+      matchEventSink.publish(
+          new MatchStarted(match.id(), match.sideToMove(), match.currentPosition()));
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to publish match start event", e);
     }
@@ -91,12 +100,22 @@ public final class MatchEngine {
     if (match == null) {
       match = startNewMatch();
     }
+    long generation = executionGeneration.incrementAndGet();
     stopRequested.set(false);
     Map<String, Integer> positionOccurrences = buildPositionOccurrences(match);
 
+    if (match.moveCount() == 0) {
+      Match startMatch = match;
+      safeDialogue(
+          () ->
+              matchDialogueCoordinator.onGameStart(
+                  startMatch.id(),
+                  () -> isDialogueAuthorityCurrent(generation, startMatch.id(), 0)));
+    }
+
     while (match.isInProgress() && !stopRequested.get()) {
       if (match.moveCount() >= maxPlies) {
-        match = finishMatch(match, GameResult.DRAW);
+        match = finishMatch(match, GameResult.DRAW, generation);
         break;
       }
 
@@ -123,14 +142,25 @@ public final class MatchEngine {
         Optional<EvaluationSwing> evaluationSwing =
             beforeEvaluation.flatMap(
                 before -> afterEvaluation.flatMap(after -> safeCompare(before, after)));
-        matchEventSink.publish(
+        MovePlayed movePlayed =
             new MovePlayed(
                 recordedMove.sequenceNumber(),
                 player,
                 recordedMove.notation(),
                 recordedMove.positionAfterMove(),
                 recordedMove.details(),
-                evaluationSwing));
+                evaluationSwing);
+        matchEventSink.publish(movePlayed);
+        Match dialogueMatch = match;
+        int dialoguePly = recordedMove.sequenceNumber();
+        safeDialogue(
+            () ->
+                matchDialogueCoordinator.onMove(
+                    dialogueMatch.id(),
+                    movePlayed,
+                    () ->
+                        isDialogueAuthorityCurrent(
+                            generation, dialogueMatch.id(), dialoguePly)));
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         result =
@@ -143,7 +173,7 @@ public final class MatchEngine {
       }
 
       if (result != null) {
-        match = finishMatch(match, result);
+        match = finishMatch(match, result, generation);
       } else if (!stopRequested.get() && !waitBeforeNextMove(ply)) {
         break;
       }
@@ -161,6 +191,7 @@ public final class MatchEngine {
   }
 
   public void stopCurrentMatch() {
+    executionGeneration.incrementAndGet();
     if (stopRequested.compareAndSet(false, true)) {
       Match match = currentMatch.get();
       if (match != null && match.isInProgress()) {
@@ -184,12 +215,38 @@ public final class MatchEngine {
     }
   }
 
-  private Match finishMatch(Match match, GameResult result) {
+  private Match finishMatch(Match match, GameResult result, long generation) {
     Match finishedMatch = match.finish(result);
+    currentMatch.set(finishedMatch);
+    safeDialogue(
+        ()
+            ->
+                matchDialogueCoordinator.onGameEnd(
+                    finishedMatch.id(),
+                    result,
+                    finishedMatch.moveCount(),
+                    () ->
+                        isDialogueAuthorityCurrent(
+                            generation, finishedMatch.id(), finishedMatch.moveCount())));
     matchEventSink.publish(
         new MatchFinished(result, finishedMatch.currentPosition(), finishedMatch.moveCount()));
-    currentMatch.set(finishedMatch);
     return finishedMatch;
+  }
+
+  private boolean isDialogueAuthorityCurrent(long generation, UUID matchId, int expectedPly) {
+    Match authoritative = currentMatch.get();
+    return executionGeneration.get() == generation
+        && authoritative != null
+        && authoritative.id().equals(matchId)
+        && authoritative.moveCount() == expectedPly;
+  }
+
+  private void safeDialogue(Runnable action) {
+    try {
+      action.run();
+    } catch (RuntimeException exception) {
+      log.warn("Dialogue workflow failed; chess execution will continue", exception);
+    }
   }
 
   private Map<String, Integer> buildPositionOccurrences(Match match) {

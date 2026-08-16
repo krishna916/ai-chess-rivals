@@ -19,6 +19,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class MatchStreamMessageMapperTest {
@@ -68,7 +69,8 @@ class MatchStreamMessageMapperTest {
 
   @Test
   void mapsMatchStartedEventToExplicitPayload() {
-    MatchStarted event = new MatchStarted(PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
+    MatchStarted event =
+        new MatchStarted(UUID.randomUUID(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
 
     MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(event);
 
