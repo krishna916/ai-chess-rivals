@@ -4,8 +4,10 @@ import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
 import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
+import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MatchRivalry;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Move;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
@@ -65,7 +67,8 @@ public final class MatchEngine {
     this.maxPlies = gameProperties.maxPlies();
   }
 
-  public synchronized Match startNewMatch() {
+  public synchronized Match startNewMatch(MatchRivalry rivalry) {
+    Objects.requireNonNull(rivalry, "rivalry must not be null");
     Match existingMatch = currentMatch.get();
     if (existingMatch != null && existingMatch.isInProgress()) {
       throw new IllegalStateException(
@@ -73,7 +76,7 @@ public final class MatchEngine {
     }
 
     stopRequested.set(false);
-    Match match = Match.newGame();
+    Match match = Match.newGame(rivalry);
     try {
       chessPlayer.startNewGame();
     } catch (RuntimeException e) {
@@ -87,7 +90,8 @@ public final class MatchEngine {
                 evaluationBaseline.set(new EvaluationBaseline(0, startingFen, evaluation)));
     try {
       matchEventSink.publish(
-          new MatchStarted(match.id(), match.sideToMove(), match.currentPosition()));
+          new MatchStarted(
+              match.id(), match.sideToMove(), match.currentPosition(), match.rivalry()));
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to publish match start event", e);
     }
@@ -98,7 +102,7 @@ public final class MatchEngine {
   public synchronized Match playUntilFinished() {
     Match match = currentMatch.get();
     if (match == null) {
-      match = startNewMatch();
+      throw new IllegalStateException("No match has been started");
     }
     long generation = executionGeneration.incrementAndGet();
     stopRequested.set(false);
@@ -110,6 +114,7 @@ public final class MatchEngine {
           () ->
               matchDialogueCoordinator.onGameStart(
                   startMatch.id(),
+                  startMatch.rivalry(),
                   () -> isDialogueAuthorityCurrent(generation, startMatch.id(), 0)));
     }
 
@@ -157,6 +162,7 @@ public final class MatchEngine {
             () ->
                 matchDialogueCoordinator.onMove(
                     dialogueMatch.id(),
+                    dialogueMatch.rivalry(),
                     movePlayed,
                     () -> isDialogueAuthorityCurrent(generation, dialogueMatch.id(), dialoguePly)));
         int currentPositionOccurrences =
@@ -220,6 +226,7 @@ public final class MatchEngine {
         () ->
             matchDialogueCoordinator.onGameEnd(
                 finishedMatch.id(),
+                finishedMatch.rivalry(),
                 result,
                 finishedMatch.moveCount(),
                 () ->
@@ -248,8 +255,8 @@ public final class MatchEngine {
 
   private Map<String, Integer> buildPositionOccurrences(Match match) {
     Map<String, Integer> positionOccurrences = new HashMap<>();
-    recordPositionOccurrence(positionOccurrences, Match.newGame().currentPosition());
-    for (dev.krishnamurti.ai_chess_rivals.game.domain.Move move : match.moves()) {
+    recordPositionOccurrence(positionOccurrences, BoardPosition.STARTING_POSITION);
+    for (Move move : match.moves()) {
       recordPositionOccurrence(positionOccurrences, move.positionAfterMove());
     }
     return positionOccurrences;

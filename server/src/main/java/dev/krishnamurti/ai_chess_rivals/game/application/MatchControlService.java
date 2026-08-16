@@ -1,6 +1,9 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
+import dev.krishnamurti.ai_chess_rivals.ai.api.SelectablePersonality;
+import dev.krishnamurti.ai_chess_rivals.ai.api.SelectablePersonalityCatalog;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MatchRivalry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
@@ -15,6 +18,7 @@ public final class MatchControlService {
 
   private final MatchEngine matchEngine;
   private final MatchDialogueCoordinator matchDialogueCoordinator;
+  private final SelectablePersonalityCatalog personalityCatalog;
   private final ExecutorService matchExecutor;
   private final MatchExecutionGuard executionGuard;
   private final AtomicReference<Future<?>> activeTask = new AtomicReference<>();
@@ -24,15 +28,18 @@ public final class MatchControlService {
   public MatchControlService(
       MatchEngine matchEngine,
       MatchDialogueCoordinator matchDialogueCoordinator,
+      SelectablePersonalityCatalog personalityCatalog,
       @Qualifier("matchExecutor") ExecutorService matchExecutor,
       MatchExecutionGuard executionGuard) {
     this.matchEngine = matchEngine;
     this.matchDialogueCoordinator = matchDialogueCoordinator;
+    this.personalityCatalog = personalityCatalog;
     this.matchExecutor = matchExecutor;
     this.executionGuard = executionGuard;
   }
 
-  public synchronized MatchSnapshot startMatch() {
+  public synchronized MatchSnapshot startMatch(
+      String whitePersonalityKey, String blackPersonalityKey) {
     MatchExecutionGuard.StartReservation reservation = executionGuard.reserveStart();
 
     try {
@@ -46,7 +53,10 @@ public final class MatchControlService {
       }
 
       if (!hasMatch || match.isFinished()) {
-        match = matchEngine.startNewMatch();
+        MatchRivalry rivalry = resolveNewRivalry(whitePersonalityKey, blackPersonalityKey);
+        match = matchEngine.startNewMatch(rivalry);
+      } else {
+        requireSameRivalry(match.rivalry(), whitePersonalityKey, blackPersonalityKey);
       }
 
       long taskId = nextTaskId.incrementAndGet();
@@ -121,5 +131,40 @@ public final class MatchControlService {
         executionGuard.isRunning(),
         executionGuard.availability(),
         matchDialogueCoordinator.history(match.id()));
+  }
+
+  private MatchRivalry resolveNewRivalry(String whiteKey, String blackKey) {
+    if (whiteKey == null || whiteKey.isBlank() || blackKey == null || blackKey.isBlank()) {
+      throw new InvalidPersonalitySelectionException(
+          "White and Black personality selections are required.");
+    }
+    if (whiteKey.equals(blackKey)) {
+      throw new InvalidPersonalitySelectionException(
+          "White and Black personalities must be distinct.");
+    }
+
+    SelectablePersonality white =
+        personalityCatalog
+            .findSelectable(whiteKey)
+            .orElseThrow(
+                () ->
+                    new InvalidPersonalitySelectionException(
+                        "Unknown or inactive White personality: " + whiteKey));
+    SelectablePersonality black =
+        personalityCatalog
+            .findSelectable(blackKey)
+            .orElseThrow(
+                () ->
+                    new InvalidPersonalitySelectionException(
+                        "Unknown or inactive Black personality: " + blackKey));
+
+    return new MatchRivalry(white.key(), white.displayName(), black.key(), black.displayName());
+  }
+
+  private void requireSameRivalry(MatchRivalry rivalry, String whiteKey, String blackKey) {
+    if (!rivalry.whiteKey().equals(whiteKey) || !rivalry.blackKey().equals(blackKey)) {
+      throw new InvalidPersonalitySelectionException(
+          "A stopped match must resume with its original personalities.");
+    }
   }
 }

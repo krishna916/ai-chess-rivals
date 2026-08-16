@@ -6,6 +6,7 @@ import type {
   MatchActivityItem,
   StartAvailability,
   DialogueResponse,
+  MatchPersonality,
 } from "../types/match";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -48,6 +49,8 @@ interface MatchViewerState {
   moveCount: number;
   activities: MatchActivityItem[];
   currentMatchId?: string;
+  whitePersonality?: MatchPersonality;
+  blackPersonality?: MatchPersonality;
   dialogue: DialogueResponse[];
   result?: string;
   error?: string;
@@ -85,6 +88,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           moveCount: 0,
           activities: [],
           currentMatchId: undefined,
+          whitePersonality: undefined,
+          blackPersonality: undefined,
           dialogue: [],
           error: undefined,
           startAvailability: undefined,
@@ -105,6 +110,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
             },
           ],
           currentMatchId: msg.payload.matchId,
+          whitePersonality: msg.payload.whitePersonality,
+          blackPersonality: msg.payload.blackPersonality,
           dialogue: [],
         });
         break;
@@ -148,6 +155,8 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           result: msg.payload.result || undefined,
           activities,
           currentMatchId: msg.payload.matchId,
+          whitePersonality: msg.payload.whitePersonality,
+          blackPersonality: msg.payload.blackPersonality,
           dialogue: [...msg.payload.dialogue].sort((a, b) => a.id - b.id),
           startAvailability: msg.payload.startAvailability,
         });

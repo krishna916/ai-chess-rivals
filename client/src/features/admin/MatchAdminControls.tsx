@@ -10,9 +10,12 @@ import {
 import { useMatchStream } from "@/hooks/useMatchStream";
 import { adminMatchApi } from "@/services/adminMatchApi";
 import { matchApi } from "@/services/matchApi";
+import { personalityApi } from "@/services/personalityApi";
 import { useMatchViewerStore } from "@/store/matchViewerStore";
-import type { MatchResponse } from "@/types/match";
+import type { MatchResponse, PersonalityRosterItem } from "@/types/match";
 import { clearOwnerToken } from "./ownerToken";
+import { RivalrySetup } from "./RivalrySetup";
+import { randomizeRivalry } from "./rivalrySelection";
 
 interface MatchAdminControlsProps {
   token: string;
@@ -39,14 +42,24 @@ export function MatchAdminControls({
   onUnauthorized,
 }: MatchAdminControlsProps) {
   useMatchStream();
-  const { matchStatus, startAvailability, processMessage } =
-    useMatchViewerStore();
+  const {
+    matchStatus,
+    startAvailability,
+    processMessage,
+    whitePersonality,
+    blackPersonality,
+  } = useMatchViewerStore();
   const [pendingAction, setPendingAction] = useState<"start" | "stop">();
   const [requestError, setRequestError] = useState<string>();
   const [cooldownCountdown, setCooldownCountdown] = useState<{
     sourceSeconds: number;
     remainingSeconds: number;
   }>();
+  const [roster, setRoster] = useState<PersonalityRosterItem[]>([]);
+  const [rosterLoading, setRosterLoading] = useState(true);
+  const [rosterError, setRosterError] = useState<string>();
+  const [whitePersonalityKey, setWhitePersonalityKey] = useState("");
+  const [blackPersonalityKey, setBlackPersonalityKey] = useState("");
 
   const hydrate = useCallback(
     (snapshot: MatchResponse) =>
@@ -61,6 +74,67 @@ export function MatchAdminControls({
       // The live stream remains authoritative if a refresh races the backend.
     }
   }, [hydrate]);
+
+  const loadRoster = useCallback(async () => {
+    setRosterLoading(true);
+    setRosterError(undefined);
+    try {
+      const loaded = await personalityApi.listSelectable();
+      setRoster(loaded);
+      if (loaded.length < 2) {
+        setRosterError(
+          "At least two active personalities are required to start a rivalry.",
+        );
+      }
+    } catch {
+      setRoster([]);
+      setRosterError("Unable to load personalities. Please try again.");
+    } finally {
+      setRosterLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadRoster(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadRoster]);
+
+  useEffect(() => {
+    if (
+      (matchStatus === "IN_PROGRESS" || matchStatus === "STOPPED") &&
+      whitePersonality &&
+      blackPersonality
+    ) {
+      const timer = window.setTimeout(() => {
+        setWhitePersonalityKey(whitePersonality.key);
+        setBlackPersonalityKey(blackPersonality.key);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    if (roster.length < 2) return;
+
+    const keys = new Set(roster.map((item) => item.key));
+    const currentPairIsUsable =
+      keys.has(whitePersonalityKey) &&
+      keys.has(blackPersonalityKey) &&
+      whitePersonalityKey !== blackPersonalityKey;
+
+    if (!currentPairIsUsable) {
+      const timer = window.setTimeout(() => {
+        setWhitePersonalityKey(roster[0].key);
+        setBlackPersonalityKey(roster[1].key);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [
+    matchStatus,
+    whitePersonality,
+    blackPersonality,
+    roster,
+    whitePersonalityKey,
+    blackPersonalityKey,
+  ]);
 
   useEffect(() => {
     if (
@@ -120,11 +194,24 @@ export function MatchAdminControls({
   };
 
   const running = matchStatus === "IN_PROGRESS";
+  const stopped = matchStatus === "STOPPED";
   const showStart =
     !running &&
-    (startAvailability?.allowed === true ||
+    (stopped ||
+      startAvailability?.allowed === true ||
       (matchStatus === "IDLE" && startAvailability === undefined));
   const isPending = pendingAction !== undefined;
+  const rivalryLocked = running || stopped;
+  const validSelection =
+    whitePersonalityKey !== "" &&
+    blackPersonalityKey !== "" &&
+    whitePersonalityKey !== blackPersonalityKey;
+  const canCreateNewMatch =
+    !rosterLoading &&
+    rosterError === undefined &&
+    roster.length >= 2 &&
+    validSelection;
+  const canStartOrResume = stopped || canCreateNewMatch;
   const cooldownSeconds =
     cooldownCountdown &&
     cooldownCountdown.sourceSeconds === startAvailability?.retryAfterSeconds
@@ -165,16 +252,73 @@ export function MatchAdminControls({
           </p>
         )}
 
+        {rosterLoading && (
+          <p className="text-sm text-muted-foreground">
+            Loading personalities…
+          </p>
+        )}
+
+        {rosterError && !stopped && (
+          <div className="space-y-2" role="alert">
+            <p className="text-sm text-destructive">{rosterError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void loadRoster()}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {stopped &&
+          whitePersonality &&
+          blackPersonality &&
+          roster.length < 2 && (
+            <p className="text-sm text-muted-foreground">
+              Current rivalry: {whitePersonality.displayName} vs{" "}
+              {blackPersonality.displayName}
+            </p>
+          )}
+
+        {roster.length >= 2 && (
+          <RivalrySetup
+            roster={roster}
+            whitePersonalityKey={whitePersonalityKey}
+            blackPersonalityKey={blackPersonalityKey}
+            disabled={rivalryLocked || isPending}
+            onWhiteChange={setWhitePersonalityKey}
+            onBlackChange={setBlackPersonalityKey}
+            onRandomize={() => {
+              const next = randomizeRivalry(roster);
+              setWhitePersonalityKey(next.whitePersonalityKey);
+              setBlackPersonalityKey(next.blackPersonalityKey);
+            }}
+          />
+        )}
+
         <div className="flex gap-2" aria-live="polite">
           {showStart && (
             <Button
               type="button"
-              disabled={isPending}
+              disabled={isPending || !canStartOrResume}
               onClick={() =>
-                void runOperation("start", adminMatchApi.startMatch)
+                void runOperation("start", (ownerToken) =>
+                  adminMatchApi.startMatch(ownerToken, {
+                    whitePersonalityKey,
+                    blackPersonalityKey,
+                  }),
+                )
               }
             >
-              {pendingAction === "start" ? "Starting…" : "Start Match"}
+              {pendingAction === "start"
+                ? stopped
+                  ? "Resuming…"
+                  : "Starting…"
+                : stopped
+                  ? "Resume Match"
+                  : "Start Match"}
             </Button>
           )}
           {running && (

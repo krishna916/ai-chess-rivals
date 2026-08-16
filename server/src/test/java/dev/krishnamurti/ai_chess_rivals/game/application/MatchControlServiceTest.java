@@ -3,11 +3,15 @@ package dev.krishnamurti.ai_chess_rivals.game.application;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import dev.krishnamurti.ai_chess_rivals.ai.api.SelectablePersonality;
+import dev.krishnamurti.ai_chess_rivals.ai.api.SelectablePersonalityCatalog;
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -27,6 +31,7 @@ class MatchControlServiceTest {
   private MatchControlService service;
   private MatchExecutionGuard guard;
   private MatchDialogueCoordinator matchDialogueCoordinator;
+  private SelectablePersonalityCatalog personalityCatalog;
   private Match match;
   private Future<Object> activeTask;
 
@@ -38,9 +43,12 @@ class MatchControlServiceTest {
     doReturn(activeTask).when(executorService).submit(any(Runnable.class));
     guard = new MatchExecutionGuard(fixedClock(), Duration.ZERO, 12);
     matchDialogueCoordinator = mock(MatchDialogueCoordinator.class);
+    personalityCatalog = mock(SelectablePersonalityCatalog.class);
+    allowTestRivalry();
     service =
-        new MatchControlService(matchEngine, matchDialogueCoordinator, executorService, guard);
-    match = Match.newGame();
+        new MatchControlService(
+            matchEngine, matchDialogueCoordinator, personalityCatalog, executorService, guard);
+    match = TestMatchFixtures.newMatch();
   }
 
   @Test
@@ -60,15 +68,70 @@ class MatchControlServiceTest {
   @Test
   void startMatchWhenNoMatchExistsCreatesAndRunsMatch() {
     when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
-    when(matchEngine.startNewMatch()).thenReturn(match);
+    when(matchEngine.startNewMatch(any())).thenReturn(match);
 
-    MatchSnapshot snapshot = service.startMatch();
+    MatchSnapshot snapshot = service.startMatch("white-test", "black-test");
 
     assertTrue(snapshot.running());
     assertEquals(match, snapshot.match());
 
-    verify(matchEngine).startNewMatch();
+    verify(matchEngine).startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     verify(executorService).submit(any(Runnable.class));
+  }
+
+  @Test
+  void startMatchRejectsMissingPersonalitySelectionsBeforeCreatingMatch() {
+    when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
+
+    InvalidPersonalitySelectionException error =
+        assertThrows(
+            InvalidPersonalitySelectionException.class, () -> service.startMatch("", "black-test"));
+
+    assertEquals("White and Black personality selections are required.", error.getMessage());
+    verify(matchEngine, never()).startNewMatch(any());
+    verifyNoInteractions(personalityCatalog);
+  }
+
+  @Test
+  void startMatchRejectsDuplicatePersonalitiesBeforeCatalogLookup() {
+    when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
+
+    InvalidPersonalitySelectionException error =
+        assertThrows(
+            InvalidPersonalitySelectionException.class,
+            () -> service.startMatch("white-test", "white-test"));
+
+    assertEquals("White and Black personalities must be distinct.", error.getMessage());
+    verify(matchEngine, never()).startNewMatch(any());
+    verifyNoInteractions(personalityCatalog);
+  }
+
+  @Test
+  void startMatchRejectsUnknownWhitePersonality() {
+    when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
+    when(personalityCatalog.findSelectable("missing-white")).thenReturn(Optional.empty());
+
+    InvalidPersonalitySelectionException error =
+        assertThrows(
+            InvalidPersonalitySelectionException.class,
+            () -> service.startMatch("missing-white", "black-test"));
+
+    assertEquals("Unknown or inactive White personality: missing-white", error.getMessage());
+    verify(matchEngine, never()).startNewMatch(any());
+  }
+
+  @Test
+  void startMatchRejectsUnknownBlackPersonality() {
+    when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
+    when(personalityCatalog.findSelectable("missing-black")).thenReturn(Optional.empty());
+
+    InvalidPersonalitySelectionException error =
+        assertThrows(
+            InvalidPersonalitySelectionException.class,
+            () -> service.startMatch("white-test", "missing-black"));
+
+    assertEquals("Unknown or inactive Black personality: missing-black", error.getMessage());
+    verify(matchEngine, never()).startNewMatch(any());
   }
 
   @Test
@@ -76,13 +139,30 @@ class MatchControlServiceTest {
     // Stopped in-progress match exists
     when(matchEngine.currentMatch()).thenReturn(match);
 
-    MatchSnapshot snapshot = service.startMatch();
+    MatchSnapshot snapshot = service.startMatch("white-test", "black-test");
 
     assertTrue(snapshot.running());
     assertEquals(match, snapshot.match());
 
-    verify(matchEngine, never()).startNewMatch();
+    verify(matchEngine, never()).startNewMatch(any());
     verify(executorService).submit(any(Runnable.class));
+    verifyNoInteractions(personalityCatalog);
+  }
+
+  @Test
+  void stoppedMatchRejectsChangedPersonalitiesWithoutRosterLookup() {
+    when(matchEngine.currentMatch()).thenReturn(match);
+
+    InvalidPersonalitySelectionException error =
+        assertThrows(
+            InvalidPersonalitySelectionException.class,
+            () -> service.startMatch("black-test", "white-test"));
+
+    assertEquals(
+        "A stopped match must resume with its original personalities.", error.getMessage());
+    verify(matchEngine, never()).startNewMatch(any());
+    verify(executorService, never()).submit(any(Runnable.class));
+    verifyNoInteractions(personalityCatalog);
   }
 
   @Test
@@ -90,32 +170,34 @@ class MatchControlServiceTest {
     Match finishedMatch = mock(Match.class);
     when(finishedMatch.isFinished()).thenReturn(true);
     when(matchEngine.currentMatch()).thenReturn(finishedMatch);
-    when(matchEngine.startNewMatch()).thenReturn(match);
+    when(matchEngine.startNewMatch(any())).thenReturn(match);
 
-    MatchSnapshot snapshot = service.startMatch();
+    MatchSnapshot snapshot = service.startMatch("white-test", "black-test");
 
     assertTrue(snapshot.running());
     assertEquals(match, snapshot.match());
 
-    verify(matchEngine).startNewMatch();
+    verify(matchEngine).startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     verify(executorService).submit(any(Runnable.class));
   }
 
   @Test
   void startMatchWhenAlreadyRunningThrowsConflict() {
     when(matchEngine.currentMatch()).thenReturn(match);
-    service.startMatch(); // Sets running to true
+    service.startMatch("white-test", "black-test"); // Sets running to true
 
-    assertThrows(MatchConflictException.class, () -> service.startMatch());
+    assertThrows(
+        MatchConflictException.class, () -> service.startMatch("white-test", "black-test"));
   }
 
   @Test
   void stopMatchDelegatesToStopCurrentAndReturnsStoppedSnapshot() {
     when(matchEngine.currentMatch()).thenReturn(match);
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     MatchSnapshot snapshot = service.stopMatch();
-    MatchSnapshot restartedSnapshot = assertDoesNotThrow(() -> service.startMatch());
+    MatchSnapshot restartedSnapshot =
+        assertDoesNotThrow(() -> service.startMatch("white-test", "black-test"));
     InOrder order = inOrder(matchEngine, activeTask);
 
     assertFalse(snapshot.running());
@@ -129,7 +211,7 @@ class MatchControlServiceTest {
   @Test
   void repeatedStopIsAnIdempotentNoOp() {
     when(matchEngine.currentMatch()).thenReturn(match);
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     MatchSnapshot first = service.stopMatch();
     MatchSnapshot second = assertDoesNotThrow(service::stopMatch);
@@ -150,7 +232,7 @@ class MatchControlServiceTest {
   @Test
   void runningStateResetsOnSuccessfulBackgroundFinish() {
     when(matchEngine.currentMatch()).thenReturn(match);
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
     verify(executorService).submit(runnableCaptor.capture());
@@ -170,9 +252,13 @@ class MatchControlServiceTest {
         new MatchExecutionGuard(fixedClock(), Duration.ofSeconds(60), 12);
     service =
         new MatchControlService(
-            matchEngine, matchDialogueCoordinator, executorService, cooldownGuard);
+            matchEngine,
+            matchDialogueCoordinator,
+            personalityCatalog,
+            executorService,
+            cooldownGuard);
     when(matchEngine.currentMatch()).thenReturn(match);
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
     verify(executorService).submit(runnableCaptor.capture());
@@ -186,7 +272,7 @@ class MatchControlServiceTest {
   @Test
   void runningStateResetsOnBackgroundException() {
     when(matchEngine.currentMatch()).thenReturn(match);
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
     verify(executorService).submit(runnableCaptor.capture());
@@ -206,9 +292,9 @@ class MatchControlServiceTest {
   void staleBackgroundTaskDoesNotClearRunningStateForRestartedMatch() {
     when(matchEngine.currentMatch()).thenReturn(match);
 
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
     service.stopMatch();
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
     verify(executorService, times(2)).submit(runnableCaptor.capture());
@@ -224,7 +310,7 @@ class MatchControlServiceTest {
   void stopMatchCancelsEvenWhenTheActiveTaskHasAlreadyCompleted() {
     when(matchEngine.currentMatch()).thenReturn(match);
     when(activeTask.isDone()).thenReturn(true);
-    service.startMatch();
+    service.startMatch("white-test", "black-test");
 
     MatchSnapshot snapshot = assertDoesNotThrow(() -> service.stopMatch());
 
@@ -236,9 +322,10 @@ class MatchControlServiceTest {
   @Test
   void synchronousStartFailureRollsBackReservationAndQuota() {
     when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
-    when(matchEngine.startNewMatch()).thenThrow(new IllegalStateException("Cannot initialize"));
+    when(matchEngine.startNewMatch(any()))
+        .thenThrow(new IllegalStateException("Cannot initialize"));
 
-    assertThrows(IllegalStateException.class, service::startMatch);
+    assertThrows(IllegalStateException.class, () -> service.startMatch("white-test", "black-test"));
 
     assertFalse(guard.isRunning());
     assertEquals(0, guard.availability().dailyStartsAccepted());
@@ -260,7 +347,8 @@ class MatchControlServiceTest {
               return match;
             });
 
-    CompletableFuture<MatchSnapshot> start = CompletableFuture.supplyAsync(service::startMatch);
+    CompletableFuture<MatchSnapshot> start =
+        CompletableFuture.supplyAsync(() -> service.startMatch("white-test", "black-test"));
     assertTrue(startInsideEngine.await(2, TimeUnit.SECONDS));
     CompletableFuture<MatchSnapshot> stop =
         CompletableFuture.supplyAsync(
@@ -282,5 +370,12 @@ class MatchControlServiceTest {
 
   private static Clock fixedClock() {
     return Clock.fixed(Instant.parse("2026-07-13T12:00:00Z"), ZoneOffset.UTC);
+  }
+
+  private void allowTestRivalry() {
+    when(personalityCatalog.findSelectable("white-test"))
+        .thenReturn(Optional.of(new SelectablePersonality("white-test", "White Test")));
+    when(personalityCatalog.findSelectable("black-test"))
+        .thenReturn(Optional.of(new SelectablePersonality("black-test", "Black Test")));
   }
 }

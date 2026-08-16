@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.game.websocket;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;
 
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
@@ -16,12 +17,22 @@ class WebSocketMatchEventSinkTest {
     MatchStreamMessageMapper mapper = mock(MatchStreamMessageMapper.class);
     MatchWebSocketHandler handler = mock(MatchWebSocketHandler.class);
     MatchStarted event =
-        new MatchStarted(UUID.randomUUID(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
+        new MatchStarted(
+            UUID.randomUUID(),
+            PlayerColor.WHITE,
+            BoardPosition.STARTING_POSITION,
+            TestMatchFixtures.TEST_RIVALRY);
     MatchStreamMessage<MatchStartedMessage> message =
         new MatchStreamMessage<>(
             MatchStreamMessageType.MATCH_STARTED,
             new MatchStartedMessage(
-                event.matchId(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen()));
+                event.matchId(),
+                new dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse(
+                    "white-test", "White Test"),
+                new dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse(
+                    "black-test", "Black Test"),
+                PlayerColor.WHITE,
+                BoardPosition.STARTING_POSITION.fen()));
 
     doReturn(message).when(mapper).map(event);
     doThrow(new RuntimeException("boom")).when(handler).broadcast(message);

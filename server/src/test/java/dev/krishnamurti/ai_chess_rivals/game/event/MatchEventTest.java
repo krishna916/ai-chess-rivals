@@ -2,6 +2,7 @@ package dev.krishnamurti.ai_chess_rivals.game.event;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
@@ -18,13 +19,25 @@ class MatchEventTest {
   void matchStartedRejectsNullDomainValues() {
     assertThrows(
         NullPointerException.class,
-        () -> new MatchStarted(null, PlayerColor.WHITE, BoardPosition.STARTING_POSITION));
+        () ->
+            new MatchStarted(
+                null,
+                PlayerColor.WHITE,
+                BoardPosition.STARTING_POSITION,
+                TestMatchFixtures.TEST_RIVALRY));
     assertThrows(
         NullPointerException.class,
-        () -> new MatchStarted(UUID.randomUUID(), null, BoardPosition.STARTING_POSITION));
+        () ->
+            new MatchStarted(
+                UUID.randomUUID(),
+                null,
+                BoardPosition.STARTING_POSITION,
+                TestMatchFixtures.TEST_RIVALRY));
     assertThrows(
         NullPointerException.class,
-        () -> new MatchStarted(UUID.randomUUID(), PlayerColor.WHITE, null));
+        () ->
+            new MatchStarted(
+                UUID.randomUUID(), PlayerColor.WHITE, null, TestMatchFixtures.TEST_RIVALRY));
   }
 
   @Test

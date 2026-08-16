@@ -2,10 +2,12 @@ package dev.krishnamurti.ai_chess_rivals.game.web;
 
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,8 +23,10 @@ public class MatchController {
   }
 
   @PostMapping("/start")
-  public ResponseEntity<MatchResponse> startMatch() {
-    MatchSnapshot snapshot = matchControlService.startMatch();
+  public ResponseEntity<MatchResponse> startMatch(@Valid @RequestBody StartMatchRequest request) {
+    MatchSnapshot snapshot =
+        matchControlService.startMatch(
+            request.whitePersonalityKey(), request.blackPersonalityKey());
     return ResponseEntity.accepted().body(MatchResponseMapper.map(snapshot));
   }
 

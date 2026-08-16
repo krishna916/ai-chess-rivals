@@ -7,12 +7,15 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.web.DialogueResponse;
+import dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse;
 import dev.krishnamurti.ai_chess_rivals.game.web.MoveResponse;
 import java.util.List;
 import java.util.UUID;
 
 record MatchStateMessage(
     UUID matchId,
+    MatchPersonalityResponse whitePersonality,
+    MatchPersonalityResponse blackPersonality,
     PlayerColor sideToMove,
     String fen,
     List<MoveResponse> moves,
@@ -32,9 +35,17 @@ record MatchStateMessage(
     List<MoveResponse> moves = match.moves().stream().map(MoveResponse::from).toList();
     List<DialogueResponse> dialogue =
         snapshot.dialogue().stream().map(DialogueResponse::from).toList();
+    MatchPersonalityResponse whitePersonality =
+        new MatchPersonalityResponse(
+            match.rivalry().whiteKey(), match.rivalry().whiteDisplayName());
+    MatchPersonalityResponse blackPersonality =
+        new MatchPersonalityResponse(
+            match.rivalry().blackKey(), match.rivalry().blackDisplayName());
 
     return new MatchStateMessage(
         match.id(),
+        whitePersonality,
+        blackPersonality,
         match.sideToMove(),
         match.currentPosition().fen(),
         moves,

@@ -21,10 +21,15 @@ describe("adminMatchApi", () => {
     get.mockResolvedValue({ data: { running: false } });
   });
 
-  it("attaches the bearer token only to Start", async () => {
-    await adminMatchApi.startMatch("owner-token");
+  it("sends selected personalities and bearer token to Start", async () => {
+    const request = {
+      whitePersonalityKey: "blaze",
+      blackPersonalityKey: "vesper",
+    };
 
-    expect(post).toHaveBeenCalledWith("/match/start", undefined, {
+    await adminMatchApi.startMatch("owner-token", request);
+
+    expect(post).toHaveBeenCalledWith("/match/start", request, {
       headers: { Authorization: "Bearer owner-token" },
     });
   });

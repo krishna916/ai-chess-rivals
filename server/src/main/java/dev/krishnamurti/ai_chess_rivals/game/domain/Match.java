@@ -13,6 +13,7 @@ public final class Match {
   private final List<Move> moves;
   private final GameStatus status;
   private final GameResult result;
+  private final MatchRivalry rivalry;
 
   public Match(
       UUID id,
@@ -20,7 +21,8 @@ public final class Match {
       BoardPosition currentPosition,
       List<Move> moves,
       GameStatus status,
-      GameResult result) {
+      GameResult result,
+      MatchRivalry rivalry) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.sideToMove = Objects.requireNonNull(sideToMove, "sideToMove must not be null");
     this.currentPosition =
@@ -34,6 +36,7 @@ public final class Match {
       throw new IllegalArgumentException("result is only allowed when status is FINISHED");
     }
     this.result = result;
+    this.rivalry = Objects.requireNonNull(rivalry, "rivalry must not be null");
   }
 
   public Match(
@@ -41,18 +44,20 @@ public final class Match {
       BoardPosition currentPosition,
       List<Move> moves,
       GameStatus status,
-      GameResult result) {
-    this(UUID.randomUUID(), sideToMove, currentPosition, moves, status, result);
+      GameResult result,
+      MatchRivalry rivalry) {
+    this(UUID.randomUUID(), sideToMove, currentPosition, moves, status, result, rivalry);
   }
 
-  public static Match newGame() {
+  public static Match newGame(MatchRivalry rivalry) {
     return new Match(
         UUID.randomUUID(),
         PlayerColor.WHITE,
         BoardPosition.STARTING_POSITION,
         List.of(),
         GameStatus.IN_PROGRESS,
-        null);
+        null,
+        rivalry);
   }
 
   public UUID id() {
@@ -91,6 +96,10 @@ public final class Match {
     return Optional.ofNullable(result);
   }
 
+  public MatchRivalry rivalry() {
+    return rivalry;
+  }
+
   public Match recordMove(
       MoveNotation notation, BoardPosition positionAfterMove, MoveDetails details) {
     requireInProgress("record a move");
@@ -100,12 +109,18 @@ public final class Match {
     updatedMoves.add(move);
 
     return new Match(
-        id, sideToMove.opposite(), positionAfterMove, updatedMoves, GameStatus.IN_PROGRESS, null);
+        id,
+        sideToMove.opposite(),
+        positionAfterMove,
+        updatedMoves,
+        GameStatus.IN_PROGRESS,
+        null,
+        rivalry);
   }
 
   public Match finish(GameResult result) {
     requireInProgress("finish a match");
-    return new Match(id, sideToMove, currentPosition, moves, GameStatus.FINISHED, result);
+    return new Match(id, sideToMove, currentPosition, moves, GameStatus.FINISHED, result, rivalry);
   }
 
   private void requireInProgress(String action) {

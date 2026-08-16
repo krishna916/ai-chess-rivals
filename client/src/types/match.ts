@@ -68,8 +68,27 @@ export interface DialogueResponse {
   createdAt: string;
 }
 
+export interface PersonalityRosterItem {
+  key: string;
+  displayName: string;
+  description: string;
+  avatarRef: string | null;
+}
+
+export interface MatchPersonality {
+  key: string;
+  displayName: string;
+}
+
+export interface StartMatchRequest {
+  whitePersonalityKey: string;
+  blackPersonalityKey: string;
+}
+
 export interface MatchResponse {
   matchId: string;
+  whitePersonality: MatchPersonality;
+  blackPersonality: MatchPersonality;
   sideToMove: PlayerColor;
   fen: string;
   moves: MoveResponse[];
@@ -89,6 +108,8 @@ export interface MatchStartedMessage extends BaseMessage {
   type: "MATCH_STARTED";
   payload: {
     matchId: string;
+    whitePersonality: MatchPersonality;
+    blackPersonality: MatchPersonality;
     sideToMove: PlayerColor;
     fen: string;
   };

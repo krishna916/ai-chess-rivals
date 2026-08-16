@@ -10,7 +10,7 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueTriggerType;
 import dev.krishnamurti.ai_chess_rivals.ai.api.GeneratedDialogue;
 import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
-import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MatchRivalry;
 import dev.krishnamurti.ai_chess_rivals.game.event.DialoguePlayed;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
@@ -24,9 +24,6 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 final class MatchDialogueCoordinator {
-
-  private static final String DEFAULT_WHITE_PERSONALITY = "blaze";
-  private static final String DEFAULT_BLACK_PERSONALITY = "vesper";
 
   private final DialogueGenerator dialogueGenerator;
   private final DialogueHistoryStore historyStore;
@@ -42,7 +39,7 @@ final class MatchDialogueCoordinator {
     this.matchEventSink = Objects.requireNonNull(matchEventSink, "matchEventSink must not be null");
   }
 
-  void onGameStart(UUID matchId, BooleanSupplier authoritative) {
+  void onGameStart(UUID matchId, MatchRivalry rivalry, BooleanSupplier authoritative) {
     safeRun(
         matchId,
         0,
@@ -50,20 +47,18 @@ final class MatchDialogueCoordinator {
           List<GeneratedDialogue> generated =
               dialogueGenerator.generateStart(
                   new DialogueStartRequest(
-                      DEFAULT_WHITE_PERSONALITY,
-                      DEFAULT_BLACK_PERSONALITY,
-                      historyStore.lastFour(matchId)));
+                      rivalry.whiteKey(), rivalry.blackKey(), historyStore.lastFour(matchId)));
           persistAndPublish(matchId, DialogueTriggerType.GAME_START, 0, generated, authoritative);
         });
   }
 
-  void onMove(UUID matchId, MovePlayed move, BooleanSupplier authoritative) {
+  void onMove(UUID matchId, MatchRivalry rivalry, MovePlayed move, BooleanSupplier authoritative) {
     safeRun(
         matchId,
         move.ply(),
         () -> {
-          String mover = personalityFor(move.player());
-          String opponent = personalityFor(move.player().opposite());
+          String mover = rivalry.personalityKey(move.player());
+          String opponent = rivalry.personalityKey(move.player().opposite());
           DialogueMoveRequest request =
               new DialogueMoveRequest(
                   move.ply(),
@@ -90,7 +85,12 @@ final class MatchDialogueCoordinator {
         });
   }
 
-  void onGameEnd(UUID matchId, GameResult result, int totalPlies, BooleanSupplier authoritative) {
+  void onGameEnd(
+      UUID matchId,
+      MatchRivalry rivalry,
+      GameResult result,
+      int totalPlies,
+      BooleanSupplier authoritative) {
     safeRun(
         matchId,
         totalPlies,
@@ -110,9 +110,9 @@ final class MatchDialogueCoordinator {
           List<GeneratedDialogue> generated =
               dialogueGenerator.generateEnd(
                   new DialogueEndRequest(
-                      DEFAULT_WHITE_PERSONALITY,
+                      rivalry.whiteKey(),
                       whiteOutcome,
-                      DEFAULT_BLACK_PERSONALITY,
+                      rivalry.blackKey(),
                       blackOutcome,
                       totalPlies,
                       historyStore.lastFour(matchId)));
@@ -157,9 +157,5 @@ final class MatchDialogueCoordinator {
     } catch (RuntimeException exception) {
       log.warn("Dialogue unavailable for match {} at ply {}", matchId, triggerPly, exception);
     }
-  }
-
-  private static String personalityFor(PlayerColor player) {
-    return player == PlayerColor.WHITE ? DEFAULT_WHITE_PERSONALITY : DEFAULT_BLACK_PERSONALITY;
   }
 }

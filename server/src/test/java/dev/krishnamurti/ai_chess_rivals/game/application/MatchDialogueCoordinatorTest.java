@@ -20,6 +20,7 @@ import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide;
 import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
+import dev.krishnamurti.ai_chess_rivals.game.domain.MatchRivalry;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
@@ -39,6 +40,8 @@ import org.mockito.InOrder;
 class MatchDialogueCoordinatorTest {
 
   private static final UUID MATCH_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+  private static final MatchRivalry RIVALRY =
+      new MatchRivalry("sage", "Sage", "maverick", "Maverick");
 
   private final DialogueGenerator dialogueGenerator =
       org.mockito.Mockito.mock(DialogueGenerator.class);
@@ -60,13 +63,13 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.lastFour(MATCH_ID)).thenReturn(history);
     when(dialogueGenerator.generateMove(any())).thenReturn(Optional.empty());
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
     ArgumentCaptor<dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest> request =
         ArgumentCaptor.forClass(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest.class);
     verify(dialogueGenerator).generateMove(request.capture());
-    assertThat(request.getValue().moverPersonalityKey()).isEqualTo("blaze");
-    assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("vesper");
+    assertThat(request.getValue().moverPersonalityKey()).isEqualTo("sage");
+    assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("maverick");
     assertThat(request.getValue().recentDialogue()).isSameAs(history);
   }
 
@@ -74,13 +77,13 @@ class MatchDialogueCoordinatorTest {
   void onMoveMapsBlackSidesInReverse() {
     when(dialogueGenerator.generateMove(any())).thenReturn(Optional.empty());
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.BLACK), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.BLACK), () -> true);
 
     ArgumentCaptor<dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest> request =
         ArgumentCaptor.forClass(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest.class);
     verify(dialogueGenerator).generateMove(request.capture());
-    assertThat(request.getValue().moverPersonalityKey()).isEqualTo("vesper");
-    assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("blaze");
+    assertThat(request.getValue().moverPersonalityKey()).isEqualTo("maverick");
+    assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("sage");
   }
 
   @Test
@@ -91,7 +94,7 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated))
         .thenReturn(Optional.of(saved));
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
     InOrder order = inOrder(historyStore, matchEventSink);
     order.verify(historyStore).persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated);
@@ -105,7 +108,7 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated))
         .thenReturn(Optional.empty());
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
     verify(matchEventSink, never()).publish(any());
   }
@@ -118,7 +121,7 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, fallback))
         .thenReturn(Optional.of(saved));
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
     verify(historyStore).persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, fallback);
     verify(matchEventSink).publish(new DialoguePlayed(saved));
@@ -128,7 +131,7 @@ class MatchDialogueCoordinatorTest {
   void generatorFailureDoesNotEscapeOrPublish() {
     when(dialogueGenerator.generateMove(any())).thenThrow(new IllegalStateException("provider"));
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
     verify(historyStore, never()).persistIfAbsent(any(), any(), any(Integer.class), any());
     verify(matchEventSink, never()).publish(any());
@@ -141,7 +144,7 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated))
         .thenThrow(new IllegalStateException("database"));
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
     verify(matchEventSink, never()).publish(any());
   }
@@ -157,7 +160,7 @@ class MatchDialogueCoordinatorTest {
               return Optional.of(generated);
             });
 
-    coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), authoritative::get);
+    coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), authoritative::get);
 
     verify(historyStore, never()).persistIfAbsent(any(), any(), any(Integer.class), any());
     verify(matchEventSink, never()).publish(any());
@@ -174,7 +177,7 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.GAME_START, 0, black))
         .thenReturn(Optional.of(savedBlack));
 
-    coordinator.onGameStart(MATCH_ID, () -> true);
+    coordinator.onGameStart(MATCH_ID, RIVALRY, () -> true);
 
     verify(matchEventSink).publish(new DialoguePlayed(savedBlack));
     verify(matchEventSink, org.mockito.Mockito.times(1)).publish(any());
@@ -193,6 +196,7 @@ class MatchDialogueCoordinatorTest {
 
     coordinator.onGameEnd(
         MATCH_ID,
+        RIVALRY,
         dev.krishnamurti.ai_chess_rivals.game.domain.GameResult.WHITE_WINS,
         12,
         () -> true);
@@ -202,6 +206,8 @@ class MatchDialogueCoordinatorTest {
     verify(dialogueGenerator).generateEnd(request.capture());
     assertThat(request.getValue().whiteOutcome())
         .isEqualTo(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueOutcome.VICTORY);
+    assertThat(request.getValue().whitePersonalityKey()).isEqualTo("sage");
+    assertThat(request.getValue().blackPersonalityKey()).isEqualTo("maverick");
     assertThat(request.getValue().blackOutcome())
         .isEqualTo(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueOutcome.DEFEAT);
     verify(matchEventSink).publish(new DialoguePlayed(savedLoser));

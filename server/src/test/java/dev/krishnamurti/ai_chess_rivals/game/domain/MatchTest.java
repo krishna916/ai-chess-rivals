@@ -12,9 +12,12 @@ import org.junit.jupiter.api.Test;
 
 class MatchTest {
 
+  private static final MatchRivalry RIVALRY =
+      new MatchRivalry("blaze", "Blaze", "vesper", "Vesper");
+
   @Test
   void newGameReturnsExpectedInitialState() {
-    Match match = Match.newGame();
+    Match match = Match.newGame(RIVALRY);
 
     assertEquals(PlayerColor.WHITE, match.sideToMove());
     assertEquals(BoardPosition.STARTING_POSITION, match.currentPosition());
@@ -28,7 +31,7 @@ class MatchTest {
 
   @Test
   void keepsMatchIdAcrossImmutableTransitions() {
-    Match started = Match.newGame();
+    Match started = Match.newGame(RIVALRY);
     BoardPosition positionAfterMove =
         new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 
@@ -42,7 +45,7 @@ class MatchTest {
 
   @Test
   void newGamesReceiveDistinctIds() {
-    assertNotEquals(Match.newGame().id(), Match.newGame().id());
+    assertNotEquals(Match.newGame(RIVALRY).id(), Match.newGame(RIVALRY).id());
   }
 
   @Test
@@ -51,10 +54,15 @@ class MatchTest {
         NullPointerException.class,
         () ->
             new Match(
-                null, BoardPosition.STARTING_POSITION, List.of(), GameStatus.IN_PROGRESS, null));
+                null,
+                BoardPosition.STARTING_POSITION,
+                List.of(),
+                GameStatus.IN_PROGRESS,
+                null,
+                RIVALRY));
     assertThrows(
         NullPointerException.class,
-        () -> new Match(PlayerColor.WHITE, null, List.of(), GameStatus.IN_PROGRESS, null));
+        () -> new Match(PlayerColor.WHITE, null, List.of(), GameStatus.IN_PROGRESS, null, RIVALRY));
     assertThrows(
         NullPointerException.class,
         () ->
@@ -63,10 +71,18 @@ class MatchTest {
                 BoardPosition.STARTING_POSITION,
                 null,
                 GameStatus.IN_PROGRESS,
-                null));
+                null,
+                RIVALRY));
     assertThrows(
         NullPointerException.class,
-        () -> new Match(PlayerColor.WHITE, BoardPosition.STARTING_POSITION, List.of(), null, null));
+        () ->
+            new Match(
+                PlayerColor.WHITE,
+                BoardPosition.STARTING_POSITION,
+                List.of(),
+                null,
+                null,
+                RIVALRY));
   }
 
   @Test
@@ -80,7 +96,8 @@ class MatchTest {
                     BoardPosition.STARTING_POSITION,
                     List.of(),
                     GameStatus.IN_PROGRESS,
-                    GameResult.WHITE_WINS));
+                    GameResult.WHITE_WINS,
+                    RIVALRY));
 
     assertEquals("result is only allowed when status is FINISHED", error.getMessage());
   }
@@ -96,7 +113,8 @@ class MatchTest {
                     BoardPosition.STARTING_POSITION,
                     List.of(),
                     GameStatus.FINISHED,
-                    null));
+                    null,
+                    RIVALRY));
 
     assertEquals("result is required when status is FINISHED", error.getMessage());
   }
@@ -118,7 +136,8 @@ class MatchTest {
             new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"),
             history,
             GameStatus.IN_PROGRESS,
-            null);
+            null,
+            RIVALRY);
 
     history.clear();
 
@@ -128,7 +147,7 @@ class MatchTest {
 
   @Test
   void recordMoveAppendsMoveAndFlipsSideToMove() {
-    Match match = Match.newGame();
+    Match match = Match.newGame(RIVALRY);
     BoardPosition positionAfterMove =
         new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 
@@ -146,7 +165,7 @@ class MatchTest {
 
   @Test
   void recordMoveRejectsFinishedMatch() {
-    Match finishedMatch = Match.newGame().finish(GameResult.WHITE_WINS);
+    Match finishedMatch = Match.newGame(RIVALRY).finish(GameResult.WHITE_WINS);
 
     IllegalStateException error =
         assertThrows(
@@ -162,12 +181,37 @@ class MatchTest {
 
   @Test
   void finishSetsStatusAndResult() {
-    Match finishedMatch = Match.newGame().finish(GameResult.DRAW);
+    Match finishedMatch = Match.newGame(RIVALRY).finish(GameResult.DRAW);
 
     assertTrue(finishedMatch.isFinished());
     assertFalse(finishedMatch.isInProgress());
     assertEquals(GameStatus.FINISHED, finishedMatch.status());
     assertEquals(GameResult.DRAW, finishedMatch.result().orElseThrow());
+  }
+
+  @Test
+  void keepsRivalryAcrossImmutableTransitions() {
+    Match started = Match.newGame(RIVALRY);
+    BoardPosition positionAfterMove =
+        new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+
+    Match moved =
+        started.recordMove(new MoveNotation("e2e4"), positionAfterMove, quietPawnMoveDetails());
+    Match finished = moved.finish(GameResult.DRAW);
+
+    assertEquals(RIVALRY, started.rivalry());
+    assertEquals(RIVALRY, moved.rivalry());
+    assertEquals(RIVALRY, finished.rivalry());
+  }
+
+  @Test
+  void rivalryRejectsMirrorMatch() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new MatchRivalry("blaze", "Blaze", "blaze", "Blaze"));
+
+    assertEquals("White and Black personalities must be distinct", error.getMessage());
   }
 
   private static Move historyMove() {
