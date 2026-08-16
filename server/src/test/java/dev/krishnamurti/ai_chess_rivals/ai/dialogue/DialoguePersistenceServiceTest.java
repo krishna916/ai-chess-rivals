@@ -28,22 +28,22 @@ class DialoguePersistenceServiceTest {
 
   private static final UUID MATCH_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-  private final DialogueLineRepository repository = org.mockito.Mockito.mock(DialogueLineRepository.class);
-  private final PersonalityService personalityService = org.mockito.Mockito.mock(PersonalityService.class);
+  private final DialogueLineRepository repository =
+      org.mockito.Mockito.mock(DialogueLineRepository.class);
+  private final PersonalityService personalityService =
+      org.mockito.Mockito.mock(PersonalityService.class);
   private final DialoguePersistenceService service =
       new DialoguePersistenceService(repository, personalityService);
 
   @BeforeEach
   void setUpPersonalityProfile() {
-    when(personalityService.requirePromptProfile("blaze"))
-        .thenReturn(profile("blaze", "Blaze"));
+    when(personalityService.requirePromptProfile("blaze")).thenReturn(profile("blaze", "Blaze"));
   }
 
   @Test
   void returnsEmptyAndDoesNotSaveWhenTriggerSpeakerAlreadyExists() {
-    when(
-            repository.findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
-                MATCH_ID, DialogueTriggerType.MOVE, 7, "blaze"))
+    when(repository.findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
+            MATCH_ID, DialogueTriggerType.MOVE, 7, "blaze"))
         .thenReturn(Optional.of(entity(1, 7)));
 
     Optional<PersistedDialogue> saved =
@@ -73,9 +73,8 @@ class DialoguePersistenceServiceTest {
             DialogueEmotion.NEUTRAL,
             DialogueReactionType.MOVE_REACTION,
             AiResponseSource.DETERMINISTIC_FALLBACK);
-    when(
-            repository.findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
-                MATCH_ID, DialogueTriggerType.MOVE, 4, "blaze"))
+    when(repository.findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
+            MATCH_ID, DialogueTriggerType.MOVE, 4, "blaze"))
         .thenReturn(Optional.empty());
     when(repository.save(any(DialogueLineEntity.class)))
         .thenAnswer(
@@ -104,9 +103,8 @@ class DialoguePersistenceServiceTest {
 
   @Test
   void persistsDisplayNameFromPersonalityProfile() {
-    when(
-            repository.findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
-                MATCH_ID, DialogueTriggerType.MOVE, 4, "blaze"))
+    when(repository.findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
+            MATCH_ID, DialogueTriggerType.MOVE, 4, "blaze"))
         .thenReturn(Optional.empty());
     DialogueLineEntity savedEntity = entity(11, 4);
     when(repository.save(any(DialogueLineEntity.class))).thenReturn(savedEntity);

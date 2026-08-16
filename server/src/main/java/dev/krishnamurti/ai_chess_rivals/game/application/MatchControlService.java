@@ -116,11 +116,10 @@ public final class MatchControlService {
   }
 
   private MatchSnapshot snapshot(Match match) {
-    return
-        new MatchSnapshot(
-            match,
-            executionGuard.isRunning(),
-            executionGuard.availability(),
-            matchDialogueCoordinator.history(match.id()));
+    return new MatchSnapshot(
+        match,
+        executionGuard.isRunning(),
+        executionGuard.availability(),
+        matchDialogueCoordinator.history(match.id()));
   }
 }

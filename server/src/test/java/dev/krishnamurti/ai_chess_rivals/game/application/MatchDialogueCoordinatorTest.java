@@ -2,7 +2,6 @@ package dev.krishnamurti.ai_chess_rivals.game.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,14 +20,12 @@ import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide;
 import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
-import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.DialoguePlayed;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEventSink;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -43,8 +40,10 @@ class MatchDialogueCoordinatorTest {
 
   private static final UUID MATCH_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
-  private final DialogueGenerator dialogueGenerator = org.mockito.Mockito.mock(DialogueGenerator.class);
-  private final DialogueHistoryStore historyStore = org.mockito.Mockito.mock(DialogueHistoryStore.class);
+  private final DialogueGenerator dialogueGenerator =
+      org.mockito.Mockito.mock(DialogueGenerator.class);
+  private final DialogueHistoryStore historyStore =
+      org.mockito.Mockito.mock(DialogueHistoryStore.class);
   private final MatchEventSink matchEventSink = org.mockito.Mockito.mock(MatchEventSink.class);
   private final MatchDialogueCoordinator coordinator =
       new MatchDialogueCoordinator(dialogueGenerator, historyStore, matchEventSink);
@@ -64,8 +63,7 @@ class MatchDialogueCoordinatorTest {
     coordinator.onMove(MATCH_ID, move(PlayerColor.WHITE), () -> true);
 
     ArgumentCaptor<dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest> request =
-        ArgumentCaptor.forClass(
-            dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest.class);
+        ArgumentCaptor.forClass(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest.class);
     verify(dialogueGenerator).generateMove(request.capture());
     assertThat(request.getValue().moverPersonalityKey()).isEqualTo("blaze");
     assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("vesper");
@@ -79,8 +77,7 @@ class MatchDialogueCoordinatorTest {
     coordinator.onMove(MATCH_ID, move(PlayerColor.BLACK), () -> true);
 
     ArgumentCaptor<dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest> request =
-        ArgumentCaptor.forClass(
-            dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest.class);
+        ArgumentCaptor.forClass(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueMoveRequest.class);
     verify(dialogueGenerator).generateMove(request.capture());
     assertThat(request.getValue().moverPersonalityKey()).isEqualTo("vesper");
     assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("blaze");
@@ -194,11 +191,14 @@ class MatchDialogueCoordinatorTest {
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.GAME_END, 12, loser))
         .thenReturn(Optional.of(savedLoser));
 
-    coordinator.onGameEnd(MATCH_ID, dev.krishnamurti.ai_chess_rivals.game.domain.GameResult.WHITE_WINS, 12, () -> true);
+    coordinator.onGameEnd(
+        MATCH_ID,
+        dev.krishnamurti.ai_chess_rivals.game.domain.GameResult.WHITE_WINS,
+        12,
+        () -> true);
 
     ArgumentCaptor<dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEndRequest> request =
-        ArgumentCaptor.forClass(
-            dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEndRequest.class);
+        ArgumentCaptor.forClass(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEndRequest.class);
     verify(dialogueGenerator).generateEnd(request.capture());
     assertThat(request.getValue().whiteOutcome())
         .isEqualTo(dev.krishnamurti.ai_chess_rivals.ai.api.DialogueOutcome.VICTORY);

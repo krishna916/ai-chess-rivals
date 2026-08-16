@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -37,7 +36,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 class MatchEngineTest {
@@ -121,26 +119,32 @@ class MatchEngineTest {
     MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
     MatchEngine[] engine = new MatchEngine[1];
     List<MatchEvent> events = new ArrayList<>();
-    doAnswer(invocation -> { events.add(invocation.getArgument(0)); return null; })
+    doAnswer(
+            invocation -> {
+              events.add(invocation.getArgument(0));
+              return null;
+            })
         .when(eventSink)
         .publish(any());
-    doAnswer(invocation -> { engine[0].stopCurrentMatch(); return null; })
+    doAnswer(
+            invocation -> {
+              engine[0].stopCurrentMatch();
+              return null;
+            })
         .when(pacing)
         .waitBeforeNextMove();
     engine[0] =
         matchEngine(
-            chessPlayer,
-            250,
-            2,
-            pacing,
-            eventSink,
-            new FakeChessEvaluationService(),
-            coordinator);
+            chessPlayer, 250, 2, pacing, eventSink, new FakeChessEvaluationService(), coordinator);
 
     Match finalMatch = engine[0].playUntilFinished();
 
     MovePlayed movePlayed =
-        events.stream().filter(MovePlayed.class::isInstance).map(MovePlayed.class::cast).findFirst().orElseThrow();
+        events.stream()
+            .filter(MovePlayed.class::isInstance)
+            .map(MovePlayed.class::cast)
+            .findFirst()
+            .orElseThrow();
     InOrder order = inOrder(eventSink, coordinator, pacing);
     order.verify(eventSink).publish(movePlayed);
     order.verify(coordinator).onMove(eq(finalMatch.id()), eq(movePlayed), any());
@@ -164,7 +168,15 @@ class MatchEngineTest {
             })
         .when(coordinator)
         .onMove(any(), any(), any());
-    engine[0] = matchEngine(chessPlayer, 250, 2, NO_OP_PACING, event -> {}, new FakeChessEvaluationService(), coordinator);
+    engine[0] =
+        matchEngine(
+            chessPlayer,
+            250,
+            2,
+            NO_OP_PACING,
+            event -> {},
+            new FakeChessEvaluationService(),
+            coordinator);
 
     engine[0].playUntilFinished();
 
@@ -191,7 +203,15 @@ class MatchEngineTest {
             })
         .when(coordinator)
         .onMove(any(), any(), any());
-    engine[0] = matchEngine(chessPlayer, 250, 2, NO_OP_PACING, event -> {}, new FakeChessEvaluationService(), coordinator);
+    engine[0] =
+        matchEngine(
+            chessPlayer,
+            250,
+            2,
+            NO_OP_PACING,
+            event -> {},
+            new FakeChessEvaluationService(),
+            coordinator);
 
     engine[0].playUntilFinished();
     engine[0].playUntilFinished();
@@ -206,8 +226,22 @@ class MatchEngineTest {
     List<String> order = new ArrayList<>();
     chessPlayer.operationOrder = order;
     MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
-    doAnswer(invocation -> { order.add("start"); return null; }).when(coordinator).onGameStart(any(), any());
-    MatchEngine engine = matchEngine(chessPlayer, 250, 1, NO_OP_PACING, event -> {}, new FakeChessEvaluationService(), coordinator);
+    doAnswer(
+            invocation -> {
+              order.add("start");
+              return null;
+            })
+        .when(coordinator)
+        .onGameStart(any(), any());
+    MatchEngine engine =
+        matchEngine(
+            chessPlayer,
+            250,
+            1,
+            NO_OP_PACING,
+            event -> {},
+            new FakeChessEvaluationService(),
+            coordinator);
 
     engine.playUntilFinished();
 
@@ -219,7 +253,15 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("f2f3", "e7e5", "g2g4", "d8h4");
     MatchEventSink eventSink = mock(MatchEventSink.class);
     MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
-    MatchEngine engine = matchEngine(chessPlayer, 250, 10, NO_OP_PACING, eventSink, new FakeChessEvaluationService(), coordinator);
+    MatchEngine engine =
+        matchEngine(
+            chessPlayer,
+            250,
+            10,
+            NO_OP_PACING,
+            eventSink,
+            new FakeChessEvaluationService(),
+            coordinator);
 
     engine.playUntilFinished();
 
@@ -232,7 +274,15 @@ class MatchEngineTest {
   void maxPliesDrawRunsEndDialogue() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
-    MatchEngine engine = matchEngine(chessPlayer, 250, 1, NO_OP_PACING, event -> {}, new FakeChessEvaluationService(), coordinator);
+    MatchEngine engine =
+        matchEngine(
+            chessPlayer,
+            250,
+            1,
+            NO_OP_PACING,
+            event -> {},
+            new FakeChessEvaluationService(),
+            coordinator);
 
     engine.playUntilFinished();
 
@@ -243,8 +293,18 @@ class MatchEngineTest {
   void dialogueFailureDoesNotPreventMatchCompletion() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
-    doThrow(new IllegalStateException("dialogue failed")).when(coordinator).onMove(any(), any(), any());
-    MatchEngine engine = matchEngine(chessPlayer, 250, 1, NO_OP_PACING, event -> {}, new FakeChessEvaluationService(), coordinator);
+    doThrow(new IllegalStateException("dialogue failed"))
+        .when(coordinator)
+        .onMove(any(), any(), any());
+    MatchEngine engine =
+        matchEngine(
+            chessPlayer,
+            250,
+            1,
+            NO_OP_PACING,
+            event -> {},
+            new FakeChessEvaluationService(),
+            coordinator);
 
     Match finalMatch = engine.playUntilFinished();
 

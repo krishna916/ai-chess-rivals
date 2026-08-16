@@ -1,7 +1,7 @@
 package dev.krishnamurti.ai_chess_rivals.game.websocket;
 
-import dev.krishnamurti.ai_chess_rivals.game.event.MatchEvent;
 import dev.krishnamurti.ai_chess_rivals.game.event.DialoguePlayed;
+import dev.krishnamurti.ai_chess_rivals.game.event.MatchEvent;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;

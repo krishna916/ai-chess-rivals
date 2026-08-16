@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-final class DialoguePersistenceService implements DialogueHistoryStore {
+class DialoguePersistenceService implements DialogueHistoryStore {
 
   private final DialogueLineRepository repository;
   private final PersonalityService personalityService;
@@ -82,10 +82,7 @@ final class DialoguePersistenceService implements DialogueHistoryStore {
       DialogueLineEntity row = newestFirst.get(i);
       chronological.add(
           new DialogueHistoryLine(
-              row.triggerPly(),
-              row.personalityKey(),
-              row.personalityDisplayName(),
-              row.text()));
+              row.triggerPly(), row.personalityKey(), row.personalityDisplayName(), row.text()));
     }
     return List.copyOf(chronological);
   }

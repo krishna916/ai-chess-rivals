@@ -53,8 +53,7 @@ final class MatchDialogueCoordinator {
                       DEFAULT_WHITE_PERSONALITY,
                       DEFAULT_BLACK_PERSONALITY,
                       historyStore.lastFour(matchId)));
-          persistAndPublish(
-              matchId, DialogueTriggerType.GAME_START, 0, generated, authoritative);
+          persistAndPublish(matchId, DialogueTriggerType.GAME_START, 0, generated, authoritative);
         });
   }
 
@@ -91,8 +90,7 @@ final class MatchDialogueCoordinator {
         });
   }
 
-  void onGameEnd(
-      UUID matchId, GameResult result, int totalPlies, BooleanSupplier authoritative) {
+  void onGameEnd(UUID matchId, GameResult result, int totalPlies, BooleanSupplier authoritative) {
     safeRun(
         matchId,
         totalPlies,

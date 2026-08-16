@@ -6,8 +6,8 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameStatus;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
-import dev.krishnamurti.ai_chess_rivals.game.web.MoveResponse;
 import dev.krishnamurti.ai_chess_rivals.game.web.DialogueResponse;
+import dev.krishnamurti.ai_chess_rivals.game.web.MoveResponse;
 import java.util.List;
 import java.util.UUID;
 

@@ -18,10 +18,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -158,9 +158,7 @@ public final class MatchEngine {
                 matchDialogueCoordinator.onMove(
                     dialogueMatch.id(),
                     movePlayed,
-                    () ->
-                        isDialogueAuthorityCurrent(
-                            generation, dialogueMatch.id(), dialoguePly)));
+                    () -> isDialogueAuthorityCurrent(generation, dialogueMatch.id(), dialoguePly)));
         int currentPositionOccurrences =
             recordPositionOccurrence(positionOccurrences, match.currentPosition());
         result =
@@ -219,15 +217,14 @@ public final class MatchEngine {
     Match finishedMatch = match.finish(result);
     currentMatch.set(finishedMatch);
     safeDialogue(
-        ()
-            ->
-                matchDialogueCoordinator.onGameEnd(
-                    finishedMatch.id(),
-                    result,
-                    finishedMatch.moveCount(),
-                    () ->
-                        isDialogueAuthorityCurrent(
-                            generation, finishedMatch.id(), finishedMatch.moveCount())));
+        () ->
+            matchDialogueCoordinator.onGameEnd(
+                finishedMatch.id(),
+                result,
+                finishedMatch.moveCount(),
+                () ->
+                    isDialogueAuthorityCurrent(
+                        generation, finishedMatch.id(), finishedMatch.moveCount())));
     matchEventSink.publish(
         new MatchFinished(result, finishedMatch.currentPosition(), finishedMatch.moveCount()));
     return finishedMatch;

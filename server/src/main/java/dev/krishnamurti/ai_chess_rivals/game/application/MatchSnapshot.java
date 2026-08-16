@@ -1,7 +1,7 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
-import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
+import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import java.util.List;
 import java.util.Objects;
 
