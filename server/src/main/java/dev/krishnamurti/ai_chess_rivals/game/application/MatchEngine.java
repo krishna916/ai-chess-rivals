@@ -95,7 +95,7 @@ public final class MatchEngine {
     return match;
   }
 
-  public Match playUntilFinished() {
+  public synchronized Match playUntilFinished() {
     Match match = currentMatch.get();
     if (match == null) {
       match = startNewMatch();

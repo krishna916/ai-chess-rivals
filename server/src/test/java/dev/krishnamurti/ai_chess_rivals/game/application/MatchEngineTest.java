@@ -33,6 +33,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
@@ -218,6 +225,70 @@ class MatchEngineTest {
 
     assertFalse(oldAuthority.get().getAsBoolean());
     assertTrue(newAuthority.get().getAsBoolean());
+  }
+
+  @Test
+  void resumeWaitsForStoppedExecutionToLeaveDialogueBeforeStartingAnotherLoop() throws Exception {
+    FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5", "c7c5");
+    MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
+    CountDownLatch firstDialogueEntered = new CountDownLatch(1);
+    CountDownLatch releaseFirstDialogue = new CountDownLatch(1);
+    AtomicInteger moveDialogueCalls = new AtomicInteger();
+
+    doAnswer(
+            invocation -> {
+              if (moveDialogueCalls.incrementAndGet() == 1) {
+                firstDialogueEntered.countDown();
+                assertTrue(releaseFirstDialogue.await(5, TimeUnit.SECONDS));
+              }
+              return null;
+            })
+        .when(coordinator)
+        .onMove(any(), any(), any());
+
+    MatchEngine engine =
+        matchEngine(
+            chessPlayer,
+            250,
+            2,
+            NO_OP_PACING,
+            event -> {},
+            new FakeChessEvaluationService(),
+            coordinator);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    try {
+      Future<Match> stoppedExecution = executor.submit(engine::playUntilFinished);
+      assertTrue(firstDialogueEntered.await(5, TimeUnit.SECONDS));
+
+      engine.stopCurrentMatch();
+
+      CountDownLatch resumeTaskStarted = new CountDownLatch(1);
+      Future<Match> resumedExecution =
+          executor.submit(
+              () -> {
+                resumeTaskStarted.countDown();
+                return engine.playUntilFinished();
+              });
+      assertTrue(resumeTaskStarted.await(5, TimeUnit.SECONDS));
+
+      assertThrows(TimeoutException.class, () -> resumedExecution.get(500, TimeUnit.MILLISECONDS));
+
+      releaseFirstDialogue.countDown();
+
+      stoppedExecution.get(5, TimeUnit.SECONDS);
+      Match finished = resumedExecution.get(5, TimeUnit.SECONDS);
+
+      assertTrue(finished.isFinished());
+      assertEquals(2, finished.moveCount());
+      assertEquals("e2e4", finished.moves().get(0).notation().value());
+      assertEquals("e7e5", finished.moves().get(1).notation().value());
+      assertEquals(2, chessPlayer.chooseMoveMatches.size());
+      assertEquals(finished, engine.currentMatch());
+    } finally {
+      releaseFirstDialogue.countDown();
+      executor.shutdownNow();
+    }
   }
 
   @Test
