@@ -2,6 +2,7 @@ package dev.krishnamurti.ai_chess_rivals.game.domain;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,6 +24,25 @@ class MatchTest {
     assertEquals(0, match.moveCount());
     assertTrue(match.moves().isEmpty());
     assertTrue(match.result().isEmpty());
+  }
+
+  @Test
+  void keepsMatchIdAcrossImmutableTransitions() {
+    Match started = Match.newGame();
+    BoardPosition positionAfterMove =
+        new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+
+    Match moved =
+        started.recordMove(new MoveNotation("e2e4"), positionAfterMove, quietPawnMoveDetails());
+    Match finished = moved.finish(GameResult.DRAW);
+
+    assertEquals(started.id(), moved.id());
+    assertEquals(started.id(), finished.id());
+  }
+
+  @Test
+  void newGamesReceiveDistinctIds() {
+    assertNotEquals(Match.newGame().id(), Match.newGame().id());
   }
 
   @Test

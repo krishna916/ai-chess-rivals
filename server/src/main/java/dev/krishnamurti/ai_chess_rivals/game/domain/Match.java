@@ -3,9 +3,11 @@ package dev.krishnamurti.ai_chess_rivals.game.domain;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 public final class Match {
 
+  private final UUID id;
   private final PlayerColor sideToMove;
   private final BoardPosition currentPosition;
   private final List<Move> moves;
@@ -13,11 +15,13 @@ public final class Match {
   private final GameResult result;
 
   public Match(
+      UUID id,
       PlayerColor sideToMove,
       BoardPosition currentPosition,
       List<Move> moves,
       GameStatus status,
       GameResult result) {
+    this.id = Objects.requireNonNull(id, "id must not be null");
     this.sideToMove = Objects.requireNonNull(sideToMove, "sideToMove must not be null");
     this.currentPosition =
         Objects.requireNonNull(currentPosition, "currentPosition must not be null");
@@ -32,13 +36,27 @@ public final class Match {
     this.result = result;
   }
 
+  public Match(
+      PlayerColor sideToMove,
+      BoardPosition currentPosition,
+      List<Move> moves,
+      GameStatus status,
+      GameResult result) {
+    this(UUID.randomUUID(), sideToMove, currentPosition, moves, status, result);
+  }
+
   public static Match newGame() {
     return new Match(
+        UUID.randomUUID(),
         PlayerColor.WHITE,
         BoardPosition.STARTING_POSITION,
         List.of(),
         GameStatus.IN_PROGRESS,
         null);
+  }
+
+  public UUID id() {
+    return id;
   }
 
   public PlayerColor sideToMove() {
@@ -82,12 +100,12 @@ public final class Match {
     updatedMoves.add(move);
 
     return new Match(
-        sideToMove.opposite(), positionAfterMove, updatedMoves, GameStatus.IN_PROGRESS, null);
+        id, sideToMove.opposite(), positionAfterMove, updatedMoves, GameStatus.IN_PROGRESS, null);
   }
 
   public Match finish(GameResult result) {
     requireInProgress("finish a match");
-    return new Match(sideToMove, currentPosition, moves, GameStatus.FINISHED, result);
+    return new Match(id, sideToMove, currentPosition, moves, GameStatus.FINISHED, result);
   }
 
   private void requireInProgress(String action) {
