@@ -26,6 +26,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import dev.krishnamurti.ai_chess_rivals.game.web.DialogueResponse;
+import dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -93,12 +94,10 @@ class MatchStreamMessageMapperTest {
     MatchStartedMessage payload = (MatchStartedMessage) message.payload();
     assertEquals(matchId, payload.matchId());
     assertEquals(
-        new dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse(
-            "white-test", "White Test"),
+        new MatchPersonalityResponse("white-test", "White Test"),
         payload.whitePersonality());
     assertEquals(
-        new dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse(
-            "black-test", "Black Test"),
+        new MatchPersonalityResponse("black-test", "Black Test"),
         payload.blackPersonality());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(BoardPosition.STARTING_POSITION.fen(), payload.fen());
@@ -143,6 +142,10 @@ class MatchStreamMessageMapperTest {
         MatchStateMessage.from(new MatchSnapshot(match, true, availability, List.of(line)));
 
     assertEquals(match.id(), payload.matchId());
+    assertEquals(
+        new MatchPersonalityResponse("white-test", "White Test"), payload.whitePersonality());
+    assertEquals(
+        new MatchPersonalityResponse("black-test", "Black Test"), payload.blackPersonality());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(match.currentPosition().fen(), payload.fen());
     assertTrue(payload.moves().isEmpty());
