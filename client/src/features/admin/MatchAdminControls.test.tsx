@@ -294,6 +294,50 @@ describe("MatchAdminControls", () => {
     expect(adminMatchApi.startMatch).not.toHaveBeenCalled();
   });
 
+  it("renders stored rivalry identities instead of roster selectors while stopped", async () => {
+    const storedWhite = { key: "retired-white", displayName: "Retired White" };
+    const storedBlack = { key: "retired-black", displayName: "Retired Black" };
+
+    useMatchViewerStore.setState({
+      matchStatus: "STOPPED",
+      startAvailability: allowed,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+    });
+    vi.mocked(matchApi.getCurrentMatch).mockResolvedValue({
+      ...snapshot,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+      running: false,
+      status: "STOPPED",
+      startAvailability: allowed,
+    });
+
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(personalityApi.listSelectable).toHaveBeenCalledTimes(1),
+    );
+
+    expect(screen.getByText("Retired White")).toBeVisible();
+    expect(screen.getByText("Retired Black")).toBeVisible();
+    expect(
+      screen.queryByLabelText("White personality"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Black personality"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Randomize Rivalry" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows pending Stop and sends one stop request", async () => {
     let resolveStop: (value: typeof snapshot) => void = () => undefined;
     vi.mocked(adminMatchApi.stopMatch).mockImplementation(

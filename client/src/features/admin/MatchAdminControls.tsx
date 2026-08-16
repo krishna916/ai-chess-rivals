@@ -195,13 +195,13 @@ export function MatchAdminControls({
 
   const running = matchStatus === "IN_PROGRESS";
   const stopped = matchStatus === "STOPPED";
+  const rivalryEditable = !running && !stopped;
   const showStart =
     !running &&
     (stopped ||
       startAvailability?.allowed === true ||
       (matchStatus === "IDLE" && startAvailability === undefined));
   const isPending = pendingAction !== undefined;
-  const rivalryLocked = running || stopped;
   const validSelection =
     whitePersonalityKey !== "" &&
     blackPersonalityKey !== "" &&
@@ -264,13 +264,13 @@ export function MatchAdminControls({
           </p>
         )}
 
-        {rosterLoading && (
+        {rivalryEditable && rosterLoading && (
           <p className="text-sm text-muted-foreground">
             Loading personalities…
           </p>
         )}
 
-        {rosterError && !stopped && (
+        {rivalryEditable && rosterError && (
           <div className="space-y-2" role="alert">
             <p className="text-sm text-destructive">{rosterError}</p>
             <Button
@@ -284,22 +284,32 @@ export function MatchAdminControls({
           </div>
         )}
 
-        {stopped &&
-          whitePersonality &&
-          blackPersonality &&
-          roster.length < 2 && (
-            <p className="text-sm text-muted-foreground">
-              Current rivalry: {whitePersonality.displayName} vs{" "}
-              {blackPersonality.displayName}
-            </p>
-          )}
+        {(running || stopped) && whitePersonality && blackPersonality && (
+          <div
+            className="grid gap-4 rounded-md border p-3 sm:grid-cols-2"
+            aria-label="Current rivalry"
+          >
+            <div className="space-y-1">
+              <p className="text-sm font-medium">White personality</p>
+              <p className="text-sm text-muted-foreground">
+                {whitePersonality.displayName}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Black personality</p>
+              <p className="text-sm text-muted-foreground">
+                {blackPersonality.displayName}
+              </p>
+            </div>
+          </div>
+        )}
 
-        {roster.length >= 2 && (
+        {rivalryEditable && roster.length >= 2 && (
           <RivalrySetup
             roster={roster}
             whitePersonalityKey={whitePersonalityKey}
             blackPersonalityKey={blackPersonalityKey}
-            disabled={rivalryLocked || isPending}
+            disabled={isPending}
             onWhiteChange={setWhitePersonalityKey}
             onBlackChange={setBlackPersonalityKey}
             onRandomize={() => {
