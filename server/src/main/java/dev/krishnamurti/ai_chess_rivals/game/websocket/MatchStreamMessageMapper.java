@@ -1,6 +1,7 @@
 package dev.krishnamurti.ai_chess_rivals.game.websocket;
 
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchEvent;
+import dev.krishnamurti.ai_chess_rivals.game.event.DialoguePlayed;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
@@ -15,7 +16,8 @@ final class MatchStreamMessageMapper {
       case MatchStarted started ->
           new MatchStreamMessage<>(
               MatchStreamMessageType.MATCH_STARTED,
-              new MatchStartedMessage(started.sideToMove(), started.position().fen()));
+              new MatchStartedMessage(
+                  started.matchId(), started.sideToMove(), started.position().fen()));
       case MovePlayed move ->
           new MatchStreamMessage<>(
               MatchStreamMessageType.MOVE_PLAYED,
@@ -36,6 +38,10 @@ final class MatchStreamMessageMapper {
                   move.check(),
                   move.checkmate(),
                   move.promotion()));
+      case DialoguePlayed dialogue ->
+          new MatchStreamMessage<>(
+              MatchStreamMessageType.DIALOGUE_PLAYED,
+              DialoguePlayedMessage.from(dialogue.dialogue()));
       case MatchStopped stopped ->
           new MatchStreamMessage<>(
               MatchStreamMessageType.MATCH_STOPPED,

@@ -7,11 +7,13 @@ import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTest
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchNotFoundException;
+import dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,7 +36,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
           + "org.springframework.modulith.events.config.EventPublicationAutoConfiguration,"
           + "org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration"
     })
-@Import(PersonalityRepositoryTestConfiguration.class)
+@Import({PersonalityRepositoryTestConfiguration.class, DialogueRepositoryTestConfiguration.class})
 class MatchWebSocketIntegrationTest {
 
   @LocalServerPort private int port;
@@ -71,7 +73,8 @@ class MatchWebSocketIntegrationTest {
     handler.broadcast(
         new MatchStreamMessage<>(
             MatchStreamMessageType.MATCH_STARTED,
-            new MatchStartedMessage(PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen())));
+            new MatchStartedMessage(
+                UUID.randomUUID(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen())));
 
     String matchStartedMessage = messages.poll(5, TimeUnit.SECONDS);
     assertNotNull(matchStartedMessage);

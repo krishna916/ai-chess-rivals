@@ -26,6 +26,7 @@ class MatchControlServiceTest {
   private ExecutorService executorService;
   private MatchControlService service;
   private MatchExecutionGuard guard;
+  private MatchDialogueCoordinator matchDialogueCoordinator;
   private Match match;
   private Future<Object> activeTask;
 
@@ -36,7 +37,8 @@ class MatchControlServiceTest {
     activeTask = mock(Future.class);
     doReturn(activeTask).when(executorService).submit(any(Runnable.class));
     guard = new MatchExecutionGuard(fixedClock(), Duration.ZERO, 12);
-    service = new MatchControlService(matchEngine, executorService, guard);
+    matchDialogueCoordinator = mock(MatchDialogueCoordinator.class);
+    service = new MatchControlService(matchEngine, matchDialogueCoordinator, executorService, guard);
     match = Match.newGame();
   }
 
@@ -165,7 +167,7 @@ class MatchControlServiceTest {
   void successfulBackgroundFinishStartsCooldown() {
     MatchExecutionGuard cooldownGuard =
         new MatchExecutionGuard(fixedClock(), Duration.ofSeconds(60), 12);
-    service = new MatchControlService(matchEngine, executorService, cooldownGuard);
+    service = new MatchControlService(matchEngine, matchDialogueCoordinator, executorService, cooldownGuard);
     when(matchEngine.currentMatch()).thenReturn(match);
     service.startMatch();
 

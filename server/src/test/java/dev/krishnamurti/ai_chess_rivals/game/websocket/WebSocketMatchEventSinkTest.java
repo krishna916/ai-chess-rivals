@@ -20,7 +20,8 @@ class WebSocketMatchEventSinkTest {
     MatchStreamMessage<MatchStartedMessage> message =
         new MatchStreamMessage<>(
             MatchStreamMessageType.MATCH_STARTED,
-            new MatchStartedMessage(PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen()));
+            new MatchStartedMessage(
+                event.matchId(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen()));
 
     doReturn(message).when(mapper).map(event);
     doThrow(new RuntimeException("boom")).when(handler).broadcast(message);

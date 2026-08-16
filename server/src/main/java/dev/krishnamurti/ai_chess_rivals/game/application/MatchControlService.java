@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 public final class MatchControlService {
 
   private final MatchEngine matchEngine;
+  private final MatchDialogueCoordinator matchDialogueCoordinator;
   private final ExecutorService matchExecutor;
   private final MatchExecutionGuard executionGuard;
   private final AtomicReference<Future<?>> activeTask = new AtomicReference<>();
@@ -22,9 +23,11 @@ public final class MatchControlService {
 
   public MatchControlService(
       MatchEngine matchEngine,
+      MatchDialogueCoordinator matchDialogueCoordinator,
       @Qualifier("matchExecutor") ExecutorService matchExecutor,
       MatchExecutionGuard executionGuard) {
     this.matchEngine = matchEngine;
+    this.matchDialogueCoordinator = matchDialogueCoordinator;
     this.matchExecutor = matchExecutor;
     this.executionGuard = executionGuard;
   }
@@ -113,6 +116,11 @@ public final class MatchControlService {
   }
 
   private MatchSnapshot snapshot(Match match) {
-    return new MatchSnapshot(match, executionGuard.isRunning(), executionGuard.availability());
+    return
+        new MatchSnapshot(
+            match,
+            executionGuard.isRunning(),
+            executionGuard.availability(),
+            matchDialogueCoordinator.history(match.id()));
   }
 }
