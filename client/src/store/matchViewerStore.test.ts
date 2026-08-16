@@ -69,6 +69,8 @@ describe("matchViewerStore", () => {
       activeTurn: "WHITE",
       moveCount: 0,
       activities: [],
+      currentMatchId: undefined,
+      dialogue: [],
       result: undefined,
       error: undefined,
       startAvailability: undefined,
@@ -78,7 +80,7 @@ describe("matchViewerStore", () => {
   it("starts a match and clears stale activity", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STARTED",
-      payload: { fen: "newfen", sideToMove: "BLACK" },
+      payload: { matchId: "match-2", fen: "newfen", sideToMove: "BLACK" },
     });
 
     expect(useMatchViewerStore.getState()).toMatchObject({
@@ -87,6 +89,8 @@ describe("matchViewerStore", () => {
       activeTurn: "BLACK",
       moveCount: 0,
       activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
+      currentMatchId: "match-2",
+      dialogue: [],
     });
   });
 
@@ -105,6 +109,7 @@ describe("matchViewerStore", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
+        matchId: "match-1",
         status: "FINISHED",
         fen: "finalfen",
         sideToMove: "WHITE",
@@ -123,6 +128,7 @@ describe("matchViewerStore", () => {
           }),
           snapshotMove({ fenAfterMove: "fen1" }),
         ],
+        dialogue: [dialogue({ id: 2 }), dialogue({ id: 1 })],
       },
     });
 
@@ -151,6 +157,7 @@ describe("matchViewerStore", () => {
     const message = {
       type: "MATCH_STATE" as const,
       payload: {
+        matchId: "match-1",
         status: "IN_PROGRESS" as const,
         fen: "after-capture",
         sideToMove: "BLACK" as const,
@@ -169,6 +176,7 @@ describe("matchViewerStore", () => {
             capture: true,
           }),
         ],
+        dialogue: [],
       },
     };
 
@@ -229,6 +237,7 @@ describe("matchViewerStore", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
+        matchId: "match-1",
         status: "FINISHED",
         fen: "mate",
         sideToMove: "WHITE",
@@ -249,6 +258,7 @@ describe("matchViewerStore", () => {
             checkmate: true,
           }),
         ],
+        dialogue: [],
       },
     });
 
@@ -263,6 +273,7 @@ describe("matchViewerStore", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
+        matchId: "match-1",
         status: "IN_PROGRESS",
         fen: "after-e4",
         sideToMove: "BLACK",
@@ -270,6 +281,7 @@ describe("matchViewerStore", () => {
         running: false,
         startAvailability,
         moves: [snapshotMove()],
+        dialogue: [],
       },
     });
 
@@ -314,9 +326,52 @@ describe("matchViewerStore", () => {
     });
   });
 
+  it("hydrates dialogue in ascending persisted id order", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STATE",
+      payload: {
+        matchId: "match-1",
+        status: "IN_PROGRESS",
+        fen: "start",
+        sideToMove: "WHITE",
+        result: null,
+        running: true,
+        startAvailability,
+        moves: [],
+        dialogue: [dialogue({ id: 2 }), dialogue({ id: 1 })],
+      },
+    });
+
+    expect(
+      useMatchViewerStore.getState().dialogue.map((line) => line.id),
+    ).toEqual([1, 2]);
+  });
+
+  it("deduplicates live dialogue and ignores another match", () => {
+    useMatchViewerStore.setState({ currentMatchId: "match-1" });
+    const message = {
+      type: "DIALOGUE_PLAYED" as const,
+      payload: dialogue({ id: 3 }),
+    };
+
+    useMatchViewerStore.getState().processMessage(message);
+    useMatchViewerStore.getState().processMessage(message);
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({ id: 4, matchId: "other-match" }),
+    });
+
+    expect(
+      useMatchViewerStore.getState().dialogue.map((line) => line.id),
+    ).toEqual([3]);
+    expect(useMatchViewerStore.getState().activities).toEqual([]);
+  });
+
   it("resets all stale state on NO_MATCH", () => {
     useMatchViewerStore.setState({
       activeTurn: "BLACK",
+      currentMatchId: "old-match",
+      dialogue: [dialogue()],
       result: "DRAW",
       error: "stale",
       startAvailability,
@@ -333,7 +388,32 @@ describe("matchViewerStore", () => {
       result: undefined,
       error: undefined,
       activities: [],
+      currentMatchId: undefined,
+      dialogue: [],
       startAvailability: undefined,
     });
   });
 });
+
+function dialogue(
+  overrides: Partial<{
+    id: number;
+    matchId: string;
+    triggerPly: number;
+  }> = {},
+) {
+  return {
+    id: 1,
+    matchId: "match-1",
+    triggerType: "MOVE" as const,
+    triggerPly: 1,
+    personalityKey: "blaze",
+    personalityDisplayName: "Blaze",
+    text: "hello",
+    emotion: "CONFIDENT" as const,
+    reactionType: "MOVE_REACTION" as const,
+    source: "DETERMINISTIC_FALLBACK" as const,
+    createdAt: "2026-08-16T00:00:00Z",
+    ...overrides,
+  };
+}

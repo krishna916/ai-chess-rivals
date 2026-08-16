@@ -11,14 +11,18 @@ public final class MatchResponseMapper {
   public static MatchResponse map(MatchSnapshot snapshot) {
     Match match = snapshot.match();
     List<MoveResponse> moves = match.moves().stream().map(MoveResponse::from).toList();
+    List<DialogueResponse> dialogue =
+        snapshot.dialogue().stream().map(DialogueResponse::from).toList();
 
     return new MatchResponse(
+        match.id(),
         match.sideToMove(),
         match.currentPosition().fen(),
         moves,
         match.status(),
         match.result().orElse(null),
         snapshot.running(),
-        snapshot.startAvailability());
+        snapshot.startAvailability(),
+        dialogue);
   }
 }

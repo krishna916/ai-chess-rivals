@@ -2,6 +2,11 @@ package dev.krishnamurti.ai_chess_rivals.game.websocket;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
+import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEmotion;
+import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueReactionType;
+import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueTriggerType;
+import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
@@ -14,11 +19,16 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
+import dev.krishnamurti.ai_chess_rivals.game.event.DialoguePlayed;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
+import dev.krishnamurti.ai_chess_rivals.game.web.DialogueResponse;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class MatchStreamMessageMapperTest {
@@ -68,12 +78,15 @@ class MatchStreamMessageMapperTest {
 
   @Test
   void mapsMatchStartedEventToExplicitPayload() {
-    MatchStarted event = new MatchStarted(PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
+    UUID matchId = UUID.randomUUID();
+    MatchStarted event =
+        new MatchStarted(matchId, PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
 
     MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(event);
 
     assertEquals(MatchStreamMessageType.MATCH_STARTED, message.type());
     MatchStartedMessage payload = (MatchStartedMessage) message.payload();
+    assertEquals(matchId, payload.matchId());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(BoardPosition.STARTING_POSITION.fen(), payload.fen());
   }
@@ -112,9 +125,11 @@ class MatchStreamMessageMapperTest {
     MatchStartAvailability availability =
         new MatchStartAvailability(false, MatchStartBlockReason.MATCH_ALREADY_RUNNING, 0, 2, 12);
 
+    PersistedDialogue line = dialogue(match.id(), 1, 1, "hello");
     MatchStateMessage payload =
-        MatchStateMessage.from(new MatchSnapshot(match, true, availability));
+        MatchStateMessage.from(new MatchSnapshot(match, true, availability, List.of(line)));
 
+    assertEquals(match.id(), payload.matchId());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(match.currentPosition().fen(), payload.fen());
     assertTrue(payload.moves().isEmpty());
@@ -122,5 +137,42 @@ class MatchStreamMessageMapperTest {
     assertNull(payload.result());
     assertTrue(payload.running());
     assertSame(availability, payload.startAvailability());
+    assertEquals(List.of(1L), payload.dialogue().stream().map(DialogueResponse::id).toList());
+  }
+
+  @Test
+  void mapsPersistedDialogueToLiveMessage() {
+    PersistedDialogue line = dialogue(UUID.randomUUID(), 7, 3, "stored line");
+
+    MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(new DialoguePlayed(line));
+
+    assertEquals(MatchStreamMessageType.DIALOGUE_PLAYED, message.type());
+    DialoguePlayedMessage payload = (DialoguePlayedMessage) message.payload();
+    assertEquals(line.id(), payload.id());
+    assertEquals(line.matchId(), payload.matchId());
+    assertEquals(line.triggerType(), payload.triggerType());
+    assertEquals(line.triggerPly(), payload.triggerPly());
+    assertEquals(line.personalityKey(), payload.personalityKey());
+    assertEquals(line.personalityDisplayName(), payload.personalityDisplayName());
+    assertEquals(line.text(), payload.text());
+    assertEquals(line.emotion(), payload.emotion());
+    assertEquals(line.reactionType(), payload.reactionType());
+    assertEquals(line.source(), payload.source());
+    assertEquals(line.createdAt(), payload.createdAt());
+  }
+
+  private static PersistedDialogue dialogue(UUID matchId, long id, int ply, String text) {
+    return new PersistedDialogue(
+        id,
+        matchId,
+        DialogueTriggerType.MOVE,
+        ply,
+        "blaze",
+        "Blaze",
+        text,
+        DialogueEmotion.CONFIDENT,
+        DialogueReactionType.MOVE_REACTION,
+        AiResponseSource.DETERMINISTIC_FALLBACK,
+        Instant.parse("2026-08-16T00:00:00Z").plusSeconds(id));
   }
 }

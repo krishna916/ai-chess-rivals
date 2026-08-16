@@ -122,7 +122,17 @@ an additional Actuator endpoint.
 
 ### Phase 2 Dialogue Generation
 
-The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs Groq → Gemini → deterministic fallback. Dialogue persistence and match-lifecycle wiring remain separate work in issue #43.
+The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs Groq → Gemini → deterministic fallback.
+
+### Issue #43 Dialogue Persistence and Match Lifecycle
+
+- Flyway V4 adds the `dialogue_line` table, including match UUID, trigger type/ply, personality, text, emotion, reaction, source, and creation time. The unique key is `(match_id, trigger_type, trigger_ply, personality_key)`.
+- A match UUID is an in-memory identity used to partition dialogue history; no persisted match aggregate is introduced.
+- Dialogue runs synchronously after a committed move and its broadcast, before result handling and pacing; end dialogue is persisted before `MATCH_FINISHED` is published.
+- Prompt context uses the last four persisted dialogue rows in chronological order. Deterministic provider fallbacks follow the same persistence path with source `DETERMINISTIC_FALLBACK`.
+- Stop increments an execution-generation guard. Late provider results from an invalidated generation are discarded, including when execution is resumed.
+- The temporary runtime personality pairing is Blaze/Vesper only until issue #44 supplies match personality selection.
+- REST snapshots, WebSocket state/live messages, and the frontend store hydrate and deduplicate persisted dialogue. Rendering dialogue in the activity feed remains issue #45 work.
 
 ### Web & API Communication
 *   **Spring Boot Starter WebMVC**: Configures REST APIs and synchronous web endpoints.
@@ -141,7 +151,7 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
 *   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
 *   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
-*   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`, with `server/spotbugs-exclude.xml` limited to Hibernate-generated accessors on the personality entity.
+*   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`, with `server/spotbugs-exclude.xml` limited to Hibernate-generated accessors on the personality and dialogue entities plus the persistence service's defensive constructor validation.
 *   **Maven Enforcer Plugin** (`v3.6.3`): Requires Java 25 and Maven 3.9 or newer.
 *   **Spring Modulith verification**: A focused test validates module cycles and dependency boundaries.
 

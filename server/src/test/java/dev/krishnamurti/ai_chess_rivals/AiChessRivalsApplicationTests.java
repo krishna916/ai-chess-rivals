@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals;
 
+import dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
           + "org.springframework.modulith.events.config.EventPublicationAutoConfiguration,"
           + "org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration"
     })
-@Import(PersonalityRepositoryTestConfiguration.class)
+@Import({PersonalityRepositoryTestConfiguration.class, DialogueRepositoryTestConfiguration.class})
 class AiChessRivalsApplicationTests {
 
   // Prevents the real StockfishEngine from starting — it requires a binary on disk.

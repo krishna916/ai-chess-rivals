@@ -8,4 +8,16 @@
     <Class name="dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityEntity" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueLineEntity" />
+    <Bug pattern="EI_EXPOSE_REP" />
+  </Match>
+  <Match>
+    <Class name="dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueLineEntity" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialoguePersistenceService" />
+    <Bug pattern="CT_CONSTRUCTOR_THROW" />
+  </Match>
 </FindBugsFilter>

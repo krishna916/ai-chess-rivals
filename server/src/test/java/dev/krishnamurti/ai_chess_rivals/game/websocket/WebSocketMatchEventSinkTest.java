@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import dev.krishnamurti.ai_chess_rivals.game.domain.BoardPosition;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class WebSocketMatchEventSinkTest {
@@ -14,11 +15,13 @@ class WebSocketMatchEventSinkTest {
   void sinkDoesNotPropagateTransportFailures() {
     MatchStreamMessageMapper mapper = mock(MatchStreamMessageMapper.class);
     MatchWebSocketHandler handler = mock(MatchWebSocketHandler.class);
-    MatchStarted event = new MatchStarted(PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
+    MatchStarted event =
+        new MatchStarted(UUID.randomUUID(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
     MatchStreamMessage<MatchStartedMessage> message =
         new MatchStreamMessage<>(
             MatchStreamMessageType.MATCH_STARTED,
-            new MatchStartedMessage(PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen()));
+            new MatchStartedMessage(
+                event.matchId(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen()));
 
     doReturn(message).when(mapper).map(event);
     doThrow(new RuntimeException("boom")).when(handler).broadcast(message);

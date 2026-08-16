@@ -1,16 +1,23 @@
 package dev.krishnamurti.ai_chess_rivals.game.application;
 
+import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
+import java.util.List;
+import java.util.Objects;
 
 public record MatchSnapshot(
-    Match match, boolean running, MatchStartAvailability startAvailability) {
+    Match match,
+    boolean running,
+    MatchStartAvailability startAvailability,
+    List<PersistedDialogue> dialogue) {
   public MatchSnapshot {
-    if (match == null) {
-      throw new NullPointerException("match must not be null");
-    }
-    if (startAvailability == null) {
-      throw new NullPointerException("startAvailability must not be null");
-    }
+    Objects.requireNonNull(match, "match must not be null");
+    Objects.requireNonNull(startAvailability, "startAvailability must not be null");
+    dialogue = dialogue != null ? List.copyOf(dialogue) : List.of();
+  }
+
+  public MatchSnapshot(Match match, boolean running, MatchStartAvailability startAvailability) {
+    this(match, running, startAvailability, List.of());
   }
 
   public MatchSnapshot(Match match, boolean running) {
@@ -22,6 +29,7 @@ public record MatchSnapshot(
             running ? MatchStartBlockReason.MATCH_ALREADY_RUNNING : null,
             0,
             0,
-            Integer.MAX_VALUE));
+            Integer.MAX_VALUE),
+        List.of());
   }
 }

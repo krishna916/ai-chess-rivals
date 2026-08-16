@@ -2,10 +2,18 @@ package dev.krishnamurti.ai_chess_rivals.game.web;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
+import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEmotion;
+import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueReactionType;
+import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueTriggerType;
+import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
 import dev.krishnamurti.ai_chess_rivals.game.domain.*;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class MatchResponseMapperTest {
@@ -26,6 +34,25 @@ class MatchResponseMapperTest {
     assertNull(response.result());
     assertTrue(response.running());
     assertSame(availability, response.startAvailability());
+  }
+
+  @Test
+  void mapsMatchIdentityAndChronologicalDialogue() {
+    Match match = Match.newGame();
+    PersistedDialogue first = dialogue(match.id(), 1, 0, "first");
+    PersistedDialogue second = dialogue(match.id(), 2, 1, "second");
+    MatchResponse response =
+        MatchResponseMapper.map(
+            new MatchSnapshot(
+                match,
+                false,
+                new MatchStartAvailability(true, null, 0, 0, 12),
+                List.of(first, second)));
+
+    assertEquals(match.id(), response.matchId());
+    assertEquals(List.of(1L, 2L), response.dialogue().stream().map(DialogueResponse::id).toList());
+    assertEquals("first", response.dialogue().get(0).text());
+    assertEquals("second", response.dialogue().get(1).text());
   }
 
   @Test
@@ -70,5 +97,20 @@ class MatchResponseMapperTest {
     assertEquals(match.status(), response.status());
     assertNull(response.result());
     assertFalse(response.running());
+  }
+
+  private static PersistedDialogue dialogue(UUID matchId, long id, int ply, String text) {
+    return new PersistedDialogue(
+        id,
+        matchId,
+        DialogueTriggerType.MOVE,
+        ply,
+        "blaze",
+        "Blaze",
+        text,
+        DialogueEmotion.CONFIDENT,
+        DialogueReactionType.MOVE_REACTION,
+        AiResponseSource.DETERMINISTIC_FALLBACK,
+        Instant.parse("2026-08-16T00:00:00Z").plusSeconds(id));
   }
 }

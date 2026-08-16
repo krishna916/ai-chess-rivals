@@ -90,6 +90,26 @@ Error Prone, runs tests (including Spring Modulith structure verification), and 
 Apply Java formatting with `server\mvnw.cmd -f server\pom.xml spotless:apply` on Windows or
 `./server/mvnw -f server/pom.xml spotless:apply` on POSIX systems.
 
+### Optional dialogue persistence PostgreSQL integration test
+
+The explicit `DialoguePersistencePostgresIT` is excluded from the normal Surefire run. Run it
+against an isolated PostgreSQL 17 container and keep the normal verifier independent of Docker:
+
+```powershell
+docker run --name ai-chess-rivals-dialogue-it --rm -d `
+  -e POSTGRES_DB=aichessrivals_it `
+  -e POSTGRES_PASSWORD=secretpassword `
+  -p 55433:5432 postgres:17-alpine
+
+server\mvnw.cmd -f server\pom.xml -Dtest=DialoguePersistencePostgresIT test
+
+docker stop ai-chess-rivals-dialogue-it
+```
+
+The test pins both datasource and Flyway URLs to `localhost:55433`, validates Flyway V1–V4 and
+Hibernate schema mapping, and proves dialogue idempotency, chronological history, and last-four
+context behavior. Do not point it at the normal development database or volume.
+
 ## Frontend
 
 Run these commands from `client/`:

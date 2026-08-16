@@ -6,6 +6,18 @@ export type PlayerColor = "WHITE" | "BLACK";
 export type ChessPieceType =
   "PAWN" | "KNIGHT" | "BISHOP" | "ROOK" | "QUEEN" | "KING";
 export type CastlingSide = "KING_SIDE" | "QUEEN_SIDE";
+export type DialogueTriggerType = "GAME_START" | "MOVE" | "GAME_END";
+export type DialogueEmotion =
+  | "NEUTRAL"
+  | "CONFIDENT"
+  | "AMUSED"
+  | "ANNOYED"
+  | "CALM"
+  | "TRIUMPHANT"
+  | "DEFIANT";
+export type DialogueReactionType =
+  "GAME_START" | "MOVE_REACTION" | "VICTORY" | "DEFEAT" | "DRAW";
+export type AiResponseSource = "GROQ" | "GEMINI" | "DETERMINISTIC_FALLBACK";
 
 export interface BaseMessage {
   type: string;
@@ -42,7 +54,22 @@ export interface StartAvailability {
   dailyStartLimit: number;
 }
 
+export interface DialogueResponse {
+  id: number;
+  matchId: string;
+  triggerType: DialogueTriggerType;
+  triggerPly: number;
+  personalityKey: string;
+  personalityDisplayName: string;
+  text: string;
+  emotion: DialogueEmotion;
+  reactionType: DialogueReactionType;
+  source: AiResponseSource;
+  createdAt: string;
+}
+
 export interface MatchResponse {
+  matchId: string;
   sideToMove: PlayerColor;
   fen: string;
   moves: MoveResponse[];
@@ -50,6 +77,7 @@ export interface MatchResponse {
   result: string | null;
   running: boolean;
   startAvailability: StartAvailability;
+  dialogue: DialogueResponse[];
 }
 
 export interface MatchStateMessage extends BaseMessage {
@@ -60,9 +88,15 @@ export interface MatchStateMessage extends BaseMessage {
 export interface MatchStartedMessage extends BaseMessage {
   type: "MATCH_STARTED";
   payload: {
+    matchId: string;
     sideToMove: PlayerColor;
     fen: string;
   };
+}
+
+export interface DialoguePlayedMessage extends BaseMessage {
+  type: "DIALOGUE_PLAYED";
+  payload: DialogueResponse;
 }
 
 export interface MovePlayedMessage extends BaseMessage {
@@ -116,6 +150,7 @@ export type MatchStreamMessage =
   | MovePlayedMessage
   | MatchStoppedMessage
   | MatchFinishedMessage
+  | DialoguePlayedMessage
   | NoMatchMessage;
 
 export type MatchActivityKind = "MATCH_STARTED" | "MOVE" | "MATCH_FINISHED";

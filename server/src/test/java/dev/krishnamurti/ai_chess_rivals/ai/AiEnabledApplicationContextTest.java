@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatGateway;
+import dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
           + "org.springframework.modulith.events.config.EventPublicationAutoConfiguration,"
           + "org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration"
     })
-@Import(PersonalityRepositoryTestConfiguration.class)
+@Import({PersonalityRepositoryTestConfiguration.class, DialogueRepositoryTestConfiguration.class})
 class AiEnabledApplicationContextTest {
 
   @Autowired ApplicationContext context;

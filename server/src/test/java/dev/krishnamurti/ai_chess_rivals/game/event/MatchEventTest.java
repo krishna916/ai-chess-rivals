@@ -9,6 +9,7 @@ import dev.krishnamurti.ai_chess_rivals.game.domain.MoveDetails;
 import dev.krishnamurti.ai_chess_rivals.game.domain.MoveNotation;
 import dev.krishnamurti.ai_chess_rivals.game.domain.PlayerColor;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class MatchEventTest {
@@ -16,8 +17,14 @@ class MatchEventTest {
   @Test
   void matchStartedRejectsNullDomainValues() {
     assertThrows(
-        NullPointerException.class, () -> new MatchStarted(null, BoardPosition.STARTING_POSITION));
-    assertThrows(NullPointerException.class, () -> new MatchStarted(PlayerColor.WHITE, null));
+        NullPointerException.class,
+        () -> new MatchStarted(null, PlayerColor.WHITE, BoardPosition.STARTING_POSITION));
+    assertThrows(
+        NullPointerException.class,
+        () -> new MatchStarted(UUID.randomUUID(), null, BoardPosition.STARTING_POSITION));
+    assertThrows(
+        NullPointerException.class,
+        () -> new MatchStarted(UUID.randomUUID(), PlayerColor.WHITE, null));
   }
 
   @Test
