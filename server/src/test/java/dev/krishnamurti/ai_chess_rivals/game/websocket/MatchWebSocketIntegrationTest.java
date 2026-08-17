@@ -96,6 +96,12 @@ class MatchWebSocketIntegrationTest {
     String matchStartedMessage = messages.poll(5, TimeUnit.SECONDS);
     assertNotNull(matchStartedMessage);
     assertTrue(matchStartedMessage.contains("\"type\":\"MATCH_STARTED\""));
+    assertTrue(
+        matchStartedMessage.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        matchStartedMessage.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(matchStartedMessage.contains("\"sideToMove\":\"WHITE\""));
     assertTrue(
         matchStartedMessage.contains("\"fen\":\"" + BoardPosition.STARTING_POSITION.fen() + "\""));

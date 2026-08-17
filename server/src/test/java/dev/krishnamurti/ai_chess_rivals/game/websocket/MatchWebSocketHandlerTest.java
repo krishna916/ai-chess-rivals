@@ -57,6 +57,12 @@ class MatchWebSocketHandlerTest {
     assertEquals(1, rawSession.getSentMessages().size());
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"type\":\"MATCH_STATE\""));
+    assertTrue(
+        payload.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        payload.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(payload.contains("\"running\":true"));
   }
 
@@ -70,6 +76,12 @@ class MatchWebSocketHandlerTest {
 
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"status\":\"IN_PROGRESS\""));
+    assertTrue(
+        payload.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        payload.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(payload.contains("\"running\":false"));
   }
 
@@ -83,6 +95,12 @@ class MatchWebSocketHandlerTest {
 
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"status\":\"FINISHED\""));
+    assertTrue(
+        payload.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        payload.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(payload.contains("\"result\":\"DRAW\""));
     assertTrue(payload.contains("\"running\":false"));
   }

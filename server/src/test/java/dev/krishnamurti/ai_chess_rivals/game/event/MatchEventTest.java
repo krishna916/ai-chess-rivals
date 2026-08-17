@@ -38,6 +38,11 @@ class MatchEventTest {
         () ->
             new MatchStarted(
                 UUID.randomUUID(), PlayerColor.WHITE, null, TestMatchFixtures.TEST_RIVALRY));
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            new MatchStarted(
+                UUID.randomUUID(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION, null));
   }
 
   @Test
