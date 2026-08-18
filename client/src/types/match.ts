@@ -174,7 +174,8 @@ export type MatchStreamMessage =
   | DialoguePlayedMessage
   | NoMatchMessage;
 
-export type MatchActivityKind = "MATCH_STARTED" | "MOVE" | "MATCH_FINISHED";
+export type MatchActivityKind =
+  "MATCH_STARTED" | "MOVE" | "DIALOGUE" | "MATCH_FINISHED";
 
 export interface MatchStartedActivityItem {
   id: string;
@@ -203,6 +204,21 @@ export interface MoveActivityItem {
   isNew: boolean;
 }
 
+export interface DialogueActivityItem {
+  id: string;
+  kind: "DIALOGUE";
+  sequence: number;
+  dialogueId: number;
+  triggerType: DialogueTriggerType;
+  personalityKey: string;
+  personalityDisplayName: string;
+  side: PlayerColor | null;
+  text: string;
+  emotion: DialogueEmotion;
+  reactionType: DialogueReactionType;
+  createdAt: string;
+}
+
 export interface MatchFinishedActivityItem {
   id: string;
   kind: "MATCH_FINISHED";
@@ -211,4 +227,7 @@ export interface MatchFinishedActivityItem {
 }
 
 export type MatchActivityItem =
-  MatchStartedActivityItem | MoveActivityItem | MatchFinishedActivityItem;
+  | MatchStartedActivityItem
+  | MoveActivityItem
+  | DialogueActivityItem
+  | MatchFinishedActivityItem;
