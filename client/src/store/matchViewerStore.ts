@@ -129,14 +129,13 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
       case "DIALOGUE_PLAYED":
         set((state) => {
           if (
-            state.currentMatchId !== undefined &&
+            state.currentMatchId === undefined ||
             msg.payload.matchId !== state.currentMatchId
           ) {
             return state;
           }
 
           return {
-            currentMatchId: state.currentMatchId ?? msg.payload.matchId,
             activities: mergeMatchActivity(
               state.activities,
               toDialogueActivity(

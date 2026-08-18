@@ -271,6 +271,35 @@ describe("matchViewerStore", () => {
     ).toHaveLength(1);
   });
 
+  it("keeps a hydrated move historical when a duplicate live move arrives", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STATE",
+      payload: {
+        matchId: "match-1",
+        ...matchPersonalities,
+        status: "IN_PROGRESS",
+        fen: "after-e4",
+        sideToMove: "BLACK",
+        result: null,
+        running: true,
+        startAvailability,
+        moves: [snapshotMove()],
+        dialogue: [],
+      },
+    });
+
+    useMatchViewerStore.getState().processMessage({
+      type: "MOVE_PLAYED",
+      payload: liveMove({ capture: true }),
+    });
+
+    expect(useMatchViewerStore.getState().activities).toHaveLength(2);
+    expect(useMatchViewerStore.getState().activities[1]).toMatchObject({
+      id: "move-1",
+      isNew: false,
+    });
+  });
+
   it("hydrates server flags without chess.js reconstruction", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
@@ -559,6 +588,16 @@ describe("matchViewerStore", () => {
       whitePersonality: undefined,
       blackPersonality: undefined,
     });
+  });
+
+  it("ignores dialogue received before a match has been established", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({ id: 8, matchId: "stale-match" }),
+    });
+
+    expect(useMatchViewerStore.getState().activities).toEqual([]);
+    expect(useMatchViewerStore.getState().currentMatchId).toBeUndefined();
   });
 });
 

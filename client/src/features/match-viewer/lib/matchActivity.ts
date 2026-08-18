@@ -100,14 +100,13 @@ function activityRank(activity: MatchActivityItem): number {
     case "MOVE":
       return 10;
     case "DIALOGUE":
-      switch (activity.triggerType) {
-        case "GAME_START":
-          return 5;
-        case "MOVE":
-          return 20;
-        case "GAME_END":
-          return 30;
+      if (activity.triggerType === "GAME_START") {
+        return 5;
       }
+      if (activity.triggerType === "MOVE") {
+        return 20;
+      }
+      return 30;
     case "MATCH_FINISHED":
       return 40;
   }
@@ -138,9 +137,15 @@ export function mergeMatchActivity(
   activities: MatchActivityItem[],
   next: MatchActivityItem,
 ): MatchActivityItem[] {
+  const existing = activities.find((activity) => activity.id === next.id);
+  const mergedNext =
+    existing?.kind === "MOVE" && next.kind === "MOVE"
+      ? { ...next, isNew: existing.isNew }
+      : next;
+
   return [
     ...activities.filter((activity) => activity.id !== next.id),
-    next,
+    mergedNext,
   ].sort(compareMatchActivities);
 }
 
