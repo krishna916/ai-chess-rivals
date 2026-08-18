@@ -13,7 +13,10 @@ export function MatchActivityPanel() {
   }, [activities.length]);
 
   return (
-    <div className="bg-card shadow rounded-xl border flex flex-col h-full min-h-[400px] max-h-[600px] lg:max-h-[calc(100vh-200px)]">
+    <div
+      data-testid="match-activity-panel"
+      className="bg-card shadow rounded-xl border flex flex-col h-full min-h-[400px] max-h-[600px] lg:max-h-[calc(100vh-200px)]"
+    >
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">
           Match Activity
@@ -25,6 +28,7 @@ export function MatchActivityPanel() {
 
       <div
         ref={feedRef}
+        data-testid="match-activity-feed"
         className="flex-1 overflow-y-auto p-4 space-y-3"
         id="match-activity-feed"
       >
