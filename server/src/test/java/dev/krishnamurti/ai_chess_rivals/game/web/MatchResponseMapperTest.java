@@ -7,6 +7,7 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEmotion;
 import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueReactionType;
 import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueTriggerType;
 import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
@@ -20,7 +21,7 @@ class MatchResponseMapperTest {
 
   @Test
   void mapsMatchSnapshotToMatchResponse() {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     MatchStartAvailability availability =
         new MatchStartAvailability(false, MatchStartBlockReason.MATCH_ALREADY_RUNNING, 0, 1, 12);
     MatchSnapshot snapshot = new MatchSnapshot(match, true, availability);
@@ -38,7 +39,7 @@ class MatchResponseMapperTest {
 
   @Test
   void mapsMatchIdentityAndChronologicalDialogue() {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     PersistedDialogue first = dialogue(match.id(), 1, 0, "first");
     PersistedDialogue second = dialogue(match.id(), 2, 1, "second");
     MatchResponse response =
@@ -50,6 +51,10 @@ class MatchResponseMapperTest {
                 List.of(first, second)));
 
     assertEquals(match.id(), response.matchId());
+    assertEquals(
+        new MatchPersonalityResponse("white-test", "White Test"), response.whitePersonality());
+    assertEquals(
+        new MatchPersonalityResponse("black-test", "Black Test"), response.blackPersonality());
     assertEquals(List.of(1L, 2L), response.dialogue().stream().map(DialogueResponse::id).toList());
     assertEquals("first", response.dialogue().get(0).text());
     assertEquals("second", response.dialogue().get(1).text());
@@ -58,7 +63,7 @@ class MatchResponseMapperTest {
   @Test
   void mapsMatchSnapshotWithMovesToMatchResponse() {
     Match match =
-        Match.newGame()
+        TestMatchFixtures.newMatch()
             .recordMove(
                 new MoveNotation("e2e4"),
                 new BoardPosition("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"),

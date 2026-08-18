@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public record MatchResponse(
     UUID matchId,
+    MatchPersonalityResponse whitePersonality,
+    MatchPersonalityResponse blackPersonality,
     PlayerColor sideToMove,
     String fen,
     List<MoveResponse> moves,

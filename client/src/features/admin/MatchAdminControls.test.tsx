@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminMatchApi } from "@/services/adminMatchApi";
 import { matchApi } from "@/services/matchApi";
+import { personalityApi } from "@/services/personalityApi";
 import { useMatchViewerStore } from "@/store/matchViewerStore";
 import { clearOwnerToken } from "./ownerToken";
 import { MatchAdminControls } from "./MatchAdminControls";
@@ -19,6 +20,9 @@ vi.mock("@/services/adminMatchApi", () => ({
 }));
 vi.mock("@/services/matchApi", () => ({
   matchApi: { getCurrentMatch: vi.fn() },
+}));
+vi.mock("@/services/personalityApi", () => ({
+  personalityApi: { listSelectable: vi.fn() },
 }));
 vi.mock("./ownerToken", async (importOriginal) => {
   const original = await importOriginal<typeof import("./ownerToken")>();
@@ -35,6 +39,8 @@ const allowed = {
 
 const snapshot = {
   matchId: "match-1",
+  whitePersonality: { key: "blaze", displayName: "Blaze" },
+  blackPersonality: { key: "vesper", displayName: "Vesper" },
   sideToMove: "WHITE" as const,
   fen: "start",
   moves: [],
@@ -49,15 +55,40 @@ const snapshot = {
   dialogue: [],
 };
 
+const roster = [
+  { key: "blaze", displayName: "Blaze", description: "Bold.", avatarRef: null },
+  {
+    key: "vesper",
+    displayName: "Vesper",
+    description: "Precise.",
+    avatarRef: null,
+  },
+  {
+    key: "gremlin",
+    displayName: "Gremlin",
+    description: "Chaotic.",
+    avatarRef: null,
+  },
+  {
+    key: "regent",
+    displayName: "Regent",
+    description: "Regal.",
+    avatarRef: null,
+  },
+];
+
 describe("MatchAdminControls", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(personalityApi.listSelectable).mockResolvedValue(roster);
     sessionStorage.setItem("ownerControlToken", "owner-token");
     useMatchViewerStore.setState({
       matchStatus: "IDLE",
       startAvailability: allowed,
       activities: [],
       moveCount: 0,
+      whitePersonality: undefined,
+      blackPersonality: undefined,
     });
   });
 
@@ -76,10 +107,18 @@ describe("MatchAdminControls", () => {
       />,
     );
 
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start Match" }),
+      ).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Start Match" }));
 
     await waitFor(() =>
-      expect(adminMatchApi.startMatch).toHaveBeenCalledWith("owner-token"),
+      expect(adminMatchApi.startMatch).toHaveBeenCalledWith("owner-token", {
+        whitePersonalityKey: "blaze",
+        blackPersonalityKey: "vesper",
+      }),
     );
     expect(useMatchViewerStore.getState()).toMatchObject({
       matchStatus: "IN_PROGRESS",
@@ -101,11 +140,202 @@ describe("MatchAdminControls", () => {
       />,
     );
 
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start Match" }),
+      ).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Start Match" }));
 
     await waitFor(() =>
-      expect(adminMatchApi.startMatch).toHaveBeenCalledWith("owner-token"),
+      expect(adminMatchApi.startMatch).toHaveBeenCalledWith("owner-token", {
+        whitePersonalityKey: "blaze",
+        blackPersonalityKey: "vesper",
+      }),
     );
+  });
+
+  it("loads the roster and posts changed selections", async () => {
+    vi.mocked(adminMatchApi.startMatch).mockResolvedValue(snapshot);
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("White personality")).toBeVisible(),
+    );
+    fireEvent.change(screen.getByLabelText("White personality"), {
+      target: { value: "gremlin" },
+    });
+    fireEvent.change(screen.getByLabelText("Black personality"), {
+      target: { value: "regent" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start Match" }),
+      ).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start Match" }));
+
+    await waitFor(() =>
+      expect(adminMatchApi.startMatch).toHaveBeenCalledWith("owner-token", {
+        whitePersonalityKey: "gremlin",
+        blackPersonalityKey: "regent",
+      }),
+    );
+  });
+
+  it("shows a retryable roster error and disables a new start", async () => {
+    vi.mocked(personalityApi.listSelectable).mockRejectedValueOnce(
+      new Error("offline"),
+    );
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Loading personalities…")).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to load personalities. Please try again.",
+    );
+    expect(screen.getByRole("button", { name: "Start Match" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(personalityApi.listSelectable).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it("resumes a stopped match with stored identities when roster loading fails", async () => {
+    const storedWhite = { key: "stored-white", displayName: "Stored White" };
+    const storedBlack = { key: "stored-black", displayName: "Stored Black" };
+
+    vi.mocked(personalityApi.listSelectable).mockRejectedValue(
+      new Error("offline"),
+    );
+    useMatchViewerStore.setState({
+      matchStatus: "STOPPED",
+      startAvailability: allowed,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+    });
+    vi.mocked(matchApi.getCurrentMatch).mockResolvedValue({
+      ...snapshot,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+      running: false,
+      status: "STOPPED",
+      startAvailability: allowed,
+    });
+    vi.mocked(adminMatchApi.startMatch).mockResolvedValue(snapshot);
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    const resume = screen.getByRole("button", { name: "Resume Match" });
+    expect(resume).not.toBeDisabled();
+    fireEvent.click(resume);
+
+    await waitFor(() =>
+      expect(adminMatchApi.startMatch).toHaveBeenCalledWith("owner-token", {
+        whitePersonalityKey: "stored-white",
+        blackPersonalityKey: "stored-black",
+      }),
+    );
+  });
+
+  it("keeps Resume disabled while the server blocks a stopped match", () => {
+    const blocked = {
+      ...allowed,
+      allowed: false,
+      blockedBy: "MATCH_COOLDOWN_ACTIVE" as const,
+      retryAfterSeconds: 60,
+    };
+    const storedWhite = { key: "stored-white", displayName: "Stored White" };
+    const storedBlack = { key: "stored-black", displayName: "Stored Black" };
+
+    useMatchViewerStore.setState({
+      matchStatus: "STOPPED",
+      startAvailability: blocked,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+    });
+    vi.mocked(matchApi.getCurrentMatch).mockResolvedValue({
+      ...snapshot,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+      running: false,
+      status: "STOPPED",
+      startAvailability: blocked,
+    });
+
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    const resume = screen.getByRole("button", { name: "Resume Match" });
+    expect(resume).toBeDisabled();
+    fireEvent.click(resume);
+    expect(adminMatchApi.startMatch).not.toHaveBeenCalled();
+  });
+
+  it("renders stored rivalry identities instead of roster selectors while stopped", async () => {
+    const storedWhite = { key: "retired-white", displayName: "Retired White" };
+    const storedBlack = { key: "retired-black", displayName: "Retired Black" };
+
+    useMatchViewerStore.setState({
+      matchStatus: "STOPPED",
+      startAvailability: allowed,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+    });
+    vi.mocked(matchApi.getCurrentMatch).mockResolvedValue({
+      ...snapshot,
+      whitePersonality: storedWhite,
+      blackPersonality: storedBlack,
+      running: false,
+      status: "STOPPED",
+      startAvailability: allowed,
+    });
+
+    render(
+      <MatchAdminControls
+        token="owner-token"
+        onLock={vi.fn()}
+        onUnauthorized={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(personalityApi.listSelectable).toHaveBeenCalledTimes(1),
+    );
+
+    expect(screen.getByText("Retired White")).toBeVisible();
+    expect(screen.getByText("Retired Black")).toBeVisible();
+    expect(
+      screen.queryByLabelText("White personality"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Black personality"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Randomize Rivalry" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows pending Stop and sends one stop request", async () => {
@@ -143,6 +373,11 @@ describe("MatchAdminControls", () => {
       />,
     );
 
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start Match" }),
+      ).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Start Match" }));
 
     await waitFor(() => expect(clearOwnerToken).toHaveBeenCalled());
@@ -249,6 +484,11 @@ describe("MatchAdminControls", () => {
         onLock={vi.fn()}
         onUnauthorized={vi.fn()}
       />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start Match" }),
+      ).not.toBeDisabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: "Start Match" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(

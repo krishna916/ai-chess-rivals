@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.game.websocket;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchNotFoundException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
@@ -46,7 +47,7 @@ class MatchWebSocketHandlerTest {
 
   @Test
   void newClientReceivesCurrentMatchStateImmediately() throws Exception {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(match, true));
 
     StubWebSocketSession rawSession = new StubWebSocketSession("healthy");
@@ -56,24 +57,37 @@ class MatchWebSocketHandlerTest {
     assertEquals(1, rawSession.getSentMessages().size());
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"type\":\"MATCH_STATE\""));
+    assertTrue(
+        payload.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        payload.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(payload.contains("\"running\":true"));
   }
 
   @Test
   void newClientReceivesStoppedMatchStateImmediately() throws Exception {
-    when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(Match.newGame(), false));
+    when(matchControlService.currentMatch())
+        .thenReturn(new MatchSnapshot(TestMatchFixtures.newMatch(), false));
     StubWebSocketSession rawSession = new StubWebSocketSession("stopped");
 
     handler.afterConnectionEstablished(rawSession);
 
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"status\":\"IN_PROGRESS\""));
+    assertTrue(
+        payload.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        payload.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(payload.contains("\"running\":false"));
   }
 
   @Test
   void newClientReceivesFinishedMatchStateImmediately() throws Exception {
-    Match finishedMatch = Match.newGame().finish(GameResult.DRAW);
+    Match finishedMatch = TestMatchFixtures.newMatch().finish(GameResult.DRAW);
     when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(finishedMatch, false));
     StubWebSocketSession rawSession = new StubWebSocketSession("finished");
 
@@ -81,6 +95,12 @@ class MatchWebSocketHandlerTest {
 
     String payload = rawSession.getSentMessages().getFirst().getPayload();
     assertTrue(payload.contains("\"status\":\"FINISHED\""));
+    assertTrue(
+        payload.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        payload.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(payload.contains("\"result\":\"DRAW\""));
     assertTrue(payload.contains("\"running\":false"));
   }

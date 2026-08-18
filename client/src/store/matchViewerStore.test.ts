@@ -14,6 +14,11 @@ const startAvailability: StartAvailability = {
   dailyStartLimit: 12,
 };
 
+const matchPersonalities = {
+  whitePersonality: { key: "blaze", displayName: "Blaze" },
+  blackPersonality: { key: "vesper", displayName: "Vesper" },
+};
+
 function snapshotMove(overrides: Partial<MoveResponse> = {}): MoveResponse {
   return {
     sequenceNumber: 1,
@@ -80,7 +85,12 @@ describe("matchViewerStore", () => {
   it("starts a match and clears stale activity", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STARTED",
-      payload: { matchId: "match-2", fen: "newfen", sideToMove: "BLACK" },
+      payload: {
+        matchId: "match-2",
+        ...matchPersonalities,
+        fen: "newfen",
+        sideToMove: "BLACK",
+      },
     });
 
     expect(useMatchViewerStore.getState()).toMatchObject({
@@ -91,6 +101,7 @@ describe("matchViewerStore", () => {
       activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
       currentMatchId: "match-2",
       dialogue: [],
+      ...matchPersonalities,
     });
   });
 
@@ -105,11 +116,36 @@ describe("matchViewerStore", () => {
     });
   });
 
+  it("preserves identities through stop and finish events", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STARTED",
+      payload: {
+        matchId: "match-2",
+        ...matchPersonalities,
+        fen: "newfen",
+        sideToMove: "WHITE",
+      },
+    });
+
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STOPPED",
+      payload: { sideToMove: "WHITE", fen: "stopped", totalPlies: 1 },
+    });
+    expect(useMatchViewerStore.getState()).toMatchObject(matchPersonalities);
+
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_FINISHED",
+      payload: { result: "DRAW", fen: "finished", totalPlies: 2 },
+    });
+    expect(useMatchViewerStore.getState()).toMatchObject(matchPersonalities);
+  });
+
   it("hydrates ordered structured moves and a final result", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
         matchId: "match-1",
+        ...matchPersonalities,
         status: "FINISHED",
         fen: "finalfen",
         sideToMove: "WHITE",
@@ -133,6 +169,8 @@ describe("matchViewerStore", () => {
     });
 
     const state = useMatchViewerStore.getState();
+    expect(state.whitePersonality).toEqual(matchPersonalities.whitePersonality);
+    expect(state.blackPersonality).toEqual(matchPersonalities.blackPersonality);
     expect(state.activities.map((activity) => activity.id)).toEqual([
       "match-started",
       "move-1",
@@ -158,6 +196,7 @@ describe("matchViewerStore", () => {
       type: "MATCH_STATE" as const,
       payload: {
         matchId: "match-1",
+        ...matchPersonalities,
         status: "IN_PROGRESS" as const,
         fen: "after-capture",
         sideToMove: "BLACK" as const,
@@ -238,6 +277,7 @@ describe("matchViewerStore", () => {
       type: "MATCH_STATE",
       payload: {
         matchId: "match-1",
+        ...matchPersonalities,
         status: "FINISHED",
         fen: "mate",
         sideToMove: "WHITE",
@@ -274,6 +314,7 @@ describe("matchViewerStore", () => {
       type: "MATCH_STATE",
       payload: {
         matchId: "match-1",
+        ...matchPersonalities,
         status: "IN_PROGRESS",
         fen: "after-e4",
         sideToMove: "BLACK",
@@ -291,6 +332,7 @@ describe("matchViewerStore", () => {
       activeTurn: "BLACK",
       matchStatus: "STOPPED",
       startAvailability,
+      ...matchPersonalities,
     });
   });
 
@@ -323,6 +365,7 @@ describe("matchViewerStore", () => {
       boardFen: "after-e4",
       activeTurn: "BLACK",
       moveCount: 1,
+      ...matchPersonalities,
     });
   });
 
@@ -331,6 +374,7 @@ describe("matchViewerStore", () => {
       type: "MATCH_STATE",
       payload: {
         matchId: "match-1",
+        ...matchPersonalities,
         status: "IN_PROGRESS",
         fen: "start",
         sideToMove: "WHITE",
@@ -391,6 +435,8 @@ describe("matchViewerStore", () => {
       currentMatchId: undefined,
       dialogue: [],
       startAvailability: undefined,
+      whitePersonality: undefined,
+      blackPersonality: undefined,
     });
   });
 });

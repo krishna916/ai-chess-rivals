@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
@@ -36,7 +37,7 @@ class StockfishPlayerTest {
   void chooseMovePassesCurrentFenToStockfish() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
     StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
 
     player.chooseMove(match);
 
@@ -50,7 +51,7 @@ class StockfishPlayerTest {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
     StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(375, 300));
 
-    player.chooseMove(Match.newGame());
+    player.chooseMove(TestMatchFixtures.newMatch());
 
     assertEquals(List.of(Duration.ofMillis(375)), stockfishClient.bestMoveCalls);
   }
@@ -60,7 +61,7 @@ class StockfishPlayerTest {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("g1f3");
     StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
 
-    MoveNotation moveNotation = player.chooseMove(Match.newGame());
+    MoveNotation moveNotation = player.chooseMove(TestMatchFixtures.newMatch());
 
     assertEquals(new MoveNotation("g1f3"), moveNotation);
   }
@@ -80,7 +81,7 @@ class StockfishPlayerTest {
   void chooseMoveRejectsFinishedMatch() {
     FakeStockfishClient stockfishClient = new FakeStockfishClient("e2e4");
     StockfishPlayer player = new StockfishPlayer(stockfishClient, gameProperties(250, 300));
-    Match finishedMatch = Match.newGame().finish(GameResult.DRAW);
+    Match finishedMatch = TestMatchFixtures.newMatch().finish(GameResult.DRAW);
 
     IllegalStateException error =
         assertThrows(IllegalStateException.class, () -> player.chooseMove(finishedMatch));

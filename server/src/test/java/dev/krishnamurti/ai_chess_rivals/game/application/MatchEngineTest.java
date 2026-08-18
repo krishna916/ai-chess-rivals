@@ -16,6 +16,7 @@ import dev.krishnamurti.ai_chess_rivals.chess.api.ChessEvaluationService;
 import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwing;
 import dev.krishnamurti.ai_chess_rivals.chess.api.EvaluationSwingClassification;
 import dev.krishnamurti.ai_chess_rivals.chess.api.PositionEvaluation;
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.config.GameProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType;
 import dev.krishnamurti.ai_chess_rivals.game.domain.GameResult;
@@ -143,6 +144,7 @@ class MatchEngineTest {
     engine[0] =
         matchEngine(
             chessPlayer, 250, 2, pacing, eventSink, new FakeChessEvaluationService(), coordinator);
+    engine[0].startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = engine[0].playUntilFinished();
 
@@ -154,7 +156,9 @@ class MatchEngineTest {
             .orElseThrow();
     InOrder order = inOrder(eventSink, coordinator, pacing);
     order.verify(eventSink).publish(movePlayed);
-    order.verify(coordinator).onMove(eq(finalMatch.id()), eq(movePlayed), any());
+    order
+        .verify(coordinator)
+        .onMove(eq(finalMatch.id()), eq(finalMatch.rivalry()), eq(movePlayed), any());
     order.verify(pacing).waitBeforeNextMove();
   }
 
@@ -166,7 +170,7 @@ class MatchEngineTest {
     AtomicReference<BooleanSupplier> authority = new AtomicReference<>();
     doAnswer(
             invocation -> {
-              BooleanSupplier captured = invocation.getArgument(2);
+              BooleanSupplier captured = invocation.getArgument(3);
               authority.set(captured);
               assertTrue(captured.getAsBoolean());
               engine[0].stopCurrentMatch();
@@ -174,7 +178,7 @@ class MatchEngineTest {
               return null;
             })
         .when(coordinator)
-        .onMove(any(), any(), any());
+        .onMove(any(), any(), any(), any());
     engine[0] =
         matchEngine(
             chessPlayer,
@@ -184,6 +188,7 @@ class MatchEngineTest {
             event -> {},
             new FakeChessEvaluationService(),
             coordinator);
+    engine[0].startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     engine[0].playUntilFinished();
 
@@ -199,7 +204,7 @@ class MatchEngineTest {
     AtomicReference<BooleanSupplier> newAuthority = new AtomicReference<>();
     doAnswer(
             invocation -> {
-              BooleanSupplier captured = invocation.getArgument(2);
+              BooleanSupplier captured = invocation.getArgument(3);
               if (oldAuthority.get() == null) {
                 oldAuthority.set(captured);
                 engine[0].stopCurrentMatch();
@@ -209,7 +214,7 @@ class MatchEngineTest {
               return null;
             })
         .when(coordinator)
-        .onMove(any(), any(), any());
+        .onMove(any(), any(), any(), any());
     engine[0] =
         matchEngine(
             chessPlayer,
@@ -219,6 +224,7 @@ class MatchEngineTest {
             event -> {},
             new FakeChessEvaluationService(),
             coordinator);
+    engine[0].startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     engine[0].playUntilFinished();
     engine[0].playUntilFinished();
@@ -244,7 +250,7 @@ class MatchEngineTest {
               return null;
             })
         .when(coordinator)
-        .onMove(any(), any(), any());
+        .onMove(any(), any(), any(), any());
 
     MatchEngine engine =
         matchEngine(
@@ -255,6 +261,7 @@ class MatchEngineTest {
             event -> {},
             new FakeChessEvaluationService(),
             coordinator);
+    engine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     ExecutorService executor = Executors.newFixedThreadPool(2);
 
     try {
@@ -303,7 +310,7 @@ class MatchEngineTest {
               return null;
             })
         .when(coordinator)
-        .onGameStart(any(), any());
+        .onGameStart(any(), any(), any());
     MatchEngine engine =
         matchEngine(
             chessPlayer,
@@ -313,6 +320,7 @@ class MatchEngineTest {
             event -> {},
             new FakeChessEvaluationService(),
             coordinator);
+    engine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     engine.playUntilFinished();
 
@@ -333,11 +341,12 @@ class MatchEngineTest {
             eventSink,
             new FakeChessEvaluationService(),
             coordinator);
+    engine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     engine.playUntilFinished();
 
     InOrder order = inOrder(coordinator, eventSink);
-    order.verify(coordinator).onGameEnd(any(), eq(GameResult.BLACK_WINS), eq(4), any());
+    order.verify(coordinator).onGameEnd(any(), any(), eq(GameResult.BLACK_WINS), eq(4), any());
     order.verify(eventSink).publish(any(MatchFinished.class));
   }
 
@@ -354,10 +363,11 @@ class MatchEngineTest {
             event -> {},
             new FakeChessEvaluationService(),
             coordinator);
+    engine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     engine.playUntilFinished();
 
-    verify(coordinator).onGameEnd(any(), eq(GameResult.DRAW), eq(1), any());
+    verify(coordinator).onGameEnd(any(), any(), eq(GameResult.DRAW), eq(1), any());
   }
 
   @Test
@@ -366,7 +376,7 @@ class MatchEngineTest {
     MatchDialogueCoordinator coordinator = mock(MatchDialogueCoordinator.class);
     doThrow(new IllegalStateException("dialogue failed"))
         .when(coordinator)
-        .onMove(any(), any(), any());
+        .onMove(any(), any(), any(), any());
     MatchEngine engine =
         matchEngine(
             chessPlayer,
@@ -376,6 +386,7 @@ class MatchEngineTest {
             event -> {},
             new FakeChessEvaluationService(),
             coordinator);
+    engine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = engine.playUntilFinished();
 
@@ -387,7 +398,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
 
-    Match match = matchEngine.startNewMatch();
+    Match match = matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     assertEquals(1, chessPlayer.startNewGameCalls);
     assertTrue(match.isInProgress());
@@ -399,6 +410,7 @@ class MatchEngineTest {
   void playUntilFinishedRecordsMovesAndStopsAtMaxPliesFallback() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -425,6 +437,7 @@ class MatchEngineTest {
   void playUntilFinishedStopsAfterCurrentIterationWhenStopIsRequested() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match match = matchEngine.playUntilFinished();
@@ -439,6 +452,7 @@ class MatchEngineTest {
   void playUntilFinishedResumesStoppedMatch() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     Match stoppedMatch = matchEngine.playUntilFinished();
@@ -460,6 +474,7 @@ class MatchEngineTest {
         new FakeChessEvaluationService().withEvaluations(cp(0), cp(-20), cp(-10));
     MatchEngine matchEngine =
         matchEngine(chessPlayer, 250, 2, NO_OP_PACING, eventSink, evaluationService);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     chessPlayer.onChooseMove = matchEngine::stopCurrentMatch;
 
     matchEngine.playUntilFinished();
@@ -503,6 +518,7 @@ class MatchEngineTest {
           }
         });
     engine[0] = matchEngine(chessPlayer, 250, 2, NO_OP_PACING, eventSink, evaluationService);
+    engine[0].startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match stoppedMatch = engine[0].playUntilFinished();
     Match resumedMatch = engine[0].playUntilFinished();
@@ -537,6 +553,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer =
         new FakeChessPlayer("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8");
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 20);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -549,10 +566,12 @@ class MatchEngineTest {
   void startNewMatchRejectsReplacingActiveMatch() {
     FakeChessPlayer chessPlayer = new FakeChessPlayer();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300);
-    matchEngine.startNewMatch();
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     IllegalStateException error =
-        assertThrows(IllegalStateException.class, matchEngine::startNewMatch);
+        assertThrows(
+            IllegalStateException.class,
+            () -> matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY));
 
     assertEquals("Cannot start a new match while another match is in progress", error.getMessage());
   }
@@ -574,7 +593,7 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
 
-    Match match = matchEngine.startNewMatch();
+    Match match = matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     assertEquals(1, eventSink.events.size());
     MatchStarted event = (MatchStarted) eventSink.events.getFirst();
@@ -589,7 +608,9 @@ class MatchEngineTest {
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
 
-    assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
+    assertThrows(
+        MatchEngineException.class,
+        () -> matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY));
 
     assertTrue(eventSink.events.isEmpty());
   }
@@ -599,6 +620,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 1, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -627,6 +649,7 @@ class MatchEngineTest {
         new FakeChessEvaluationService().withEvaluations(cp(10), cp(-250));
     MatchEngine matchEngine =
         matchEngine(chessPlayer, 250, 1, NO_OP_PACING, eventSink, evaluationService);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     matchEngine.playUntilFinished();
 
@@ -654,6 +677,7 @@ class MatchEngineTest {
             .withEvaluations(cp(-250));
     MatchEngine matchEngine =
         matchEngine(chessPlayer, 250, 1, NO_OP_PACING, eventSink, evaluationService);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -670,6 +694,7 @@ class MatchEngineTest {
         new FakeChessEvaluationService().withEvaluations(cp(10)).failsOnCall(2);
     MatchEngine matchEngine =
         matchEngine(chessPlayer, 250, 1, NO_OP_PACING, eventSink, evaluationService);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -685,6 +710,7 @@ class MatchEngineTest {
         new FakeChessEvaluationService().withEvaluations(cp(0), cp(-20), cp(-10));
     MatchEngine matchEngine =
         matchEngine(chessPlayer, 250, 2, NO_OP_PACING, event -> {}, evaluationService);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     matchEngine.playUntilFinished();
 
@@ -703,6 +729,7 @@ class MatchEngineTest {
           }
         };
     engine[0] = matchEngine(chessPlayer, 250, 1, eventSink);
+    engine[0].startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     engine[0].playUntilFinished();
 
@@ -714,6 +741,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match finalMatch = matchEngine.playUntilFinished();
 
@@ -731,6 +759,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     matchEngine.playUntilFinished();
 
@@ -743,6 +772,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -760,6 +790,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4", "e7e5");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 2, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     chessPlayer.onChooseMove = () -> matchEngine.stopCurrentMatch();
 
     matchEngine.playUntilFinished();
@@ -774,6 +805,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("f2f3", "e7e5", "g2g4", "d8h4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     matchEngine.playUntilFinished();
 
@@ -791,7 +823,9 @@ class MatchEngineTest {
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 300, eventSink);
 
     MatchEngineException error =
-        assertThrows(MatchEngineException.class, matchEngine::startNewMatch);
+        assertThrows(
+            MatchEngineException.class,
+            () -> matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY));
 
     assertEquals("Failed to publish match start event", error.getMessage());
     assertThrows(IllegalStateException.class, matchEngine::currentMatch);
@@ -802,7 +836,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, eventSink);
-    matchEngine.startNewMatch();
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     eventSink.failure = new IllegalStateException("sink failed");
 
     MatchEngineException error =
@@ -818,7 +852,7 @@ class MatchEngineTest {
     FakeChessPlayer chessPlayer = new FakeChessPlayer("e2e4");
     RecordingMatchEventSink eventSink = new RecordingMatchEventSink();
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 1, eventSink);
-    matchEngine.startNewMatch();
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
     eventSink.failOnPublishNumber = 3;
 
     IllegalStateException error =
@@ -842,6 +876,7 @@ class MatchEngineTest {
     MatchEngine[] matchEngine = new MatchEngine[1];
     pacing.onWait = () -> matchEngine[0].stopCurrentMatch();
     matchEngine[0] = matchEngine(chessPlayer, 250, 2, pacing, eventSink);
+    matchEngine[0].startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     Match stoppedMatch = matchEngine[0].playUntilFinished();
 
@@ -860,6 +895,7 @@ class MatchEngineTest {
     RecordingMatchPacing pacing = new RecordingMatchPacing();
     pacing.operationOrder = order;
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, pacing, eventSink);
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     matchEngine.playUntilFinished();
 
@@ -874,6 +910,7 @@ class MatchEngineTest {
     RecordingMatchPacing pacing = new RecordingMatchPacing();
     pacing.failure = new InterruptedException("boom");
     MatchEngine matchEngine = matchEngine(chessPlayer, 250, 10, pacing, event -> {});
+    matchEngine.startNewMatch(TestMatchFixtures.TEST_RIVALRY);
 
     try {
       MatchEngineException error =

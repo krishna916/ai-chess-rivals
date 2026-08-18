@@ -11,6 +11,7 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
 import dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchNotFoundException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
@@ -84,11 +85,23 @@ class MatchWebSocketIntegrationTest {
         new MatchStreamMessage<>(
             MatchStreamMessageType.MATCH_STARTED,
             new MatchStartedMessage(
-                UUID.randomUUID(), PlayerColor.WHITE, BoardPosition.STARTING_POSITION.fen())));
+                UUID.randomUUID(),
+                new dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse(
+                    "white-test", "White Test"),
+                new dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse(
+                    "black-test", "Black Test"),
+                PlayerColor.WHITE,
+                BoardPosition.STARTING_POSITION.fen())));
 
     String matchStartedMessage = messages.poll(5, TimeUnit.SECONDS);
     assertNotNull(matchStartedMessage);
     assertTrue(matchStartedMessage.contains("\"type\":\"MATCH_STARTED\""));
+    assertTrue(
+        matchStartedMessage.contains(
+            "\"whitePersonality\":{\"key\":\"white-test\",\"displayName\":\"White Test\"}"));
+    assertTrue(
+        matchStartedMessage.contains(
+            "\"blackPersonality\":{\"key\":\"black-test\",\"displayName\":\"Black Test\"}"));
     assertTrue(matchStartedMessage.contains("\"sideToMove\":\"WHITE\""));
     assertTrue(
         matchStartedMessage.contains("\"fen\":\"" + BoardPosition.STARTING_POSITION.fen() + "\""));
@@ -99,7 +112,7 @@ class MatchWebSocketIntegrationTest {
   @Test
   void websocketEndpointHydratesPersistedDialogueInChronologicalOrder() throws Exception {
     Instant createdAt = Instant.parse("2026-08-16T00:00:00Z");
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     UUID matchId = match.id();
     when(matchControlService.currentMatch())
         .thenReturn(

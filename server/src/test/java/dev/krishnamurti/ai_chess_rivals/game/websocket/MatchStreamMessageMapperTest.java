@@ -7,6 +7,7 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEmotion;
 import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueReactionType;
 import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueTriggerType;
 import dev.krishnamurti.ai_chess_rivals.ai.api.PersistedDialogue;
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartAvailability;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchStartBlockReason;
@@ -25,6 +26,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
 import dev.krishnamurti.ai_chess_rivals.game.web.DialogueResponse;
+import dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -80,13 +82,21 @@ class MatchStreamMessageMapperTest {
   void mapsMatchStartedEventToExplicitPayload() {
     UUID matchId = UUID.randomUUID();
     MatchStarted event =
-        new MatchStarted(matchId, PlayerColor.WHITE, BoardPosition.STARTING_POSITION);
+        new MatchStarted(
+            matchId,
+            PlayerColor.WHITE,
+            BoardPosition.STARTING_POSITION,
+            TestMatchFixtures.TEST_RIVALRY);
 
     MatchStreamMessage<?> message = new MatchStreamMessageMapper().map(event);
 
     assertEquals(MatchStreamMessageType.MATCH_STARTED, message.type());
     MatchStartedMessage payload = (MatchStartedMessage) message.payload();
     assertEquals(matchId, payload.matchId());
+    assertEquals(
+        new MatchPersonalityResponse("white-test", "White Test"), payload.whitePersonality());
+    assertEquals(
+        new MatchPersonalityResponse("black-test", "Black Test"), payload.blackPersonality());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(BoardPosition.STARTING_POSITION.fen(), payload.fen());
   }
@@ -121,7 +131,7 @@ class MatchStreamMessageMapperTest {
 
   @Test
   void createsMatchStatePayloadFromSnapshot() {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     MatchStartAvailability availability =
         new MatchStartAvailability(false, MatchStartBlockReason.MATCH_ALREADY_RUNNING, 0, 2, 12);
 
@@ -130,6 +140,10 @@ class MatchStreamMessageMapperTest {
         MatchStateMessage.from(new MatchSnapshot(match, true, availability, List.of(line)));
 
     assertEquals(match.id(), payload.matchId());
+    assertEquals(
+        new MatchPersonalityResponse("white-test", "White Test"), payload.whitePersonality());
+    assertEquals(
+        new MatchPersonalityResponse("black-test", "Black Test"), payload.blackPersonality());
     assertEquals(PlayerColor.WHITE, payload.sideToMove());
     assertEquals(match.currentPosition().fen(), payload.fen());
     assertTrue(payload.moves().isEmpty());

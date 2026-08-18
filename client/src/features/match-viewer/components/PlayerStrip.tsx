@@ -7,8 +7,11 @@ interface PlayerStripProps {
 }
 
 export function PlayerStrip({ side }: PlayerStripProps) {
-  const { activeTurn, matchStatus } = useMatchViewerStore();
+  const { activeTurn, matchStatus, whitePersonality, blackPersonality } =
+    useMatchViewerStore();
   const isActive = matchStatus === "IN_PROGRESS" && activeTurn === side;
+  const personality = side === "WHITE" ? whitePersonality : blackPersonality;
+  const displayName = personality?.displayName ?? MATCH_PLAYERS[side].name;
 
   return (
     <div
@@ -19,7 +22,7 @@ export function PlayerStrip({ side }: PlayerStripProps) {
           : "bg-card text-card-foreground",
       )}
     >
-      <span className="font-semibold">{MATCH_PLAYERS[side].name}</span>
+      <span className="min-w-0 break-words font-semibold">{displayName}</span>
       {isActive && (
         <span className="text-xs uppercase bg-background/50 px-2 py-1 rounded">
           Thinking...

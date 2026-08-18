@@ -174,13 +174,19 @@ jobs:
             -e POSTGRES_PASSWORD=secretpassword \
             postgres:17-alpine
 
-          for attempt in {1..30}; do
+          postgres_ready=false
+          for attempt in {1..60}; do
             if docker exec "$postgres" pg_isready -U postgres -d aichessrivals >/dev/null 2>&1; then
+              postgres_ready=true
               break
             fi
             sleep 1
           done
-          docker exec "$postgres" pg_isready -U postgres -d aichessrivals
+          if [[ "$postgres_ready" != true ]]; then
+            echo "PostgreSQL did not become ready within 60 seconds"
+            docker logs "$postgres"
+            exit 1
+          fi
 
           docker run -d \
             --name "$app" \

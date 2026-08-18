@@ -6,6 +6,7 @@ import dev.krishnamurti.ai_chess_rivals.game.event.MatchFinished;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStarted;
 import dev.krishnamurti.ai_chess_rivals.game.event.MatchStopped;
 import dev.krishnamurti.ai_chess_rivals.game.event.MovePlayed;
+import dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,7 +18,13 @@ final class MatchStreamMessageMapper {
           new MatchStreamMessage<>(
               MatchStreamMessageType.MATCH_STARTED,
               new MatchStartedMessage(
-                  started.matchId(), started.sideToMove(), started.position().fen()));
+                  started.matchId(),
+                  new MatchPersonalityResponse(
+                      started.rivalry().whiteKey(), started.rivalry().whiteDisplayName()),
+                  new MatchPersonalityResponse(
+                      started.rivalry().blackKey(), started.rivalry().blackDisplayName()),
+                  started.sideToMove(),
+                  started.position().fen()));
       case MovePlayed move ->
           new MatchStreamMessage<>(
               MatchStreamMessageType.MOVE_PLAYED,

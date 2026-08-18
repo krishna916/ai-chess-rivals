@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.game.web;
 
+import dev.krishnamurti.ai_chess_rivals.game.application.InvalidPersonalitySelectionException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchConflictException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchCooldownException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchDailyLimitException;
@@ -14,6 +15,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = MatchController.class)
 public class MatchControllerAdvice {
+
+  @ExceptionHandler(InvalidPersonalitySelectionException.class)
+  public ProblemDetail handleInvalidPersonalitySelection(
+      InvalidPersonalitySelectionException exception) {
+    ProblemDetail detail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    detail.setTitle("Invalid Personality Selection");
+    detail.setProperty("code", "INVALID_PERSONALITY_SELECTION");
+    detail.setProperty("message", exception.getMessage());
+    return detail;
+  }
 
   private static final String ALREADY_RUNNING_CODE = "MATCH_ALREADY_RUNNING";
   private static final String ALREADY_RUNNING_MESSAGE = "A match is already active.";

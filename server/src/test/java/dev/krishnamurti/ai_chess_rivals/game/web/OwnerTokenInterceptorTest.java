@@ -4,6 +4,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
 import dev.krishnamurti.ai_chess_rivals.game.config.OwnerControlProperties;
@@ -73,16 +74,19 @@ class OwnerTokenInterceptorTest {
 
   @Test
   void validTokenReachesController() throws Exception {
-    Match match = Match.newGame();
-    when(matchControlService.startMatch()).thenReturn(new MatchSnapshot(match, true));
+    Match match = TestMatchFixtures.newMatch();
+    when(matchControlService.startMatch("blaze", "vesper"))
+        .thenReturn(new MatchSnapshot(match, true));
 
     mockMvc
         .perform(
             post("/api/v1/match/start")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-owner-token"))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-owner-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"whitePersonalityKey\":\"blaze\",\"blackPersonalityKey\":\"vesper\"}"))
         .andExpect(status().isAccepted());
 
-    verify(matchControlService).startMatch();
+    verify(matchControlService).startMatch("blaze", "vesper");
   }
 
   @Test
@@ -99,7 +103,7 @@ class OwnerTokenInterceptorTest {
 
   @Test
   void publicGetDoesNotRequireToken() throws Exception {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(match, false));
 
     mockMvc.perform(get("/api/v1/match")).andExpect(status().isOk());

@@ -4,6 +4,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
+import dev.krishnamurti.ai_chess_rivals.game.application.InvalidPersonalitySelectionException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchConflictException;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchCooldownException;
@@ -39,15 +41,20 @@ class MatchControllerTest {
 
   @Test
   void startMatchReturns202AndMatchSnapshot() throws Exception {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     MatchStartAvailability availability =
         new MatchStartAvailability(false, MatchStartBlockReason.MATCH_ALREADY_RUNNING, 0, 3, 12);
-    when(matchControlService.startMatch()).thenReturn(new MatchSnapshot(match, true, availability));
+    when(matchControlService.startMatch("blaze", "vesper"))
+        .thenReturn(new MatchSnapshot(match, true, availability));
 
     mockMvc
-        .perform(ownerPost("/api/v1/match/start"))
+        .perform(ownerStartPost())
         .andExpect(status().isAccepted())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.whitePersonality.key").value("white-test"))
+        .andExpect(jsonPath("$.whitePersonality.displayName").value("White Test"))
+        .andExpect(jsonPath("$.blackPersonality.key").value("black-test"))
+        .andExpect(jsonPath("$.blackPersonality.displayName").value("Black Test"))
         .andExpect(jsonPath("$.sideToMove").value("WHITE"))
         .andExpect(jsonPath("$.fen").value(match.currentPosition().fen()))
         .andExpect(jsonPath("$.running").value(true))
@@ -62,7 +69,7 @@ class MatchControllerTest {
 
   @Test
   void stopMatchReturns202AndMatchSnapshot() throws Exception {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     when(matchControlService.stopMatch()).thenReturn(new MatchSnapshot(match, false));
 
     mockMvc
@@ -74,7 +81,7 @@ class MatchControllerTest {
 
   @Test
   void currentMatchReturns200AndMatchSnapshot() throws Exception {
-    Match match = Match.newGame();
+    Match match = TestMatchFixtures.newMatch();
     when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(match, false));
 
     mockMvc
@@ -99,11 +106,11 @@ class MatchControllerTest {
 
   @Test
   void startMatchReturns409ProblemDetailOnConflict() throws Exception {
-    when(matchControlService.startMatch())
+    when(matchControlService.startMatch("blaze", "vesper"))
         .thenThrow(new MatchConflictException("A match is already active."));
 
     mockMvc
-        .perform(ownerPost("/api/v1/match/start"))
+        .perform(ownerStartPost())
         .andExpect(status().isConflict())
         .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.title").value("Match Conflict"))
@@ -114,10 +121,11 @@ class MatchControllerTest {
 
   @Test
   void startMatchReturns429AndRetryAfterDuringCooldown() throws Exception {
-    when(matchControlService.startMatch()).thenThrow(new MatchCooldownException(60));
+    when(matchControlService.startMatch("blaze", "vesper"))
+        .thenThrow(new MatchCooldownException(60));
 
     mockMvc
-        .perform(ownerPost("/api/v1/match/start"))
+        .perform(ownerStartPost())
         .andExpect(status().isTooManyRequests())
         .andExpect(header().string("Retry-After", "60"))
         .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
@@ -128,10 +136,11 @@ class MatchControllerTest {
 
   @Test
   void startMatchReturns429WhenDailyLimitIsReached() throws Exception {
-    when(matchControlService.startMatch()).thenThrow(new MatchDailyLimitException(12));
+    when(matchControlService.startMatch("blaze", "vesper"))
+        .thenThrow(new MatchDailyLimitException(12));
 
     mockMvc
-        .perform(ownerPost("/api/v1/match/start"))
+        .perform(ownerStartPost())
         .andExpect(status().isTooManyRequests())
         .andExpect(header().doesNotExist("Retry-After"))
         .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
@@ -142,12 +151,12 @@ class MatchControllerTest {
 
   @Test
   void unexpectedEngineFailureReturns500ProblemDetail() throws Exception {
-    when(matchControlService.startMatch())
+    when(matchControlService.startMatch("blaze", "vesper"))
         .thenThrow(
             new MatchEngineException("Failed to initialize a new match", new RuntimeException()));
 
     mockMvc
-        .perform(ownerPost("/api/v1/match/start"))
+        .perform(ownerStartPost())
         .andExpect(status().isInternalServerError())
         .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.title").value("Match Engine Error"))
@@ -156,5 +165,28 @@ class MatchControllerTest {
 
   private static MockHttpServletRequestBuilder ownerPost(String path) {
     return post(path).header(HttpHeaders.AUTHORIZATION, "Bearer test-owner-token");
+  }
+
+  @Test
+  void startMatchReturns400ProblemDetailForInvalidPersonalities() throws Exception {
+    when(matchControlService.startMatch("blaze", "vesper"))
+        .thenThrow(
+            new InvalidPersonalitySelectionException(
+                "Unknown or inactive White personality: blaze"));
+
+    mockMvc
+        .perform(ownerStartPost())
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.title").value("Invalid Personality Selection"))
+        .andExpect(jsonPath("$.detail").value("Unknown or inactive White personality: blaze"))
+        .andExpect(jsonPath("$.code").value("INVALID_PERSONALITY_SELECTION"))
+        .andExpect(jsonPath("$.message").value("Unknown or inactive White personality: blaze"));
+  }
+
+  private static MockHttpServletRequestBuilder ownerStartPost() {
+    return ownerPost("/api/v1/match/start")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"whitePersonalityKey\":\"blaze\",\"blackPersonalityKey\":\"vesper\"}");
   }
 }

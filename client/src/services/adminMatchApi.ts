@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { MatchResponse } from "../types/match";
+import type { MatchResponse, StartMatchRequest } from "../types/match";
 import { API_BASE_URL } from "./matchApi";
 
 const adminApiClient = axios.create({
@@ -15,10 +15,13 @@ const authorization = (token: string) => ({
 });
 
 export const adminMatchApi = {
-  startMatch: async (token: string): Promise<MatchResponse> => {
+  startMatch: async (
+    token: string,
+    request: StartMatchRequest,
+  ): Promise<MatchResponse> => {
     const response = await adminApiClient.post<MatchResponse>(
       "/match/start",
-      undefined,
+      request,
       authorization(token),
     );
     return response.data;
