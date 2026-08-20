@@ -173,11 +173,11 @@ final class MatchDialogueCoordinator {
         action.run();
       } catch (RuntimeException exception) {
         log.warn(
-            "Dialogue unavailable matchId={} triggerType={} triggerPly={}",
+            "Dialogue unavailable matchId={} triggerType={} triggerPly={} exceptionType={}",
             matchId,
             triggerType,
             triggerPly,
-            exception);
+            exception.getClass().getSimpleName());
       }
     } finally {
       restoreMdc("matchId", previousMatchId);
@@ -194,3 +194,4 @@ final class MatchDialogueCoordinator {
     }
   }
 }
+
