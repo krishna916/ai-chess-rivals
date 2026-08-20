@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
+  DialogueResponse,
   MovePlayedMessage,
   MoveResponse,
   StartAvailability,
@@ -75,7 +76,6 @@ describe("matchViewerStore", () => {
       moveCount: 0,
       activities: [],
       currentMatchId: undefined,
-      dialogue: [],
       result: undefined,
       error: undefined,
       startAvailability: undefined,
@@ -100,7 +100,6 @@ describe("matchViewerStore", () => {
       moveCount: 0,
       activities: [{ id: "match-started", kind: "MATCH_STARTED", sequence: 0 }],
       currentMatchId: "match-2",
-      dialogue: [],
       ...matchPersonalities,
     });
   });
@@ -164,7 +163,7 @@ describe("matchViewerStore", () => {
           }),
           snapshotMove({ fenAfterMove: "fen1" }),
         ],
-        dialogue: [dialogue({ id: 2 }), dialogue({ id: 1 })],
+        dialogue: [],
       },
     });
 
@@ -272,6 +271,35 @@ describe("matchViewerStore", () => {
     ).toHaveLength(1);
   });
 
+  it("keeps a hydrated move historical when a duplicate live move arrives", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STATE",
+      payload: {
+        matchId: "match-1",
+        ...matchPersonalities,
+        status: "IN_PROGRESS",
+        fen: "after-e4",
+        sideToMove: "BLACK",
+        result: null,
+        running: true,
+        startAvailability,
+        moves: [snapshotMove()],
+        dialogue: [],
+      },
+    });
+
+    useMatchViewerStore.getState().processMessage({
+      type: "MOVE_PLAYED",
+      payload: liveMove({ capture: true }),
+    });
+
+    expect(useMatchViewerStore.getState().activities).toHaveLength(2);
+    expect(useMatchViewerStore.getState().activities[1]).toMatchObject({
+      id: "move-1",
+      isNew: false,
+    });
+  });
+
   it("hydrates server flags without chess.js reconstruction", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
@@ -369,53 +397,176 @@ describe("matchViewerStore", () => {
     });
   });
 
-  it("hydrates dialogue in ascending persisted id order", () => {
+  it("hydrates moves and persisted dialogue in authoritative chronological order", () => {
     useMatchViewerStore.getState().processMessage({
       type: "MATCH_STATE",
       payload: {
         matchId: "match-1",
         ...matchPersonalities,
-        status: "IN_PROGRESS",
-        fen: "start",
+        status: "FINISHED",
+        fen: "finished",
         sideToMove: "WHITE",
-        result: null,
-        running: true,
+        result: "WHITE_WINS",
+        running: false,
         startAvailability,
-        moves: [],
-        dialogue: [dialogue({ id: 2 }), dialogue({ id: 1 })],
+        moves: [
+          snapshotMove({ sequenceNumber: 2, player: "BLACK" }),
+          snapshotMove({ sequenceNumber: 1, player: "WHITE" }),
+        ],
+        dialogue: [
+          dialogue({
+            id: 14,
+            triggerType: "GAME_END",
+            triggerPly: 2,
+            personalityKey: "vesper",
+            personalityDisplayName: "Vesper",
+            reactionType: "DEFEAT",
+          }),
+          dialogue({ id: 12, triggerType: "MOVE", triggerPly: 2 }),
+          dialogue({ id: 10, triggerType: "GAME_START", triggerPly: 0 }),
+          dialogue({
+            id: 13,
+            triggerType: "GAME_END",
+            triggerPly: 2,
+            reactionType: "VICTORY",
+          }),
+          dialogue({
+            id: 11,
+            triggerType: "MOVE",
+            triggerPly: 1,
+            personalityKey: "vesper",
+            personalityDisplayName: "Vesper",
+          }),
+        ],
       },
     });
 
+    const activities = useMatchViewerStore.getState().activities;
+    expect(activities.map((activity) => activity.id)).toEqual([
+      "match-started",
+      "dialogue-10",
+      "move-1",
+      "dialogue-11",
+      "move-2",
+      "dialogue-12",
+      "dialogue-13",
+      "dialogue-14",
+      "match-finished",
+    ]);
     expect(
-      useMatchViewerStore.getState().dialogue.map((line) => line.id),
-    ).toEqual([1, 2]);
+      activities.find((activity) => activity.id === "dialogue-10"),
+    ).toMatchObject({
+      kind: "DIALOGUE",
+      side: "WHITE",
+    });
+    expect(
+      activities.find((activity) => activity.id === "dialogue-11"),
+    ).toMatchObject({
+      kind: "DIALOGUE",
+      side: "BLACK",
+    });
   });
 
-  it("deduplicates live dialogue and ignores another match", () => {
-    useMatchViewerStore.setState({ currentMatchId: "match-1" });
-    const message = {
-      type: "DIALOGUE_PLAYED" as const,
-      payload: dialogue({ id: 3 }),
-    };
-
-    useMatchViewerStore.getState().processMessage(message);
-    useMatchViewerStore.getState().processMessage(message);
+  it("appends live dialogue after its triggering move, deduplicates it, and ignores another match", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STARTED",
+      payload: {
+        matchId: "match-1",
+        ...matchPersonalities,
+        fen: "start",
+        sideToMove: "WHITE",
+      },
+    });
     useMatchViewerStore.getState().processMessage({
       type: "DIALOGUE_PLAYED",
-      payload: dialogue({ id: 4, matchId: "other-match" }),
+      payload: dialogue({ id: 1, triggerType: "GAME_START", triggerPly: 0 }),
+    });
+    useMatchViewerStore.getState().processMessage({
+      type: "MOVE_PLAYED",
+      payload: liveMove(),
+    });
+    const moveDialogue = {
+      type: "DIALOGUE_PLAYED" as const,
+      payload: dialogue({
+        id: 2,
+        triggerType: "MOVE",
+        triggerPly: 1,
+        personalityKey: "vesper",
+        personalityDisplayName: "Vesper",
+      }),
+    };
+
+    useMatchViewerStore.getState().processMessage(moveDialogue);
+    useMatchViewerStore.getState().processMessage(moveDialogue);
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({ id: 3, matchId: "other-match" }),
     });
 
     expect(
-      useMatchViewerStore.getState().dialogue.map((line) => line.id),
-    ).toEqual([3]);
-    expect(useMatchViewerStore.getState().activities).toEqual([]);
+      useMatchViewerStore.getState().activities.map((activity) => activity.id),
+    ).toEqual(["match-started", "dialogue-1", "move-1", "dialogue-2"]);
+  });
+
+  it("keeps terminal move dialogue and game-end dialogue before the final result", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_STARTED",
+      payload: {
+        matchId: "match-1",
+        ...matchPersonalities,
+        fen: "start",
+        sideToMove: "WHITE",
+      },
+    });
+    useMatchViewerStore.getState().processMessage({
+      type: "MOVE_PLAYED",
+      payload: liveMove({ check: true, checkmate: true }),
+    });
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({ id: 20, triggerType: "MOVE", triggerPly: 1 }),
+    });
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({
+        id: 21,
+        triggerType: "GAME_END",
+        triggerPly: 1,
+        reactionType: "VICTORY",
+      }),
+    });
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({
+        id: 22,
+        triggerType: "GAME_END",
+        triggerPly: 1,
+        personalityKey: "vesper",
+        personalityDisplayName: "Vesper",
+        reactionType: "DEFEAT",
+      }),
+    });
+    useMatchViewerStore.getState().processMessage({
+      type: "MATCH_FINISHED",
+      payload: { result: "WHITE_WINS", fen: "mate", totalPlies: 1 },
+    });
+
+    expect(
+      useMatchViewerStore.getState().activities.map((activity) => activity.id),
+    ).toEqual([
+      "match-started",
+      "move-1",
+      "dialogue-20",
+      "dialogue-21",
+      "dialogue-22",
+      "match-finished",
+    ]);
   });
 
   it("resets all stale state on NO_MATCH", () => {
     useMatchViewerStore.setState({
       activeTurn: "BLACK",
       currentMatchId: "old-match",
-      dialogue: [dialogue()],
       result: "DRAW",
       error: "stale",
       startAvailability,
@@ -433,21 +584,24 @@ describe("matchViewerStore", () => {
       error: undefined,
       activities: [],
       currentMatchId: undefined,
-      dialogue: [],
       startAvailability: undefined,
       whitePersonality: undefined,
       blackPersonality: undefined,
     });
   });
+
+  it("ignores dialogue received before a match has been established", () => {
+    useMatchViewerStore.getState().processMessage({
+      type: "DIALOGUE_PLAYED",
+      payload: dialogue({ id: 8, matchId: "stale-match" }),
+    });
+
+    expect(useMatchViewerStore.getState().activities).toEqual([]);
+    expect(useMatchViewerStore.getState().currentMatchId).toBeUndefined();
+  });
 });
 
-function dialogue(
-  overrides: Partial<{
-    id: number;
-    matchId: string;
-    triggerPly: number;
-  }> = {},
-) {
+function dialogue(overrides: Partial<DialogueResponse> = {}): DialogueResponse {
   return {
     id: 1,
     matchId: "match-1",

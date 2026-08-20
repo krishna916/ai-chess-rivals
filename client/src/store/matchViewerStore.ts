@@ -5,41 +5,16 @@ import type {
   MatchStreamMessage,
   MatchActivityItem,
   StartAvailability,
-  DialogueResponse,
   MatchPersonality,
 } from "../types/match";
+import {
+  buildSnapshotActivities,
+  mergeMatchActivity,
+  toDialogueActivity,
+  toLiveMoveActivity,
+} from "@/features/match-viewer/lib/matchActivity";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-function reconstructMoveActivities(
-  moves: Extract<
-    MatchStreamMessage,
-    { type: "MATCH_STATE" }
-  >["payload"]["moves"],
-): MatchActivityItem[] {
-  return [...moves]
-    .sort((a, b) => a.sequenceNumber - b.sequenceNumber)
-    .map((move) => ({
-      id: `move-${move.sequenceNumber}`,
-      kind: "MOVE" as const,
-      sequence: move.sequenceNumber,
-      player: move.player,
-      notation: move.notation,
-      movingPiece: move.movingPiece,
-      movingPieceColor: move.movingPieceColor,
-      sourceSquare: move.sourceSquare,
-      destinationSquare: move.destinationSquare,
-      capturedPiece: move.capturedPiece ?? undefined,
-      capturedPieceColor: move.capturedPieceColor ?? undefined,
-      promotedPiece: move.promotedPiece ?? undefined,
-      castlingSide: move.castlingSide ?? undefined,
-      capture: move.capture,
-      check: move.check,
-      checkmate: move.checkmate,
-      promotion: move.promotion,
-      isNew: false,
-    }));
-}
 
 interface MatchViewerState {
   boardFen: string;
@@ -51,7 +26,6 @@ interface MatchViewerState {
   currentMatchId?: string;
   whitePersonality?: MatchPersonality;
   blackPersonality?: MatchPersonality;
-  dialogue: DialogueResponse[];
   result?: string;
   error?: string;
   startAvailability?: StartAvailability;
@@ -68,7 +42,6 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
   moveCount: 0,
   activities: [],
   currentMatchId: undefined,
-  dialogue: [],
 
   setConnectionStatus: (status) =>
     set({
@@ -90,7 +63,6 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           currentMatchId: undefined,
           whitePersonality: undefined,
           blackPersonality: undefined,
-          dialogue: [],
           error: undefined,
           startAvailability: undefined,
         });
@@ -112,7 +84,6 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           currentMatchId: msg.payload.matchId,
           whitePersonality: msg.payload.whitePersonality,
           blackPersonality: msg.payload.blackPersonality,
-          dialogue: [],
         });
         break;
       case "MATCH_STATE": {
@@ -126,26 +97,7 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
             : msg.payload.status === "IN_PROGRESS" && !msg.payload.running
               ? "STOPPED"
               : msg.payload.status;
-        const activities: MatchActivityItem[] = [];
-
-        if (status !== "IDLE") {
-          activities.push({
-            id: "match-started",
-            kind: "MATCH_STARTED",
-            sequence: 0,
-          });
-
-          activities.push(...reconstructMoveActivities(msg.payload.moves));
-
-          if (status === "FINISHED" && msg.payload.result) {
-            activities.push({
-              id: "match-finished",
-              kind: "MATCH_FINISHED",
-              sequence: lastPly + 1,
-              result: msg.payload.result,
-            });
-          }
-        }
+        const activities = buildSnapshotActivities(msg.payload);
 
         set({
           matchStatus: status,
@@ -157,64 +109,40 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
           currentMatchId: msg.payload.matchId,
           whitePersonality: msg.payload.whitePersonality,
           blackPersonality: msg.payload.blackPersonality,
-          dialogue: [...msg.payload.dialogue].sort((a, b) => a.id - b.id),
           startAvailability: msg.payload.startAvailability,
         });
         break;
       }
       case "MOVE_PLAYED":
         set((state) => {
-          const moveId = `move-${msg.payload.ply}`;
-          const newMove: MatchActivityItem = {
-            id: moveId,
-            kind: "MOVE",
-            sequence: msg.payload.ply,
-            player: msg.payload.player,
-            notation: msg.payload.notation,
-            movingPiece: msg.payload.movingPiece,
-            movingPieceColor: msg.payload.movingPieceColor,
-            sourceSquare: msg.payload.sourceSquare,
-            destinationSquare: msg.payload.destinationSquare,
-            capturedPiece: msg.payload.capturedPiece ?? undefined,
-            capturedPieceColor: msg.payload.capturedPieceColor ?? undefined,
-            promotedPiece: msg.payload.promotedPiece ?? undefined,
-            castlingSide: msg.payload.castlingSide ?? undefined,
-            capture: msg.payload.capture,
-            check: msg.payload.check,
-            checkmate: msg.payload.checkmate,
-            promotion: msg.payload.promotion,
-            isNew: true,
-          };
-
-          const filtered = state.activities.filter((act) => act.id !== moveId);
-          const updatedActivities = [...filtered, newMove].sort(
-            (a, b) => a.sequence - b.sequence,
-          );
-
           return {
             boardFen: msg.payload.fen,
             activeTurn: msg.payload.player === "WHITE" ? "BLACK" : "WHITE",
             moveCount: msg.payload.ply,
-            activities: updatedActivities,
+            activities: mergeMatchActivity(
+              state.activities,
+              toLiveMoveActivity(msg.payload),
+            ),
           };
         });
         break;
       case "DIALOGUE_PLAYED":
         set((state) => {
           if (
-            state.currentMatchId !== undefined &&
+            state.currentMatchId === undefined ||
             msg.payload.matchId !== state.currentMatchId
           ) {
             return state;
           }
 
-          const withoutDuplicate = state.dialogue.filter(
-            (line) => line.id !== msg.payload.id,
-          );
           return {
-            currentMatchId: state.currentMatchId ?? msg.payload.matchId,
-            dialogue: [...withoutDuplicate, msg.payload].sort(
-              (a, b) => a.id - b.id,
+            activities: mergeMatchActivity(
+              state.activities,
+              toDialogueActivity(
+                msg.payload,
+                state.whitePersonality,
+                state.blackPersonality,
+              ),
             ),
           };
         });
@@ -229,27 +157,16 @@ export const useMatchViewerStore = create<MatchViewerState>((set) => ({
         break;
       case "MATCH_FINISHED":
         set((state) => {
-          const finishedId = "match-finished";
-          const lastPly = msg.payload.totalPlies;
-          const finishedItem: MatchActivityItem = {
-            id: finishedId,
-            kind: "MATCH_FINISHED",
-            sequence: lastPly + 1,
-            result: msg.payload.result,
-          };
-
-          const filtered = state.activities.filter(
-            (act) => act.id !== finishedId,
-          );
-          const updatedActivities = [...filtered, finishedItem].sort(
-            (a, b) => a.sequence - b.sequence,
-          );
-
           return {
             matchStatus: "FINISHED",
             boardFen: msg.payload.fen,
             result: msg.payload.result,
-            activities: updatedActivities,
+            activities: mergeMatchActivity(state.activities, {
+              id: "match-finished",
+              kind: "MATCH_FINISHED",
+              sequence: msg.payload.totalPlies + 1,
+              result: msg.payload.result,
+            }),
           };
         });
         break;

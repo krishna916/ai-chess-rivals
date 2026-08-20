@@ -12,6 +12,23 @@ interface MatchActivityItemProps {
   activity: ActivityType;
 }
 
+function formatDialogueLabel(value: string): string {
+  const normalized = value.replace(/_/g, " ").toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function dialogueMonogram(displayName: string): string {
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  return initials || "AI";
+}
+
 export function MatchActivityItem({ activity }: MatchActivityItemProps) {
   const formatResult = (result: string) => {
     switch (result) {
@@ -116,6 +133,62 @@ export function MatchActivityItem({ activity }: MatchActivityItemProps) {
             </div>
           </div>
         </div>
+      );
+    }
+
+    case "DIALOGUE": {
+      const sideLabel =
+        activity.side === "WHITE"
+          ? "White"
+          : activity.side === "BLACK"
+            ? "Black"
+            : "Character";
+      const emotionLabel = formatDialogueLabel(activity.emotion);
+      const reactionLabel = formatDialogueLabel(activity.reactionType);
+
+      return (
+        <article
+          data-testid={`activity-${activity.id}`}
+          aria-label={`${activity.personalityDisplayName} dialogue, ${sideLabel}, ${emotionLabel}, ${reactionLabel}`}
+          className={cn(
+            "rounded-lg border px-3 py-2.5 text-sm",
+            activity.side === "WHITE" &&
+              "border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40",
+            activity.side === "BLACK" &&
+              "border-neutral-300 bg-neutral-100/70 dark:border-neutral-700 dark:bg-neutral-800/60",
+            activity.side === null && "border-border bg-muted/40",
+          )}
+        >
+          <div className="flex items-start gap-2.5">
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-bold text-foreground"
+            >
+              {dialogueMonogram(activity.personalityDisplayName)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-semibold text-foreground">
+                  {activity.personalityDisplayName}
+                </span>
+                <span className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {sideLabel}
+                </span>
+              </div>
+              <p className="mt-1 break-words leading-relaxed text-foreground">
+                {activity.text}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span className="rounded bg-background/80 px-1.5 py-0.5">
+                  {emotionLabel}
+                </span>
+                <span className="rounded bg-background/80 px-1.5 py-0.5">
+                  {reactionLabel}
+                </span>
+              </div>
+            </div>
+          </div>
+        </article>
       );
     }
 

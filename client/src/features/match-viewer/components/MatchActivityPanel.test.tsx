@@ -1,5 +1,5 @@
 /// <reference types="@testing-library/jest-dom" />
-import { render, screen, cleanup } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MatchActivityPanel } from "./MatchActivityPanel";
 import { useMatchViewerStore } from "@/store/matchViewerStore";
@@ -23,6 +23,26 @@ function moveActivity(
     checkmate: false,
     promotion: false,
     isNew: false,
+    ...overrides,
+  };
+}
+
+function dialogueActivity(
+  overrides: Partial<Extract<MatchActivityItem, { kind: "DIALOGUE" }>> = {},
+): Extract<MatchActivityItem, { kind: "DIALOGUE" }> {
+  return {
+    id: "dialogue-1",
+    kind: "DIALOGUE",
+    sequence: 1,
+    dialogueId: 1,
+    triggerType: "MOVE",
+    personalityKey: "blaze",
+    personalityDisplayName: "Blaze",
+    side: "WHITE",
+    text: "That pawn move already has you worried.",
+    emotion: "CONFIDENT",
+    reactionType: "MOVE_REACTION",
+    createdAt: "2026-08-18T00:00:00Z",
     ...overrides,
   };
 }
@@ -173,6 +193,91 @@ describe("MatchActivityPanel", () => {
     expect(
       screen.queryByTestId("capture-indicator-hover"),
     ).not.toBeInTheDocument();
+  });
+
+  it("renders personality dialogue with visible identity, side, emotion, and reaction labels", () => {
+    useMatchViewerStore.setState({
+      activities: [
+        dialogueActivity(),
+        dialogueActivity({
+          id: "dialogue-2",
+          dialogueId: 2,
+          personalityKey: "vesper",
+          personalityDisplayName: "Vesper",
+          side: "BLACK",
+          text: "Worried? I call that optimism.",
+          emotion: "DEFIANT",
+          reactionType: "MOVE_REACTION",
+        }),
+      ],
+    });
+
+    render(<MatchActivityPanel />);
+
+    const blaze = screen.getByTestId("activity-dialogue-1");
+    expect(within(blaze).getByText("Blaze")).toBeInTheDocument();
+    expect(within(blaze).getByText("White")).toBeInTheDocument();
+    expect(within(blaze).getByText("Confident")).toBeInTheDocument();
+    expect(within(blaze).getByText("Move reaction")).toBeInTheDocument();
+    expect(
+      within(blaze).getByText("That pawn move already has you worried."),
+    ).toBeInTheDocument();
+    expect(blaze).toHaveAccessibleName(
+      "Blaze dialogue, White, Confident, Move reaction",
+    );
+
+    const vesper = screen.getByTestId("activity-dialogue-2");
+    expect(within(vesper).getByText("Vesper")).toBeInTheDocument();
+    expect(within(vesper).getByText("Black")).toBeInTheDocument();
+    expect(within(vesper).getByText("Defiant")).toBeInTheDocument();
+    expect(vesper).toHaveAccessibleName(
+      "Vesper dialogue, Black, Defiant, Move reaction",
+    );
+  });
+
+  it("renders an unmatched speaker neutrally instead of guessing a side", () => {
+    useMatchViewerStore.setState({
+      activities: [
+        dialogueActivity({
+          personalityKey: "unknown",
+          personalityDisplayName: "Unknown",
+          side: null,
+        }),
+      ],
+    });
+
+    render(<MatchActivityPanel />);
+
+    const row = screen.getByTestId("activity-dialogue-1");
+    expect(within(row).getByText("Character")).toBeInTheDocument();
+    expect(row).toHaveAccessibleName(
+      "Unknown dialogue, Character, Confident, Move reaction",
+    );
+  });
+
+  it("keeps long dialogue histories inside the bounded scroll feed", () => {
+    useMatchViewerStore.setState({
+      activities: Array.from({ length: 50 }, (_, index) =>
+        dialogueActivity({
+          id: `dialogue-${index + 1}`,
+          dialogueId: index + 1,
+          sequence: index + 1,
+          text: `Banter line ${index + 1}`,
+        }),
+      ),
+    });
+
+    render(<MatchActivityPanel />);
+
+    expect(screen.getByTestId("match-activity-panel")).toHaveClass(
+      "max-h-[600px]",
+      "lg:max-h-[calc(100vh-200px)]",
+    );
+    expect(screen.getByTestId("match-activity-feed")).toHaveClass(
+      "overflow-y-auto",
+    );
+    expect(screen.getByText("50 events")).toBeInTheDocument();
+    expect(screen.getByText("Banter line 50")).toBeInTheDocument();
   });
 
   it("scrolls only the activity feed when activities are added", () => {
