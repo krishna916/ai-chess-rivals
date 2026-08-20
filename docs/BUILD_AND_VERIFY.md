@@ -203,22 +203,29 @@ but they do not count as browser or real-provider observations.
 
 #### Automated evidence
 
-- [x] Backend verification passed with 305 tests, Spotless, and SpotBugs reporting zero findings.
+- [x] Backend verification passed with 306 tests, Spotless, and SpotBugs reporting zero findings.
 - [x] The focused backend resilience slice passed, including provider success, failure, timeout,
       validation-failure, fallback, MDC lifecycle, and match stop/resume coverage.
 - [x] The focused frontend activity-ordering suite passed 29 tests.
 - [x] Captured-output regression coverage proved provider logs contain safe metadata without prompt
       or response content.
-- [x] The root verifier passed with `AI_ENABLED=false`: backend 305 tests, Spotless, SpotBugs,
+- [x] The root verifier passed with `AI_ENABLED=false`: backend 306 tests, Spotless, SpotBugs,
       frontend format, typecheck, lint, 83 tests, and production build.
 
 #### Manual and runtime evidence
 
-- [ ] Browser acceptance was not run: no local application ports were active during this run.
-- [ ] The AI-disabled full-stack match was not run: Docker was unavailable for the local PostgreSQL
-      service, so no backend/frontend runtime was started.
-- [ ] Four-personality, random-rivalry, refresh, reconnect, and stop/resume browser checks were
-      not run for the same runtime prerequisite reason.
+- [x] Browser acceptance ran with PostgreSQL healthy, the backend on `8082`/`8081`, and the
+      frontend on `localhost:5173`.
+- [x] The AI-disabled full-stack match ran with deterministic fallback dialogue; Gremlin vs Regent
+      reached 111 moves and the viewer rendered 195 activity events. The response metric reported
+      the `deterministic_fallback` source with the `ai_disabled` reason.
+- [x] The roster exposed all four selectable personalities (Blaze, Vesper, Gremlin, and Regent);
+      Gremlin vs Regent and Blaze vs Vesper starts preserved the correct player associations.
+- [x] Refresh/reconnect hydration preserved the same 195-event activity count without duplicate
+      `Match started` entries.
+- [x] Stop/resume browser evidence showed Blaze vs Vesper stopped after four moves, then resumed
+      the same match ID from move four and continued live play.
+- [ ] Random-rivalry selection was not exercised through the owner-controls UI in this pass.
 - [ ] Real-provider and controlled Groq-failure checks were not run; no provider request was made
       and local credentials were not inspected or exposed.
 
@@ -297,4 +304,3 @@ The following items were observed with Stockfish 17.1, the backend on `8082`, th
 - [x] Long activity history scrolls inside the activity panel without scrolling the page header
       out of view.
 - [ ] Connection state and status remain readable at the narrow public viewport.
-
