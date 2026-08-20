@@ -7,6 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
 import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueEmotion;
 import dev.krishnamurti.ai_chess_rivals.ai.api.DialogueGenerator;
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 class MatchDialogueCoordinatorTest {
@@ -161,6 +165,29 @@ class MatchDialogueCoordinatorTest {
 
     verify(historyStore, never()).persistIfAbsent(any(), any(), any(Integer.class), any());
     verify(matchEventSink, never()).publish(any());
+  }
+
+  @Test
+  void generatorFailureLogsOnlySafeExceptionMetadata() {
+    Logger logger = (Logger) LoggerFactory.getLogger(MatchDialogueCoordinator.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(dialogueGenerator.generateMove(any()))
+          .thenThrow(new IllegalStateException("provider response secret"));
+
+      coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+
+    ILoggingEvent event = assertThat(appender.list).singleElement().actual();
+    assertThat(event.getFormattedMessage())
+        .contains("exceptionType=IllegalStateException")
+        .doesNotContain("provider response secret");
+    assertThat(event.getThrowableProxy()).isNull();
   }
 
   @Test
@@ -294,3 +321,4 @@ class MatchDialogueCoordinatorTest {
         Instant.parse("2026-08-16T00:00:00Z"));
   }
 }
+
