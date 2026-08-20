@@ -11,8 +11,12 @@ import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 class FailoverAiChatGatewayTest {
 
   private static final AiChatRequest REQUEST =
@@ -239,6 +243,28 @@ class FailoverAiChatGatewayTest {
     assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(1);
+  }
+
+  @Test
+  void providerLogsContainOnlySafeMetadata(CapturedOutput output) {
+    AtomicInteger groqCalls = new AtomicInteger();
+    AtomicInteger geminiCalls = new AtomicInteger();
+    AiChatRequest request =
+        new AiChatRequest("SECRET_PROMPT_DO_NOT_LOG", "SECRET_FALLBACK_DO_NOT_LOG");
+    FailoverAiChatGateway gateway =
+        gateway(returning("SECRET_RAW_RESPONSE_DO_NOT_LOG", groqCalls), failing(geminiCalls));
+
+    AiChatResult result = gateway.generate(request, response -> false);
+
+    assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
+    assertThat(output.getAll())
+        .contains("provider=groq")
+        .contains("outcome=validation_failure")
+        .contains("target=gemini")
+        .contains("source=deterministic_fallback")
+        .doesNotContain("SECRET_PROMPT_DO_NOT_LOG")
+        .doesNotContain("SECRET_RAW_RESPONSE_DO_NOT_LOG")
+        .doesNotContain("SECRET_FALLBACK_DO_NOT_LOG");
   }
 
   public enum StructuredEmotion {
