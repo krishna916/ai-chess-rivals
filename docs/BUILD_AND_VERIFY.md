@@ -175,11 +175,14 @@ $env:AI_GROQ_API_KEY = "dummy-groq-key"
 $env:AI_GROQ_MODEL = "dummy-groq-model"
 $env:AI_GROQ_BASE_URL = "http://127.0.0.1:9/v1"
 # Set AI_GEMINI_API_KEY and AI_GEMINI_MODEL from the ignored local environment only.
+$groqPortOpen = Test-NetConnection -ComputerName 127.0.0.1 -Port 9 -InformationLevel Quiet -WarningAction SilentlyContinue
+if ($groqPortOpen) { throw "Port 9 is occupied; choose another closed loopback port before continuing." }
 ```
 
-Port 9 is expected to refuse the Groq connection, so the observed result should be a bounded
-Gemini attempt followed by either a Gemini response or the deterministic fallback. Do not use a
-production key against an uncontrolled endpoint.
+The preflight aborts if port 9 is occupied. When it is closed, the Groq connection is expected to
+refuse immediately, so the observed result should be a bounded Gemini attempt followed by either a
+Gemini response or the deterministic fallback. Do not use a production key against an uncontrolled
+endpoint.
 
 For the manual Phase 2 acceptance pass, record only observations that were actually made:
 
@@ -206,8 +209,8 @@ but they do not count as browser or real-provider observations.
 - [x] The focused frontend activity-ordering suite passed 29 tests.
 - [x] Captured-output regression coverage proved provider logs contain safe metadata without prompt
       or response content.
-- [ ] The root verifier completed its backend stage but stopped at frontend `format:check` because
-      23 pre-existing frontend files are not formatted; this branch changes no frontend files.
+- [x] The root verifier passed with `AI_ENABLED=false`: backend 305 tests, Spotless, SpotBugs,
+      frontend format, typecheck, lint, 83 tests, and production build.
 
 #### Manual and runtime evidence
 
