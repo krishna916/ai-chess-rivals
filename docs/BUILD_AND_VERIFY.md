@@ -182,6 +182,29 @@ The dated acceptance record below this section must list the environment, checks
 unchecked items with their reason. Automated test results are evidence for the resilience matrix,
 but they do not count as browser or real-provider observations.
 
+### Acceptance record — 2026-08-20
+
+#### Automated evidence
+
+- [x] Backend verification passed with 305 tests, Spotless, and SpotBugs reporting zero findings.
+- [x] The focused backend resilience slice passed, including provider success, failure, timeout,
+      validation-failure, fallback, MDC lifecycle, and match stop/resume coverage.
+- [x] The focused frontend activity-ordering suite passed 29 tests.
+- [x] Captured-output regression coverage proved provider logs contain safe metadata without prompt
+      or response content.
+- [ ] The root verifier completed its backend stage but stopped at frontend `format:check` because
+      23 pre-existing frontend files are not formatted; this branch changes no frontend files.
+
+#### Manual and runtime evidence
+
+- [ ] Browser acceptance was not run: no local application ports were active during this run.
+- [ ] The AI-disabled full-stack match was not run: Docker was unavailable for the local PostgreSQL
+      service, so no backend/frontend runtime was started.
+- [ ] Four-personality, random-rivalry, refresh, reconnect, and stop/resume browser checks were
+      not run for the same runtime prerequisite reason.
+- [ ] Real-provider and controlled Groq-failure checks were not run; no provider request was made
+      and local credentials were not inspected or exposed.
+
 ## Phase 1 end-to-end acceptance
 
 Use the normal local-development topology so the management and application ports remain
