@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` only and execute this plan inline task-by-task. Do not use or dispatch `superpowers:subagent-driven-development`. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Clear the remaining non-code blockers on PR #60 so issue #46 can be truthfully completed: establish a clean frontend Prettier baseline outside the feature PR, make the forced-failover recipe deterministic, get the root verifier green, perform the required manual/runtime Phase 2 acceptance, and record only observed evidence.
+**Goal:** Clear the remaining non-code blockers on PR #60 so issue #46 can be truthfully completed: isolate the existing frontend Prettier baseline, make the forced-failover recipe deterministic, get the root verifier green, perform the required manual/runtime acceptance, and record only observed evidence.
 
-**Architecture:** Do not redesign the working AI observability implementation. Treat the existing PR code as accepted unless a verification step exposes a real defect. Keep the unrelated frontend formatting baseline isolated in its own tiny branch/PR; after that merges, rebase `feature/issue-46-ai-observability` and finish the issue-specific docs/runtime acceptance there.
+**Architecture:** Do not redesign the working AI observability implementation. Treat the current PR code as accepted unless verification exposes a reproducible defect. Keep unrelated frontend formatting outside PR #60, then rebase the feature branch and finish only the issue-specific documentation and acceptance work.
 
 **Tech Stack:** Git, PowerShell, npm/Prettier/Vitest/TypeScript/Vite, Java 25, Spring Boot 4.1.0, Spring AI 2.0.0, Micrometer/Actuator, Docker/PostgreSQL, React 19, GitHub Actions.
 
@@ -16,72 +16,43 @@
 
 ## Global Constraints
 
-- Do **not** redesign `AiGatewayMetrics`, `FailoverAiChatGateway`, `DisabledAiChatGateway`, provider configuration, MDC correlation, or frontend match activity unless a verification step exposes a reproducible defect.
-- Do **not** add dependencies, database migrations, public API changes, WebSocket contract changes, dashboards, tracing infrastructure, or frontend production features.
-- Do **not** mix the existing frontend Prettier baseline cleanup into PR #60; isolate it in `chore/frontend-prettier-baseline`.
-- Do **not** weaken, skip, reorder, or delete verification steps to make the root verifier green. `client/scripts/verify.js` must continue to run `format:check`, `typecheck`, `lint`, `test`, and `build` in that order.
-- Do **not** change provider timeouts or retry policy. Groq remains `8s`; Gemini remains `12s`; same-provider retries remain disabled.
-- Do **not** expose real Groq/Gemini keys in commits, logs, screenshots, PR comments, shell history copied into GitHub, or acceptance records.
-- Automated tests must remain provider-network-free.
-- Manual acceptance evidence is factual evidence, not inferred evidence. Check an item only after the corresponding browser/runtime/provider interaction was actually observed.
-- If Docker, browser access, or valid provider credentials are unavailable, stop at the relevant manual acceptance gate and leave PR #60 in draft state.
-- Keep PR #60 draft until every issue #46 acceptance criterion is satisfied, including a green root verifier and the complete manual acceptance run.
+- Do not redesign `AiGatewayMetrics`, `FailoverAiChatGateway`, provider configuration, MDC correlation, or frontend match activity unless verification exposes a real defect.
+- Do not add dependencies, migrations, public API/WebSocket changes, dashboards, tracing, retries, persistence, or frontend features.
+- Do not mix the existing frontend Prettier cleanup into PR #60.
+- Do not weaken `client/scripts/verify.js`; it must continue to run `format:check`, `typecheck`, `lint`, `test`, and `build` in that order.
+- Groq remains `8s`; Gemini remains `12s`; same-provider retries remain disabled.
+- Automated tests remain provider-network-free.
+- Never commit or paste real provider credentials.
+- Check manual acceptance items only after the corresponding runtime/browser/provider interaction actually occurred.
+- If Docker, browser access, or valid provider credentials are unavailable, stop at that gate and leave PR #60 draft.
+- Keep PR #60 draft until every issue #46 acceptance criterion is genuinely satisfied.
 
 ---
 
-## File Map
-
-### Separate formatting-baseline branch
-
-**Modify by formatter only:**
-- Whatever files under `client/` are reported by the current Prettier baseline when `npm.cmd run format` is executed from `client/`.
-
-**Must not modify:**
-- `client/package.json`
-- `client/package-lock.json`
-- `client/scripts/verify.js`
-- application behavior, tests, dependencies, or configuration unless Prettier itself rewrites formatting in one of those files. If `package.json`, `package-lock.json`, or `client/scripts/verify.js` changes for any reason other than deterministic Prettier whitespace/formatting, stop and inspect before committing.
-
-### PR #60 branch
-
-**Modify:**
-- `docs/BUILD_AND_VERIFY.md` — make forced-failover instructions mechanical and later replace the incomplete acceptance record with the actually observed final record.
-
-**Verify without intended production changes:**
-- `scripts/verify.ps1`
-- `client/scripts/verify.js`
-- existing backend/frontend/native verification already covered by PR #60.
-
----
-
-### Task 1: Isolate and Fix the Existing Frontend Prettier Baseline
+### Task 1: Fix the Pre-Existing Frontend Prettier Baseline in a Separate PR
 
 **Branch:** `chore/frontend-prettier-baseline`
 
 **Files:**
-- Modify: only files changed by `npm.cmd run format` under `client/`.
-- Verify unchanged behavior through the existing frontend verifier.
+- Modify: only files under `client/` changed by the repository's existing Prettier formatter.
+- Do not intentionally modify application behavior, dependencies, tests, or verification scripts.
 
-**Interfaces:**
-- Consumes: current `master` frontend source and current Prettier configuration.
-- Produces: a formatting-only commit that allows `npm.cmd run format:check` and `npm.cmd run verify` to pass on `master` once merged.
+**Produces:** A formatting-only commit that makes the existing frontend verifier green on `master`.
 
-- [ ] **Step 1: Confirm PR #60 work is committed before switching branches**
-
-From repository root:
+- [ ] **Step 1: Start from a clean current `master`**
 
 ```powershell
 git status --short
-```
-
-Expected: no output. If there are uncommitted changes, stop and resolve them before switching branches.
-
-- [ ] **Step 2: Reproduce the baseline formatting failure from current `master`**
-
-```powershell
 git fetch origin
 git switch master
 git pull --ff-only origin master
+```
+
+Expected: clean working tree.
+
+- [ ] **Step 2: Reproduce the current formatting failure on `master`**
+
+```powershell
 Push-Location client
 try {
     npm.cmd run format:check
@@ -91,21 +62,12 @@ finally {
 }
 ```
 
-Expected before cleanup: `format:check` fails and reports the existing unformatted frontend files. This establishes that the failure is a `master` baseline problem, not a PR #60 regression.
+Expected before cleanup: FAIL on the existing unformatted client files. This proves the root-verifier problem predates PR #60.
 
-Do not edit `client/scripts/verify.js` or remove `format:check` from verification.
-
-- [ ] **Step 3: Create the dedicated formatting-only branch**
+- [ ] **Step 3: Create the dedicated baseline branch and apply only Prettier**
 
 ```powershell
 git switch -c chore/frontend-prettier-baseline
-```
-
-If the branch already exists locally or remotely, stop and inspect it instead of overwriting it.
-
-- [ ] **Step 4: Apply only the repository's configured Prettier formatter**
-
-```powershell
 Push-Location client
 try {
     npm.cmd run format
@@ -115,9 +77,9 @@ finally {
 }
 ```
 
-Do not make manual refactors while this formatter branch is active.
+If the branch already exists, stop and inspect it instead of overwriting it.
 
-- [ ] **Step 5: Inspect exactly what the formatter changed**
+- [ ] **Step 4: Inspect the formatter diff**
 
 ```powershell
 git status --short
@@ -128,14 +90,12 @@ git diff --check
 
 Expected:
 - every changed path is under `client/`;
-- `git diff --check` exits successfully;
-- changes are formatting-only;
-- no dependency/version change exists;
-- no generated build output is tracked.
+- no server/docs/infrastructure change;
+- no dependency/version change;
+- formatting-only diff;
+- `git diff --check` passes.
 
-If any server/docs/infrastructure file changed, revert it before continuing.
-
-- [ ] **Step 6: Prove the full frontend verifier is green after formatting**
+- [ ] **Step 5: Run the full frontend verifier**
 
 ```powershell
 Push-Location client
@@ -147,72 +107,38 @@ finally {
 }
 ```
 
-Expected sequence and result:
+Expected: `format:check`, `typecheck`, `lint`, `test`, and `build` all PASS.
 
-```text
-format:check -> PASS
-typecheck    -> PASS
-lint         -> PASS
-test         -> PASS
-build        -> PASS
-```
-
-Do not continue if any non-formatting check fails. Investigate that as a separate defect rather than weakening verification.
-
-- [ ] **Step 7: Commit only the formatting baseline**
+- [ ] **Step 6: Commit and push the isolated cleanup**
 
 ```powershell
 git add client
 git diff --cached --check
-git diff --cached --stat
 git commit -m "style: align frontend prettier baseline"
-```
-
-Immediately inspect the commit:
-
-```powershell
-git show --stat --oneline HEAD
-git show --check HEAD
-```
-
-Expected: formatting-only client changes and no whitespace errors.
-
-- [ ] **Step 8: Push the isolated branch and open a tiny formatting-only PR**
-
-```powershell
 git push -u origin chore/frontend-prettier-baseline
 ```
+
+- [ ] **Step 7: Open and merge the formatting-only PR**
 
 If GitHub CLI is available:
 
 ```powershell
-gh pr create --base master --head chore/frontend-prettier-baseline --title "style: align frontend prettier baseline" --body "Formatting-only cleanup of the existing frontend Prettier baseline. No behavior, dependency, API, or configuration changes. `npm run verify` passes on the branch. This is intentionally isolated so PR #60 can rebase onto a clean root-verification baseline."
+gh pr create --base master --head chore/frontend-prettier-baseline --title "style: align frontend prettier baseline" --body "Formatting-only cleanup of the existing frontend Prettier baseline. No behavior, dependency, API, or configuration changes. npm run verify passes. Kept separate so PR #60 stays scoped to issue #46."
 ```
 
-If GitHub CLI is unavailable, create the same PR through GitHub using the pushed branch and the exact title/body above.
+Require green frontend CI, review the diff as formatting-only, and merge it into `master`.
 
-- [ ] **Step 9: Require green frontend CI and merge this baseline PR before continuing PR #60**
-
-Expected CI for the formatting PR: frontend verification runs and passes because client files changed.
-
-Do not cherry-pick the formatting commit into PR #60. Merge the formatting PR into `master`, then continue with Task 2 from the updated `master` history.
-
-**Checkpoint:** Task 2 must not begin until the formatting-only PR is merged into `master`.
+**Checkpoint:** Do not continue Task 2 until this formatting PR is merged.
 
 ---
 
-### Task 2: Rebase PR #60 onto the Clean Formatting Baseline
+### Task 2: Rebase PR #60 onto the Clean Baseline
 
 **Branch:** `feature/issue-46-ai-observability`
 
-**Files:**
-- No intended file changes in this task.
+**Files:** No intended changes.
 
-**Interfaces:**
-- Consumes: merged `chore/frontend-prettier-baseline` on `origin/master`.
-- Produces: PR #60 rebased so its root verifier sees the corrected frontend baseline.
-
-- [ ] **Step 1: Update remote state and verify the formatting fix is on `origin/master`**
+- [ ] **Step 1: Confirm updated `master` is formatted**
 
 ```powershell
 git fetch origin
@@ -227,25 +153,18 @@ finally {
 }
 ```
 
-Expected: `format:check` PASS on updated `master`.
+Expected: PASS. If it fails, stop; the baseline is not actually fixed.
 
-If it still fails, stop. The baseline PR was either not merged or did not fix the complete baseline.
-
-- [ ] **Step 2: Rebase PR #60 onto current `origin/master`**
+- [ ] **Step 2: Rebase the feature branch**
 
 ```powershell
 git switch feature/issue-46-ai-observability
 git rebase origin/master
 ```
 
-Resolve conflicts by preserving:
-- PR #60 AI observability/resilience behavior;
-- the merged `master` formatting baseline;
-- current `docs/BUILD_AND_VERIFY.md` Phase 2 content.
+Preserve PR #60 observability behavior and the merged formatting baseline. Do not add unrelated cleanup while resolving conflicts.
 
-Do not use conflict resolution as an opportunity for unrelated cleanup.
-
-- [ ] **Step 3: Confirm the feature diff still contains only issue #46 work plus its plan documents**
+- [ ] **Step 3: Verify PR #60 no longer contains mass frontend formatting**
 
 ```powershell
 git status --short
@@ -253,7 +172,7 @@ git diff --stat origin/master...HEAD
 git diff --name-only origin/master...HEAD
 ```
 
-Expected: no mass frontend formatting diff remains in PR #60.
+Expected: issue #46 implementation/docs only; no formatting-baseline client diff.
 
 - [ ] **Step 4: Push the rebased branch safely**
 
@@ -261,41 +180,27 @@ Expected: no mass frontend formatting diff remains in PR #60.
 git push --force-with-lease origin feature/issue-46-ai-observability
 ```
 
-Use `--force-with-lease`, never plain `--force`.
+Never use plain `--force`.
 
 ---
 
-### Task 3: Make the Forced Groq -> Gemini Acceptance Recipe Mechanical
+### Task 3: Make `BUILD_AND_VERIFY.md` Failover Instructions Mechanical
 
 **Branch:** `feature/issue-46-ai-observability`
 
 **Files:**
 - Modify: `docs/BUILD_AND_VERIFY.md`
 
-**Interfaces:**
-- Consumes: existing Phase 2 provider settings from `server/src/main/resources/application.yaml`.
-- Produces: a deterministic failover recipe that needs no local Groq stub service and cannot accidentally call the real Groq endpoint.
+- [ ] **Step 1: Replace the vague "local stub" instruction with the closed-local-port recipe**
 
-- [ ] **Step 1: Replace the vague local-stub sentence in the Phase 2 verification section**
-
-Find this current text:
-
-```markdown
-A forced Groq failure may be exercised safely by pointing `AI_GROQ_BASE_URL` at a local stub that deterministically fails;
-do not use a production key against an uncontrolled endpoint.
-```
-
-Replace it with this exact operational recipe:
-
-```markdown
-For a controlled Groq -> Gemini failover run, do not start another stub service and do not send a request to the real Groq endpoint. Keep a valid local Gemini key/model, give Groq dummy non-secret values, and point Groq at a closed local port:
+In the Phase 2 verification section, document these runtime values exactly except for the two developer-owned Gemini values, which remain local secrets/configuration and must never be committed:
 
 ```text
 AI_ENABLED=true
 AI_GROQ_API_KEY=forced-failure-not-a-secret
 AI_GROQ_BASE_URL=http://127.0.0.1:9/v1
 AI_GROQ_MODEL=forced-failure
-AI_GEMINI_API_KEY=<use the valid Gemini key already present in your local secret environment>
+AI_GEMINI_API_KEY=<use the valid Gemini key already present in the local secret environment>
 AI_GEMINI_MODEL=<use the valid Gemini model already configured locally>
 GAME_MOVE_THINK_TIME_MILLIS=0
 GAME_MOVE_DELAY_MIN=0s
@@ -303,14 +208,17 @@ GAME_MOVE_DELAY_MAX=0s
 GAME_MAX_PLIES=12
 ```
 
-The expected path is a local Groq connection failure -> fallback activation targeting `gemini` -> Gemini response. Restore or clear `AI_GROQ_BASE_URL` after the check so later runs use the normal configured Groq endpoint.
+Document the expected path as:
+
+```text
+local Groq connection failure -> fallback activation target=gemini -> Gemini response
 ```
 
-The angle-bracket lines above describe local secret/runtime inputs only. Do not replace them in committed documentation with real credentials.
+Also state that `AI_GROQ_BASE_URL` must be restored/cleared after the check.
 
-- [ ] **Step 2: Complete the fast-mode documentation while touching the same section**
+- [ ] **Step 2: Expand the existing fast-mode snippet**
 
-The current fast-mode snippet contains only move-delay variables. Replace it with:
+Replace the two-variable fast-mode snippet with:
 
 ```powershell
 $env:GAME_MOVE_THINK_TIME_MILLIS = "0"
@@ -319,95 +227,61 @@ $env:GAME_MOVE_DELAY_MAX = "0s"
 $env:GAME_MAX_PLIES = "12"
 ```
 
-This keeps manual acceptance short and matches the original issue #46 implementation plan.
-
-- [ ] **Step 3: Review the documentation diff for accidental secrets or unrelated edits**
+- [ ] **Step 3: Review and commit the docs-only change**
 
 ```powershell
 git diff -- docs/BUILD_AND_VERIFY.md
 git diff --check
-```
-
-Explicitly confirm the diff contains no actual API key/token value.
-
-- [ ] **Step 4: Commit the deterministic acceptance instructions**
-
-```powershell
 git add docs/BUILD_AND_VERIFY.md
 git commit -m "docs: make phase 2 failover verification mechanical"
 ```
 
+Confirm no real key/token value exists in the diff.
+
 ---
 
-### Task 4: Get the Root Repository Verifier Green
+### Task 4: Get the Canonical Root Verifier Green
 
-**Branch:** `feature/issue-46-ai-observability`
+**Files:** Verify only unless a reproducible PR #60 defect appears.
 
-**Files:**
-- Verify only unless a reproducible PR #60 defect is discovered.
+- [ ] **Step 1: Disable providers and run the root verifier**
 
-**Interfaces:**
-- Consumes: PR #60 implementation rebased onto the clean frontend baseline.
-- Produces: issue #46's required green root-verification evidence.
-
-- [ ] **Step 1: Disable real providers for automated repository verification**
+From repository root:
 
 ```powershell
 $env:AI_ENABLED = "false"
-```
-
-Do not set Groq/Gemini credentials for this step.
-
-- [ ] **Step 2: Run the canonical Windows root verifier from repository root**
-
-```powershell
 .\scripts\verify.ps1
 ```
 
-Expected:
+Expected final sequence:
 
 ```text
-Backend Maven verify -> PASS
-Frontend format:check -> PASS
-Frontend typecheck -> PASS
-Frontend lint -> PASS
-Frontend Vitest -> PASS
-Frontend production build -> PASS
+backend Maven verify -> PASS
+frontend format:check -> PASS
+frontend typecheck -> PASS
+frontend lint -> PASS
+frontend Vitest -> PASS
+frontend production build -> PASS
 ```
 
-- [ ] **Step 3: If root verification fails, classify the failure before editing anything**
+- [ ] **Step 2: Do not mask any failure**
 
-Use this decision rule:
+Use this rule if red:
 
-1. If `format:check` fails again, stop and verify the baseline branch was actually merged/rebased. Do not edit `verify.js`.
-2. If a backend test/quality gate fails in a PR #60 file, reproduce it with the focused Maven test and fix only that defect.
-3. If frontend typecheck/lint/test/build fails on current `master` too, treat it as a new baseline problem and keep it out of PR #60.
-4. If the failure exists only on PR #60, fix it in PR #60 and rerun the focused check before rerunning the root verifier.
+1. `format:check` red again -> verify Task 1 merge/rebase; do not modify `verify.js`.
+2. backend issue in a PR #60 file -> reproduce with a focused Maven test and fix only that defect.
+3. frontend non-format failure also exists on current `master` -> treat it as another baseline problem outside PR #60.
+4. failure exists only on PR #60 -> fix that regression and rerun the focused check, then rerun the root verifier.
 
-Do not proceed to final acceptance while the canonical root verifier is red.
-
-- [ ] **Step 4: Preserve the passing verifier output as local evidence**
-
-Record the actual counts/results needed for the acceptance record, but do not paste secrets or full noisy logs into `BUILD_AND_VERIFY.md`.
-
-No commit is required for this task unless a real issue #46 defect was fixed.
+Do not proceed to final acceptance while the root verifier is red.
 
 ---
 
-### Task 5: Run the Credential-Free Full-Stack Acceptance First
+### Task 5: Run Credential-Free Full-Stack Resilience Acceptance
 
-**Branch:** `feature/issue-46-ai-observability`
+**Files:** No intended source changes.
 
-**Files:**
-- No intended source changes.
-
-**Interfaces:**
-- Consumes: local PostgreSQL, backend, frontend, existing deterministic `AI_ENABLED=false` gateway.
-- Produces: observed evidence that provider unavailability/disabled mode cannot stop the match and that browser lifecycle behavior remains correct.
-
-- [ ] **Step 1: Start PostgreSQL using the existing local topology**
-
-From repository root:
+- [ ] **Step 1: Start local PostgreSQL**
 
 ```powershell
 Push-Location server
@@ -420,13 +294,11 @@ finally {
 }
 ```
 
-Expected: PostgreSQL service is running/healthy enough for the Spring Boot application to connect.
+If Docker is unavailable, stop and leave the manual acceptance incomplete.
 
-If Docker is unavailable, stop this task and leave manual acceptance unchecked.
+- [ ] **Step 2: Start backend in fast AI-disabled mode**
 
-- [ ] **Step 2: Start the backend in fast AI-disabled mode**
-
-Open a backend terminal and run:
+In a backend terminal:
 
 ```powershell
 cd server
@@ -441,90 +313,60 @@ $env:OWNER_CONTROL_TOKEN = [Convert]::ToHexString(
 .\mvnw.cmd spring-boot:run
 ```
 
-Expected:
-- application API on `http://localhost:8082`;
-- management endpoint on `http://localhost:8081`;
-- no real provider calls because `AI_ENABLED=false`.
+Expected: app on `8082`, management on `8081`, no provider network call.
 
-Keep this backend terminal open so logs can be inspected during the browser checks.
-
-- [ ] **Step 3: Start the Vite frontend**
-
-Open a separate terminal:
+- [ ] **Step 3: Start frontend**
 
 ```powershell
 cd client
 npm.cmd run dev
 ```
 
-Expected: frontend available at `http://localhost:5173`.
+Expected: `http://localhost:5173`.
 
-- [ ] **Step 4: Complete one AI-disabled fast match**
+- [ ] **Step 4: Complete an AI-disabled fast match**
 
 Using the UI:
+1. Start a match with two distinct personalities.
+2. Observe move/dialogue activity.
+3. Let the short match complete.
+4. Confirm deterministic dialogue fallback never stops chess progression.
 
-1. Start a match with any two distinct personalities.
-2. Observe move + dialogue entries arriving in the unified activity feed.
-3. Let the short match reach its configured completion boundary.
-4. Confirm deterministic fallback dialogue did not stop chess progression or match completion.
-
-Do not claim this proves real-provider personality quality; it proves disabled-mode resilience and full-stack dialogue persistence/rendering.
-
-- [ ] **Step 5: Verify the disabled-mode response metric**
-
-In another terminal:
+- [ ] **Step 5: Confirm disabled-mode response metric**
 
 ```powershell
 Invoke-RestMethod http://localhost:8081/actuator/metrics/ai.gateway.responses | ConvertTo-Json -Depth 8
 ```
 
-Expected: a meter series exists that distinguishes:
+Expected tags include:
 
 ```text
 source=deterministic_fallback
 reason=ai_disabled
 ```
 
-- [ ] **Step 6: Exercise refresh, reconnect, and stop/resume using the running local application**
+- [ ] **Step 6: Exercise lifecycle behavior**
 
-Perform these as separate observations:
+Perform actual browser observations:
+1. Refresh after dialogue exists; verify authoritative activity returns without duplicates.
+2. Toggle browser network offline then online while backend stays up; verify reconnect/hydration without duplication or reordering.
+3. Stop an in-progress match and Resume; verify old dialogue remains ordered and new activity continues from authoritative state.
 
-1. **Refresh:** after dialogue exists, refresh the browser; confirm authoritative board + activity hydrate without duplicate move/dialogue entries.
-2. **Reconnect:** while backend remains running, toggle browser network offline then online; confirm connection state recovers and hydration does not duplicate/reorder activity.
-3. **Stop/Resume:** during an in-progress match, use Stop and then Resume; confirm persisted dialogue remains ordered and new activity continues from the authoritative board state.
-
-If the `GAME_MAX_PLIES=12` match ends too quickly for one interaction, start another fast match. Do not increase production pacing configuration permanently; these are environment-only acceptance runs.
+Start additional fast matches if `GAME_MAX_PLIES=12` completes too quickly for all interactions.
 
 ---
 
-### Task 6: Run the Four-Personality and Random-Rivalry Provider Acceptance
+### Task 6: Run Four-Personality and Random-Rivalry Provider Acceptance
 
-**Branch:** `feature/issue-46-ai-observability`
+**Files:** No intended source changes.
 
-**Files:**
-- No intended source changes.
+- [ ] **Step 1: Require valid provider credentials from local secret storage**
 
-**Interfaces:**
-- Consumes: valid local provider credentials and existing four seeded personalities.
-- Produces: the issue #46 manual evidence for distinct character voices, contextual dialogue, and random rivalry.
+Runtime configuration must include `AI_ENABLED=true`, valid Groq key/model, and valid Gemini key/model. Never print or commit the secret values.
 
-- [ ] **Step 1: Confirm valid provider configuration exists only in local secret environment**
+If valid provider credentials are unavailable, stop here and leave PR #60 draft.
 
-Required runtime values:
-
-```text
-AI_ENABLED=true
-AI_GROQ_API_KEY=<local secret source>
-AI_GROQ_MODEL=<locally configured model>
-AI_GEMINI_API_KEY=<local secret source>
-AI_GEMINI_MODEL=<locally configured model>
-```
-
-Do not print the secret values. If valid provider credentials are unavailable, stop here and leave PR #60 draft.
-
-- [ ] **Step 2: Restart the backend with normal provider endpoints and fast match pacing**
-
-Before starting, clear any forced-failure Groq base URL from a prior shell:
+- [ ] **Step 2: Ensure normal Groq endpoint and fast pacing**
 
 ```powershell
 Remove-Item Env:AI_GROQ_BASE_URL -ErrorAction SilentlyContinue
@@ -535,54 +377,39 @@ $env:GAME_MOVE_DELAY_MAX = "0s"
 $env:GAME_MAX_PLIES = "12"
 ```
 
-Start the backend with the valid local provider secrets already present in the environment or ignored `server/.env`.
+Restart the backend using the valid local provider configuration.
 
-- [ ] **Step 3: Run Blaze vs Vesper**
+- [ ] **Step 3: Observe Blaze vs Vesper**
 
-Using the UI:
+Verify both generate dialogue and their rendered voices visibly match:
+- Blaze: high-energy/showboat.
+- Vesper: dry/surgical strategist.
 
-1. Select Blaze and Vesper explicitly.
-2. Start the match.
-3. Observe dialogue from both personalities.
-4. Confirm Blaze reads as the high-energy/showboat voice and Vesper as the dry/surgical strategist voice.
-5. Observe at least one generated line that references the current move/event or recent banter rather than being a generic unrelated quip.
+Also observe at least one line grounded in the current chess event or recent banter rather than a generic unrelated quip.
 
-Only mark these identities/context as verified if the rendered dialogue actually demonstrates them.
+- [ ] **Step 4: Observe Gremlin vs Regent**
 
-- [ ] **Step 4: Run Gremlin vs Regent**
+Verify both generate dialogue and their rendered voices visibly match:
+- Gremlin: absurdist/chaos.
+- Regent: pompous chess aristocrat.
 
-Using the UI:
+- [ ] **Step 5: Exercise Random Rivalry once**
 
-1. Select Gremlin and Regent explicitly.
-2. Start the match.
-3. Observe dialogue from both personalities.
-4. Confirm Gremlin reads as the absurdist/chaos voice and Regent as the pompous chess-aristocrat voice.
+Start a Random Rivalry match and verify:
+- two distinct seeded personalities are selected;
+- dialogue is attributed to the correct selected speaker.
 
-- [ ] **Step 5: Run Random Rivalry once**
-
-1. Choose Random Rivalry.
-2. Start the match.
-3. Confirm two distinct personalities are selected and rendered for the two sides.
-4. Confirm dialogue is associated with the correct selected speaker.
-
-Do not require a particular random pair; require only two distinct valid seeded personalities.
+Do not require a particular random pair.
 
 ---
 
-### Task 7: Run the Controlled Groq -> Gemini Failover Acceptance
+### Task 7: Run Controlled Groq -> Gemini Failover Acceptance
 
-**Branch:** `feature/issue-46-ai-observability`
+**Files:** No intended source changes.
 
-**Files:**
-- No intended source changes.
+- [ ] **Step 1: Restart backend with a deterministic local Groq failure**
 
-**Interfaces:**
-- Consumes: the closed-local-port recipe documented in Task 3 and a valid local Gemini configuration.
-- Produces: observed end-to-end evidence that a Groq outage activates Gemini, safe metrics/logging remain inspectable, and the chess match continues.
-
-- [ ] **Step 1: Restart the backend with deterministic local Groq failure and valid Gemini settings**
-
-Set:
+Set these non-secret Groq values while preserving valid local Gemini key/model values:
 
 ```powershell
 $env:AI_ENABLED = "true"
@@ -595,19 +422,15 @@ $env:GAME_MOVE_DELAY_MAX = "0s"
 $env:GAME_MAX_PLIES = "12"
 ```
 
-Keep the valid Gemini key/model in the local secret environment. Do not overwrite them with committed values.
+Expected: no request can reach real Groq because the base URL is loopback port `9`.
 
-Expected: no request can reach the real Groq service because the configured Groq base URL is loopback port `9`.
+- [ ] **Step 2: Complete a short match**
 
-- [ ] **Step 2: Start and complete a short match**
+Expected: Groq connection failure does not stop chess; Gemini supplies dialogue and the match completes.
 
-Using the frontend, start a match and let it run to completion.
+If Gemini also fails and deterministic fallback completes the match, resilience is still proven but the specific Groq -> Gemini success criterion is **not** satisfied. Diagnose Gemini before checking that acceptance item.
 
-Expected: Groq connection failure does not stop the match; Gemini supplies valid dialogue when available. If Gemini also fails, deterministic fallback may preserve match completion, but that does **not** satisfy the specific Groq -> Gemini success observation; inspect metrics/logs before checking that criterion.
-
-- [ ] **Step 3: Inspect gateway metrics**
-
-Run:
+- [ ] **Step 3: Inspect custom gateway metrics**
 
 ```powershell
 Invoke-RestMethod http://localhost:8081/actuator/metrics/ai.gateway.provider.duration | ConvertTo-Json -Depth 8
@@ -615,59 +438,45 @@ Invoke-RestMethod http://localhost:8081/actuator/metrics/ai.gateway.fallback.act
 Invoke-RestMethod http://localhost:8081/actuator/metrics/ai.gateway.responses | ConvertTo-Json -Depth 8
 ```
 
-Expected evidence includes series equivalent to:
+Required observed semantics:
 
 ```text
-ai.gateway.provider.duration: provider=groq,outcome=failure
-ai.gateway.provider.duration: provider=gemini,outcome=success
-ai.gateway.fallback.activations: target=gemini,reason=failure
-ai.gateway.responses: source=gemini,reason=fallback
+provider=groq,outcome=failure
+provider=gemini,outcome=success
+target=gemini,reason=failure
+source=gemini,reason=fallback
 ```
 
-Counts/durations may differ. The tag semantics must match.
+Across Tasks 5-7, metrics must also distinguish deterministic disabled-mode responses and successful direct Groq responses when Groq succeeded during the normal provider run.
 
-- [ ] **Step 4: Inspect Spring AI native metrics and token usage when available**
+- [ ] **Step 4: Inspect Spring AI metrics**
 
 ```powershell
 (Invoke-RestMethod http://localhost:8081/actuator/metrics).names | Select-String "gen_ai"
 ```
 
-If `gen_ai.client.token.usage` is present, inspect and record that provider token usage was available.
-
-If it is absent, record exactly:
+If `gen_ai.client.token.usage` is present, record that provider token usage was available. If absent, record exactly:
 
 ```text
 token usage metric not reported by provider in this acceptance run
 ```
 
-Do not invent zero-token data and do not add custom token estimation.
+Do not invent zero-token values or add token estimation.
 
-- [ ] **Step 5: Inspect normal backend logs for safe correlation and leakage**
+- [ ] **Step 5: Inspect logs for correlation and leakage**
 
-For dialogue-triggered provider attempts, confirm normal logs expose safe operational fields such as:
+For dialogue-triggered calls, verify safe metadata includes provider/outcome plus `matchId`, `triggerType`, and `triggerPly`.
 
-```text
-provider
-action/outcome or equivalent safe outcome metadata
-matchId
-triggerType
-triggerPly
-```
+Verify normal logs contain none of:
+- full prompt text;
+- raw provider response text;
+- deterministic fallback dialogue text;
+- Groq/Gemini API keys;
+- Authorization header values.
 
-Confirm normal logs do **not** contain:
+Any leak blocks acceptance.
 
-```text
-full prompt text
-raw provider response text
-deterministic fallback line text
-Groq API key
-Gemini API key
-Authorization header values
-```
-
-If any sensitive content is present, stop acceptance and fix that defect before recording success.
-
-- [ ] **Step 6: Restore normal Groq configuration after the test**
+- [ ] **Step 6: Clear forced-failure Groq overrides after the run**
 
 ```powershell
 Remove-Item Env:AI_GROQ_BASE_URL -ErrorAction SilentlyContinue
@@ -675,20 +484,14 @@ Remove-Item Env:AI_GROQ_API_KEY -ErrorAction SilentlyContinue
 Remove-Item Env:AI_GROQ_MODEL -ErrorAction SilentlyContinue
 ```
 
-If the normal Groq key/model are supplied through process environment rather than `server/.env`, restore them from the user's local secret source before any later provider run. Never copy them into committed files.
+Restore normal Groq key/model only from the user's local secret source when needed later.
 
 ---
 
-### Task 8: Replace the Incomplete Acceptance Record with Observed Final Evidence
-
-**Branch:** `feature/issue-46-ai-observability`
+### Task 8: Replace the Incomplete Acceptance Record with Observed Evidence
 
 **Files:**
 - Modify: `docs/BUILD_AND_VERIFY.md`
-
-**Interfaces:**
-- Consumes: actual results from Tasks 4-7.
-- Produces: issue #46's dated, auditable Phase 2 acceptance record.
 
 - [ ] **Step 1: Get the actual execution date**
 
@@ -696,65 +499,48 @@ If the normal Groq key/model are supplied through process environment rather tha
 Get-Date -Format "yyyy-MM-dd"
 ```
 
-Use the returned date in the acceptance heading. Do not guess the date.
+Use that returned date in the acceptance heading.
 
-- [ ] **Step 2: Update the checklist above the acceptance record based only on actual observations**
+- [ ] **Step 2: Update the Phase 2 checklist only from observations made in Tasks 5-7**
 
-Change `[ ]` to `[x]` only for checks actually completed in Tasks 5-7.
-
-Before finalizing, all issue #46-required manual checks should be observed:
+All issue-required manual items must be genuinely observed before final completion:
 
 ```text
-four selectable personalities
+four personalities
 contextual dialogue
 random rivalry
-refresh hydration without duplicates
-reconnect hydration without duplicates/reordering
+refresh without duplicates
+reconnect without duplicates/reordering
 stop/resume ordering
-AI-disabled match completion
-controlled Groq -> Gemini failover
+AI-disabled completion
+Groq -> Gemini failover
 safe correlated logs
 metric differentiation
 ```
 
-If any required observation remains unchecked, keep PR #60 draft and do not write a fully successful acceptance record.
+If any item remains unobserved, leave it unchecked and keep PR #60 draft.
 
-- [ ] **Step 3: Replace the current incomplete automated-evidence root-verifier line**
+- [ ] **Step 3: Replace stale/incomplete acceptance bullets**
 
-The existing record says root verification stopped at the frontend Prettier baseline. Replace that with the actually observed passing root verifier result from Task 4.
+Update the current record so it states the final observed facts for:
+- passing root verifier;
+- AI-disabled full-stack match;
+- Blaze/Vesper and Gremlin/Regent;
+- Random Rivalry;
+- contextual dialogue;
+- refresh/reconnect/stop-resume;
+- controlled Groq failure activating Gemini;
+- custom metrics;
+- Spring AI token metric present or documented unavailable;
+- safe logs with no prompt/response/credential leakage.
 
-Do not leave both the old failure and new success as if they describe the same final state; the final record should clearly state the final verified state after the baseline fix/rebase.
+Do not paste generated banter, prompts, raw responses, or secrets into the record.
 
-- [ ] **Step 4: Replace the current "not run" manual/runtime bullets with factual observed results**
-
-Record concise evidence for:
-
-1. AI-disabled fast match completion and deterministic response metric.
-2. Blaze vs Vesper observed personalities.
-3. Gremlin vs Regent observed personalities.
-4. Random Rivalry selecting distinct personalities.
-5. Contextual dialogue observation.
-6. Refresh/reconnect ordering and deduplication.
-7. Stop/resume ordering.
-8. Controlled local Groq failure activating Gemini and match completion.
-9. Gateway metric tags observed for Groq failure, Gemini success/fallback, and deterministic disabled-mode response.
-10. Spring AI token metric availability, or the exact documented absence statement.
-11. Safe correlated logs with no prompt/response/credential leakage.
-
-Do not paste generated banter, prompts, raw provider responses, or secret values into the record.
-
-- [ ] **Step 5: Review only the acceptance/documentation diff**
+- [ ] **Step 4: Review and commit acceptance evidence**
 
 ```powershell
 git diff -- docs/BUILD_AND_VERIFY.md
 git diff --check
-```
-
-Expected: factual acceptance/documentation changes only.
-
-- [ ] **Step 6: Commit the completed acceptance record**
-
-```powershell
 git add docs/BUILD_AND_VERIFY.md
 git commit -m "docs: complete phase 2 acceptance"
 ```
@@ -763,16 +549,9 @@ git commit -m "docs: complete phase 2 acceptance"
 
 ### Task 9: Final Verification and PR Readiness Gate
 
-**Branch:** `feature/issue-46-ai-observability`
+**Files:** No intended changes unless final verification exposes a real defect.
 
-**Files:**
-- No intended changes unless final verification exposes a real defect.
-
-**Interfaces:**
-- Consumes: completed remediation and acceptance evidence.
-- Produces: a PR #60 head that is ready for final review/merge.
-
-- [ ] **Step 1: Run the root verifier one final time after the acceptance-record commit**
+- [ ] **Step 1: Run the canonical verifier again after the acceptance-record commit**
 
 ```powershell
 $env:AI_ENABLED = "false"
@@ -780,8 +559,6 @@ $env:AI_ENABLED = "false"
 ```
 
 Expected: complete PASS.
-
-This is the final verification result that matters for merge readiness.
 
 - [ ] **Step 2: Run git hygiene checks**
 
@@ -793,35 +570,30 @@ git diff --name-only origin/master...HEAD
 ```
 
 Expected:
-- working tree clean;
+- clean working tree;
 - no whitespace errors;
-- PR #60 contains issue #46 implementation/docs only;
-- no mass frontend Prettier baseline diff;
-- no `.env` or credential file tracked.
+- no frontend formatting-baseline noise in PR #60;
+- no `.env`/credential file tracked.
 
-- [ ] **Step 3: Push final PR #60 commits**
+- [ ] **Step 3: Push final feature commits**
 
 ```powershell
 git push origin feature/issue-46-ai-observability
 ```
 
-If the earlier rebase means the remote still requires a non-fast-forward update, use:
+If non-fast-forward is required because of Task 2's rebase:
 
 ```powershell
 git push --force-with-lease origin feature/issue-46-ai-observability
 ```
 
-Never use plain `--force`.
+- [ ] **Step 4: Require green hosted CI on the new final head**
 
-- [ ] **Step 4: Confirm hosted CI is green on the final head**
+Do not rely on the older green PR SHA. Backend and native-image checks must remain green, plus any check triggered by the final diff.
 
-Required hosted checks for the final PR head must pass. In particular, backend and native-image verification must remain green; any check newly triggered by the final diff must also pass.
+- [ ] **Step 5: Re-read issue #46 acceptance criteria**
 
-Do not rely on an older green SHA after pushing new commits.
-
-- [ ] **Step 5: Re-read issue #46 acceptance criteria against the final state**
-
-Before marking the PR ready, verify every criterion is now supported by actual evidence:
+Every statement must now be true:
 
 ```text
 Metrics distinguish Groq, Gemini fallback, and deterministic fallback outcomes.
@@ -831,12 +603,12 @@ A provider outage cannot prevent a match from completing.
 Refresh/reconnect and stop/resume preserve correct dialogue ordering.
 Manual acceptance verifies distinct personalities, contextual replies, random rivalry, and graceful failover.
 Root verification passes.
-BUILD_AND_VERIFY.md contains the dated Phase 2 acceptance record.
+BUILD_AND_VERIFY.md contains a dated Phase 2 acceptance record.
 ```
 
-If any item is false, leave the PR draft.
+If any statement is false, leave PR #60 draft.
 
-- [ ] **Step 6: Mark PR #60 ready only after all gates are green**
+- [ ] **Step 6: Mark PR #60 ready only after every gate is satisfied**
 
 If GitHub CLI is available:
 
@@ -844,49 +616,35 @@ If GitHub CLI is available:
 gh pr ready 60
 ```
 
-Otherwise mark PR #60 "Ready for review" in GitHub.
+Otherwise use GitHub's **Ready for review** action.
 
-Do not manually close issue #46; PR #60 already uses `Closes #46`, so merge should close it automatically.
+Do not manually close issue #46; `Closes #46` on PR #60 should close it when merged.
 
 ---
 
 ## Final Self-Review Checklist
 
-Before handing PR #60 back for final review, confirm:
-
-- [ ] The frontend Prettier baseline was fixed and merged in a separate formatting-only PR.
-- [ ] PR #60 was rebased onto that clean `master` baseline.
-- [ ] PR #60 does not contain the mass frontend formatting cleanup.
-- [ ] `docs/BUILD_AND_VERIFY.md` uses the deterministic closed-local-port Groq failover recipe.
-- [ ] Fast acceptance mode documents `GAME_MOVE_THINK_TIME_MILLIS=0` and `GAME_MAX_PLIES=12` in addition to zero move delays.
-- [ ] Canonical root `scripts\verify.ps1` passes from the final PR head.
-- [ ] AI-disabled full-stack match actually completed.
-- [ ] Blaze, Vesper, Gremlin, and Regent were actually exercised with provider-generated dialogue.
-- [ ] Random Rivalry was actually exercised and selected two distinct personalities.
-- [ ] At least one contextual line was actually observed.
-- [ ] Refresh, reconnect, and stop/resume were actually exercised without dialogue duplication/reordering.
-- [ ] Controlled Groq connection failure actually activated Gemini and the match completed.
-- [ ] Gateway metrics actually exposed Groq failure, Gemini fallback/success, and deterministic disabled-mode response distinctly.
-- [ ] Spring AI token usage was either observed or explicitly recorded as unavailable for that acceptance run.
-- [ ] Normal logs showed safe match/event/provider correlation and no prompt/raw-response/credential leakage.
-- [ ] The dated acceptance record contains only observed facts.
-- [ ] Final hosted CI is green on the current PR head SHA.
-- [ ] PR #60 remains draft until every required item above is true.
+- [ ] Prettier baseline fixed and merged in a separate formatting-only PR.
+- [ ] PR #60 rebased onto the fixed `master` baseline.
+- [ ] PR #60 contains no mass formatting cleanup.
+- [ ] Closed-local-port Groq failover recipe documented.
+- [ ] Fast mode includes think time `0`, delay `0s`, and max plies `12`.
+- [ ] Root `scripts\verify.ps1` passes on final PR head.
+- [ ] AI-disabled match actually completed.
+- [ ] Blaze, Vesper, Gremlin, and Regent actually exercised with provider dialogue.
+- [ ] Random Rivalry actually exercised.
+- [ ] Contextual dialogue actually observed.
+- [ ] Refresh, reconnect, and stop/resume actually exercised without duplication/reordering.
+- [ ] Controlled Groq failure actually activated Gemini and the match completed.
+- [ ] Gateway metrics actually distinguish Groq failure, Gemini fallback/success, and deterministic disabled mode.
+- [ ] Spring AI token metric presence/absence actually recorded.
+- [ ] Logs actually verified for safe correlation and no leakage.
+- [ ] Acceptance record contains only observed facts.
+- [ ] Hosted CI green on final PR head.
+- [ ] PR remains draft until every required item above is true.
 
 ## Explicit Non-Goals
 
-Do not add any of the following while executing this remediation plan:
-
-- OpenTelemetry/tracing stack
-- dashboards
-- Prometheus/Grafana deployment work
-- new AI provider abstraction
-- provider retries
-- prompt/raw-response persistence
-- new database schema
-- frontend feature redesign
-- extra agent/memory/orchestration systems
-- load testing
-- analytics
+Do not add tracing, dashboards, Grafana/Prometheus deployment, new provider abstractions, retries, raw request persistence, new schema, frontend redesign, extra agents/memory/orchestration, load testing, or analytics.
 
 This remediation is complete when issue #46's existing acceptance contract is truthfully satisfied—not when more observability features have been invented.
