@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.MDC;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -254,7 +255,12 @@ class FailoverAiChatGatewayTest {
     FailoverAiChatGateway gateway =
         gateway(returning("SECRET_RAW_RESPONSE_DO_NOT_LOG", groqCalls), failing(geminiCalls));
 
-    AiChatResult result = gateway.generate(request, response -> false);
+    AiChatResult result;
+    try (MDC.MDCCloseable ignoredMatch = MDC.putCloseable("matchId", "match-123");
+        MDC.MDCCloseable ignoredTrigger = MDC.putCloseable("triggerType", "MOVE");
+        MDC.MDCCloseable ignoredPly = MDC.putCloseable("triggerPly", "7")) {
+      result = gateway.generate(request, response -> false);
+    }
 
     assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
     assertThat(output.getAll())
@@ -262,6 +268,9 @@ class FailoverAiChatGatewayTest {
         .contains("outcome=validation_failure")
         .contains("target=gemini")
         .contains("source=deterministic_fallback")
+        .contains("matchId=match-123")
+        .contains("triggerType=MOVE")
+        .contains("triggerPly=7")
         .doesNotContain("SECRET_PROMPT_DO_NOT_LOG")
         .doesNotContain("SECRET_RAW_RESPONSE_DO_NOT_LOG")
         .doesNotContain("SECRET_FALLBACK_DO_NOT_LOG");

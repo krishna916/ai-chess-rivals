@@ -89,6 +89,9 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void scopesMatchAndEventCorrelationThroughDialogueAndClearsItAfterward() {
+    MDC.put("matchId", "outer-match");
+    MDC.put("triggerType", "outer-trigger");
+    MDC.put("triggerPly", "outer-ply");
     when(dialogueGenerator.generateMove(any()))
         .thenAnswer(
             invocation -> {
@@ -101,9 +104,9 @@ class MatchDialogueCoordinatorTest {
     try {
       coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
 
-      assertThat(MDC.get("matchId")).isNull();
-      assertThat(MDC.get("triggerType")).isNull();
-      assertThat(MDC.get("triggerPly")).isNull();
+      assertThat(MDC.get("matchId")).isEqualTo("outer-match");
+      assertThat(MDC.get("triggerType")).isEqualTo("outer-trigger");
+      assertThat(MDC.get("triggerPly")).isEqualTo("outer-ply");
     } finally {
       MDC.clear();
     }
