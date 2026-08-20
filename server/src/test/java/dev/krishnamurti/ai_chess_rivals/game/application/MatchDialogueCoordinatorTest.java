@@ -36,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.slf4j.MDC;
 
 class MatchDialogueCoordinatorTest {
 
@@ -84,6 +85,28 @@ class MatchDialogueCoordinatorTest {
     verify(dialogueGenerator).generateMove(request.capture());
     assertThat(request.getValue().moverPersonalityKey()).isEqualTo("maverick");
     assertThat(request.getValue().opponentPersonalityKey()).isEqualTo("sage");
+  }
+
+  @Test
+  void scopesMatchAndEventCorrelationThroughDialogueAndClearsItAfterward() {
+    when(dialogueGenerator.generateMove(any()))
+        .thenAnswer(
+            invocation -> {
+              assertThat(MDC.get("matchId")).isEqualTo(MATCH_ID.toString());
+              assertThat(MDC.get("triggerType")).isEqualTo("MOVE");
+              assertThat(MDC.get("triggerPly")).isEqualTo("1");
+              return Optional.empty();
+            });
+
+    try {
+      coordinator.onMove(MATCH_ID, RIVALRY, move(PlayerColor.WHITE), () -> true);
+
+      assertThat(MDC.get("matchId")).isNull();
+      assertThat(MDC.get("triggerType")).isNull();
+      assertThat(MDC.get("triggerPly")).isNull();
+    } finally {
+      MDC.clear();
+    }
   }
 
   @Test

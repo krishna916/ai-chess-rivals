@@ -62,6 +62,14 @@ class AiConfigurationContextTest {
                           AiResponseValidator.nonBlank());
               assertThat(result.content()).isEqualTo("offline fallback");
               assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
+              MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
+              assertThat(
+                      meterRegistry
+                          .get(AiGatewayMetrics.RESPONSES)
+                          .tags("source", "deterministic_fallback", "reason", "ai_disabled")
+                          .counter()
+                          .count())
+                  .isEqualTo(1.0);
               assertThat(output.getAll())
                   .contains("AI gateway topology: disabled")
                   .doesNotContain("AI gateway topology: enabled (Groq -> Gemini)");
@@ -85,6 +93,7 @@ class AiConfigurationContextTest {
               assertThat(context).hasBean("geminiChatModel");
               assertThat(context).hasBean("geminiChatClient");
               assertThat(context).hasSingleBean(AiChatGateway.class);
+              assertThat(context).hasSingleBean(AiGatewayMetrics.class);
               assertThat(output.getAll())
                   .contains("AI gateway topology: enabled (Groq -> Gemini)")
                   .doesNotContain("AI gateway topology: disabled");

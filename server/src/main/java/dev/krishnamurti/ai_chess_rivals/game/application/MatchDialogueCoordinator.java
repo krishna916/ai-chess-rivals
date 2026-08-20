@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -42,6 +43,7 @@ final class MatchDialogueCoordinator {
   void onGameStart(UUID matchId, MatchRivalry rivalry, BooleanSupplier authoritative) {
     safeRun(
         matchId,
+        DialogueTriggerType.GAME_START,
         0,
         () -> {
           List<GeneratedDialogue> generated =
@@ -55,6 +57,7 @@ final class MatchDialogueCoordinator {
   void onMove(UUID matchId, MatchRivalry rivalry, MovePlayed move, BooleanSupplier authoritative) {
     safeRun(
         matchId,
+        DialogueTriggerType.MOVE,
         move.ply(),
         () -> {
           String mover = rivalry.personalityKey(move.player());
@@ -93,6 +96,7 @@ final class MatchDialogueCoordinator {
       BooleanSupplier authoritative) {
     safeRun(
         matchId,
+        DialogueTriggerType.GAME_END,
         totalPlies,
         () -> {
           DialogueOutcome whiteOutcome =
@@ -151,11 +155,22 @@ final class MatchDialogueCoordinator {
     }
   }
 
-  private void safeRun(UUID matchId, int triggerPly, Runnable action) {
-    try {
-      action.run();
-    } catch (RuntimeException exception) {
-      log.warn("Dialogue unavailable for match {} at ply {}", matchId, triggerPly, exception);
+  private void safeRun(
+      UUID matchId, DialogueTriggerType triggerType, int triggerPly, Runnable action) {
+    try (MDC.MDCCloseable ignoredMatch = MDC.putCloseable("matchId", matchId.toString());
+        MDC.MDCCloseable ignoredTrigger = MDC.putCloseable("triggerType", triggerType.name());
+        MDC.MDCCloseable ignoredPly =
+            MDC.putCloseable("triggerPly", Integer.toString(triggerPly))) {
+      try {
+        action.run();
+      } catch (RuntimeException exception) {
+        log.warn(
+            "Dialogue unavailable matchId={} triggerType={} triggerPly={}",
+            matchId,
+            triggerType,
+            triggerPly,
+            exception);
+      }
     }
   }
 }
