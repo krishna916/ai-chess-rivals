@@ -163,9 +163,23 @@ http://localhost:8081/actuator/metrics/ai.gateway.responses
 The metrics use only low-cardinality provider, outcome, target, source, and reason tags. Confirm
 that a successful primary response records `groq` plus `success` and `primary`; a provider failure
 records the corresponding failure or timeout and a Gemini or deterministic-fallback activation;
-and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`. A forced Groq failure
-may be exercised safely by pointing `AI_GROQ_BASE_URL` at a local stub that deterministically fails;
-do not use a production key against an uncontrolled endpoint.
+and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`.
+
+To exercise the Groq-to-Gemini path without sending a request to Groq, set the Groq base URL to a
+closed loopback port. Keep the Groq values syntactically valid but non-secret, and provide a valid
+Gemini configuration only when that provider request is authorized for the local acceptance run:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_GROQ_API_KEY = "dummy-groq-key"
+$env:AI_GROQ_MODEL = "dummy-groq-model"
+$env:AI_GROQ_BASE_URL = "http://127.0.0.1:9/v1"
+# Set AI_GEMINI_API_KEY and AI_GEMINI_MODEL from the ignored local environment only.
+```
+
+Port 9 is expected to refuse the Groq connection, so the observed result should be a bounded
+Gemini attempt followed by either a Gemini response or the deterministic fallback. Do not use a
+production key against an uncontrolled endpoint.
 
 For the manual Phase 2 acceptance pass, record only observations that were actually made:
 
@@ -280,3 +294,4 @@ The following items were observed with Stockfish 17.1, the backend on `8082`, th
 - [x] Long activity history scrolls inside the activity panel without scrolling the page header
       out of view.
 - [ ] Connection state and status remain readable at the narrow public viewport.
+
