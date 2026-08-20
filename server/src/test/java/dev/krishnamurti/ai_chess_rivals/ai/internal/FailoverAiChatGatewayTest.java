@@ -6,7 +6,10 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatRequest;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatResult;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseValidator;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.converter.BeanOutputConverter;
 
@@ -14,14 +17,23 @@ class FailoverAiChatGatewayTest {
 
   private static final AiChatRequest REQUEST =
       new AiChatRequest("test prompt", "deterministic fallback");
+  private SimpleMeterRegistry meterRegistry;
+
+  @BeforeEach
+  void setUpMetrics() {
+    meterRegistry = new SimpleMeterRegistry();
+  }
+
+  private FailoverAiChatGateway gateway(ProviderChatClient groq, ProviderChatClient gemini) {
+    return new FailoverAiChatGateway(groq, gemini, new AiGatewayMetrics(meterRegistry));
+  }
 
   @Test
   void returnsGroqResultWithoutCallingGemini() {
     AtomicInteger groqCalls = new AtomicInteger();
     AtomicInteger geminiCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(
-            returning("groq response", groqCalls), returning("gemini response", geminiCalls));
+        gateway(returning("groq response", groqCalls), returning("gemini response", geminiCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
@@ -29,6 +41,20 @@ class FailoverAiChatGatewayTest {
     assertThat(result.source()).isEqualTo(AiResponseSource.GROQ);
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(0);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.RESPONSES)
+                .tags("source", "groq", "reason", "primary")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.PROVIDER_DURATION)
+                .tags("provider", "groq", "outcome", "success")
+                .timer()
+                .count())
+        .isEqualTo(1L);
   }
 
   @Test
@@ -36,7 +62,7 @@ class FailoverAiChatGatewayTest {
     AtomicInteger groqCalls = new AtomicInteger();
     AtomicInteger geminiCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(failing(groqCalls), returning("gemini response", geminiCalls));
+        gateway(failing(groqCalls), returning("gemini response", geminiCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
@@ -44,6 +70,20 @@ class FailoverAiChatGatewayTest {
     assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(1);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
+                .tags("target", "gemini", "reason", "failure")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.RESPONSES)
+                .tags("source", "gemini", "reason", "fallback")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   @Test
@@ -51,7 +91,7 @@ class FailoverAiChatGatewayTest {
     AtomicInteger groqCalls = new AtomicInteger();
     AtomicInteger geminiCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(returning("invalid", groqCalls), returning("valid", geminiCalls));
+        gateway(returning("invalid", groqCalls), returning("valid", geminiCalls));
     AiResponseValidator validator = "valid"::equals;
 
     AiChatResult result = gateway.generate(REQUEST, validator);
@@ -60,6 +100,13 @@ class FailoverAiChatGatewayTest {
     assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(1);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
+                .tags("target", "gemini", "reason", "validation_failure")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   @Test
@@ -68,8 +115,7 @@ class FailoverAiChatGatewayTest {
     AtomicInteger geminiCalls = new AtomicInteger();
     AtomicInteger validations = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(
-            returning("groq response", groqCalls), returning("gemini response", geminiCalls));
+        gateway(returning("groq response", groqCalls), returning("gemini response", geminiCalls));
     AiResponseValidator validator =
         response -> {
           if (validations.getAndIncrement() == 0) {
@@ -89,8 +135,7 @@ class FailoverAiChatGatewayTest {
   void bothProvidersFailReturnsDeterministicFallback() {
     AtomicInteger groqCalls = new AtomicInteger();
     AtomicInteger geminiCalls = new AtomicInteger();
-    FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(failing(groqCalls), failing(geminiCalls));
+    FailoverAiChatGateway gateway = gateway(failing(groqCalls), failing(geminiCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
@@ -98,20 +143,68 @@ class FailoverAiChatGatewayTest {
     assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(1);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
+                .tags("target", "gemini", "reason", "failure")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
+                .tags("target", "deterministic_fallback", "reason", "failure")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.RESPONSES)
+                .tags("source", "deterministic_fallback", "reason", "providers_exhausted")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   @Test
   void invalidGeminiResultReturnsDeterministicFallback() {
     AtomicInteger groqCalls = new AtomicInteger();
     AtomicInteger geminiCalls = new AtomicInteger();
-    FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(returning("", groqCalls), returning("", geminiCalls));
+    FailoverAiChatGateway gateway = gateway(returning("", groqCalls), returning("", geminiCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
     assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
     assertThat(groqCalls).hasValue(1);
     assertThat(geminiCalls).hasValue(1);
+  }
+
+  @Test
+  void groqTimeoutIsObservableAndFallsBackToGemini() {
+    AtomicInteger groqCalls = new AtomicInteger();
+    AtomicInteger geminiCalls = new AtomicInteger();
+    FailoverAiChatGateway gateway =
+        gateway(timingOut(groqCalls), returning("gemini response", geminiCalls));
+
+    AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
+
+    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
+    assertThat(groqCalls).hasValue(1);
+    assertThat(geminiCalls).hasValue(1);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.PROVIDER_DURATION)
+                .tags("provider", "groq", "outcome", "timeout")
+                .timer()
+                .count())
+        .isEqualTo(1L);
+    assertThat(
+            meterRegistry
+                .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
+                .tags("target", "gemini", "reason", "timeout")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   @Test
@@ -121,7 +214,7 @@ class FailoverAiChatGatewayTest {
     BeanOutputConverter<StructuredDialogue> converter =
         new BeanOutputConverter<>(StructuredDialogue.class);
     FailoverAiChatGateway gateway =
-        new FailoverAiChatGateway(
+        gateway(
             returning("not-json", groqCalls),
             returning(
                 "{\"text\":\"A measured reply.\",\"emotion\":\"CALM\",\"reactionType\":\"MOVE_REACTION\"}",
@@ -170,6 +263,13 @@ class FailoverAiChatGatewayTest {
     return prompt -> {
       calls.incrementAndGet();
       throw new IllegalStateException("provider unavailable");
+    };
+  }
+
+  private static ProviderChatClient timingOut(AtomicInteger calls) {
+    return prompt -> {
+      calls.incrementAndGet();
+      throw new IllegalStateException(new SocketTimeoutException("read timed out"));
     };
   }
 }
