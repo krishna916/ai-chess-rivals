@@ -8,6 +8,9 @@ import dev.krishnamurti.ai_chess_rivals.ai.api.AiChatRequest;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseSource;
 import dev.krishnamurti.ai_chess_rivals.ai.api.AiResponseValidator;
 import dev.krishnamurti.ai_chess_rivals.ai.config.AiConfig;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
@@ -33,6 +36,8 @@ class AiConfigurationContextTest {
               AiConfig.class,
               AiProviderConfiguration.class,
               AiGatewayConfiguration.class)
+          .withBean(ObservationRegistry.class, ObservationRegistry::create)
+          .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
           .withPropertyValues(
               "app.ai.groq.base-url=https://api.groq.com/openai/v1",
               "app.ai.groq.timeout=8s",
