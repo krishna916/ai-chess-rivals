@@ -137,13 +137,20 @@ $env:AI_ENABLED = "false"
 .\scripts\verify.ps1
 ```
 
-For a fast local acceptance run, start the backend with zero move and dialogue pacing while
-keeping the normal application and management ports:
+For a fast local acceptance run, start the backend with six plies, minimal engine think time, and
+zero move/dialogue pacing while keeping the normal application and management ports:
 
 ```powershell
+$env:GAME_MOVE_THINK_TIME_MILLIS = "1"
+$env:GAME_MAX_PLIES = "6"
 $env:GAME_MOVE_DELAY_MIN = "0s"
 $env:GAME_MOVE_DELAY_MAX = "0s"
+$env:MATCH_COOLDOWN = "0s"
 ```
+
+`GAME_MOVE_THINK_TIME_MILLIS` uses `1` rather than `0` because runtime configuration validates the
+value with a minimum of one millisecond; six plies are enough for a short acceptance match while
+still exercising start dialogue and move-reaction context.
 
 When exercising real dialogue generation, set `AI_ENABLED=true` and provide
 `AI_GROQ_API_KEY`, `AI_GROQ_MODEL`, `AI_GEMINI_API_KEY`, and `AI_GEMINI_MODEL` through an ignored
