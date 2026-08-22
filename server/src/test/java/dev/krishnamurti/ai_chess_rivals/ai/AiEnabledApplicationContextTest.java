@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
@@ -35,6 +36,8 @@ class AiEnabledApplicationContextTest {
 
   @Autowired ApplicationContext context;
 
+  @Autowired Environment environment;
+
   @MockitoBean StockfishClient stockfishClient;
 
   @Test
@@ -45,5 +48,13 @@ class AiEnabledApplicationContextTest {
         .containsOnlyKeys("groqChatClient", "geminiChatClient");
     assertThat(context.getBeansOfType(ChatClient.Builder.class)).isEmpty();
     assertThat(context.getBeansOfType(AiChatGateway.class)).hasSize(1);
+    assertThat(environment.getProperty("spring.ai.chat.observations.log-prompt", Boolean.class))
+        .isFalse();
+    assertThat(environment.getProperty("spring.ai.chat.observations.log-completion", Boolean.class))
+        .isFalse();
+    assertThat(
+            environment.getProperty(
+                "spring.ai.chat.observations.include-error-logging", Boolean.class))
+        .isFalse();
   }
 }

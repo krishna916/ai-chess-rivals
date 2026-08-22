@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -42,6 +43,7 @@ final class MatchDialogueCoordinator {
   void onGameStart(UUID matchId, MatchRivalry rivalry, BooleanSupplier authoritative) {
     safeRun(
         matchId,
+        DialogueTriggerType.GAME_START,
         0,
         () -> {
           List<GeneratedDialogue> generated =
@@ -55,6 +57,7 @@ final class MatchDialogueCoordinator {
   void onMove(UUID matchId, MatchRivalry rivalry, MovePlayed move, BooleanSupplier authoritative) {
     safeRun(
         matchId,
+        DialogueTriggerType.MOVE,
         move.ply(),
         () -> {
           String mover = rivalry.personalityKey(move.player());
@@ -93,6 +96,7 @@ final class MatchDialogueCoordinator {
       BooleanSupplier authoritative) {
     safeRun(
         matchId,
+        DialogueTriggerType.GAME_END,
         totalPlies,
         () -> {
           DialogueOutcome whiteOutcome =
@@ -125,7 +129,12 @@ final class MatchDialogueCoordinator {
     try {
       return historyStore.findAll(matchId);
     } catch (RuntimeException exception) {
-      log.warn("Dialogue history unavailable for match {}", matchId, exception);
+      log.warn(
+          "Dialogue history unavailable matchId={} triggerType={} triggerPly={}",
+          matchId,
+          "HISTORY",
+          "-",
+          exception);
       return List.of();
     }
   }
@@ -139,7 +148,7 @@ final class MatchDialogueCoordinator {
     for (GeneratedDialogue line : generated) {
       if (!authoritative.getAsBoolean()) {
         log.debug(
-            "Discarding stale dialogue for match {} at {} ply {}",
+            "Discarding stale dialogue matchId={} triggerType={} triggerPly={}",
             matchId,
             triggerType,
             triggerPly);
@@ -151,11 +160,37 @@ final class MatchDialogueCoordinator {
     }
   }
 
-  private void safeRun(UUID matchId, int triggerPly, Runnable action) {
+  private void safeRun(
+      UUID matchId, DialogueTriggerType triggerType, int triggerPly, Runnable action) {
+    String previousMatchId = MDC.get("matchId");
+    String previousTriggerType = MDC.get("triggerType");
+    String previousTriggerPly = MDC.get("triggerPly");
+    MDC.put("matchId", matchId.toString());
+    MDC.put("triggerType", triggerType.name());
+    MDC.put("triggerPly", Integer.toString(triggerPly));
     try {
-      action.run();
-    } catch (RuntimeException exception) {
-      log.warn("Dialogue unavailable for match {} at ply {}", matchId, triggerPly, exception);
+      try {
+        action.run();
+      } catch (RuntimeException exception) {
+        log.warn(
+            "Dialogue unavailable matchId={} triggerType={} triggerPly={} exceptionType={}",
+            matchId,
+            triggerType,
+            triggerPly,
+            exception.getClass().getSimpleName());
+      }
+    } finally {
+      restoreMdc("matchId", previousMatchId);
+      restoreMdc("triggerType", previousTriggerType);
+      restoreMdc("triggerPly", previousTriggerPly);
+    }
+  }
+
+  private static void restoreMdc(String key, String previousValue) {
+    if (previousValue == null) {
+      MDC.remove(key);
+    } else {
+      MDC.put(key, previousValue);
     }
   }
 }

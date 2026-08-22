@@ -125,6 +125,117 @@ npm run verify
 production build. It stops at the first failure and does not rely on shell-specific command
 chaining.
 
+## Phase 2 AI observability and resilience verification
+
+The Phase 2 automated tests are credential-safe. They use local provider stubs and deterministic
+exceptions, never real Groq or Gemini requests, and do not log prompts, completions, personality
+text, or API keys. Run the normal repository verifier with AI disabled before any manual provider
+check:
+
+```powershell
+$env:AI_ENABLED = "false"
+.\scripts\verify.ps1
+```
+
+For a fast local acceptance run, start the backend with six plies, minimal engine think time, and
+zero move/dialogue pacing while keeping the normal application and management ports:
+
+```powershell
+$env:GAME_MOVE_THINK_TIME_MILLIS = "1"
+$env:GAME_MAX_PLIES = "6"
+$env:GAME_MOVE_DELAY_MIN = "0s"
+$env:GAME_MOVE_DELAY_MAX = "0s"
+$env:MATCH_COOLDOWN = "0s"
+```
+
+`GAME_MOVE_THINK_TIME_MILLIS` uses `1` rather than `0` because runtime configuration validates the
+value with a minimum of one millisecond; six plies are enough for a short acceptance match while
+still exercising start dialogue and move-reaction context.
+
+When exercising real dialogue generation, set `AI_ENABLED=true` and provide
+`AI_GROQ_API_KEY`, `AI_GROQ_MODEL`, `AI_GEMINI_API_KEY`, and `AI_GEMINI_MODEL` through an ignored
+local environment file or the process environment. Never paste those values into this document,
+the terminal transcript, issue comments, or application logs. The configured provider timeouts are
+8 seconds for Groq and 12 seconds for Gemini; failover is bounded and does not retry a provider.
+
+Inspect the management endpoint while a match is running:
+
+```text
+http://localhost:8081/actuator/health
+http://localhost:8081/actuator/metrics/ai.gateway.provider.duration
+http://localhost:8081/actuator/metrics/ai.gateway.fallback.activations
+http://localhost:8081/actuator/metrics/ai.gateway.responses
+```
+
+The metrics use only low-cardinality provider, outcome, target, source, and reason tags. Confirm
+that a successful primary response records `groq` plus `success` and `primary`; a provider failure
+records the corresponding failure or timeout and a Gemini or deterministic-fallback activation;
+and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`.
+
+To exercise the Groq-to-Gemini path without sending a request to Groq, set the Groq base URL to a
+closed loopback port. Keep the Groq values syntactically valid but non-secret, and provide a valid
+Gemini configuration only when that provider request is authorized for the local acceptance run:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_GROQ_API_KEY = "dummy-groq-key"
+$env:AI_GROQ_MODEL = "dummy-groq-model"
+$env:AI_GROQ_BASE_URL = "http://127.0.0.1:9/v1"
+# Set AI_GEMINI_API_KEY and AI_GEMINI_MODEL from the ignored local environment only.
+$groqPortOpen = Test-NetConnection -ComputerName 127.0.0.1 -Port 9 -InformationLevel Quiet -WarningAction SilentlyContinue
+if ($groqPortOpen) { throw "Port 9 is occupied; choose another closed loopback port before continuing." }
+```
+
+The preflight aborts if port 9 is occupied. When it is closed, the Groq connection is expected to
+refuse immediately, so the observed result should be a bounded Gemini attempt followed by either a
+Gemini response or the deterministic fallback. Do not use a production key against an uncontrolled
+endpoint.
+
+For the manual Phase 2 acceptance pass, record only observations that were actually made:
+
+- [ ] Four selectable personalities start a match and remain associated with the correct players.
+- [ ] A random-rivalry match produces contextual dialogue after committed chess events.
+- [ ] Refresh hydrates the current board and unified activity without duplicate entries.
+- [ ] Disconnect and reconnect restore the authoritative state without duplicate dialogue or moves.
+- [ ] Stopping and resuming a match preserves the latest valid board and dialogue ordering.
+- [ ] An AI-disabled match remains playable with deterministic fallback dialogue and response metrics.
+- [ ] A controlled Groq failure activates Gemini or deterministic fallback and emits safe metrics/logs.
+- [ ] No prompt, completion, personality text, or credential appears in captured application output.
+
+The dated acceptance record below this section must list the environment, checks performed, and any
+unchecked items with their reason. Automated test results are evidence for the resilience matrix,
+but they do not count as browser or real-provider observations.
+
+### Acceptance record — 2026-08-20
+
+#### Automated evidence
+
+- [x] Backend verification passed with 306 tests, Spotless, and SpotBugs reporting zero findings.
+- [x] The focused backend resilience slice passed, including provider success, failure, timeout,
+      validation-failure, fallback, MDC lifecycle, and match stop/resume coverage.
+- [x] The focused frontend activity-ordering suite passed 29 tests.
+- [x] Captured-output regression coverage proved provider logs contain safe metadata without prompt
+      or response content.
+- [x] The root verifier passed with `AI_ENABLED=false`: backend 306 tests, Spotless, SpotBugs,
+      frontend format, typecheck, lint, 83 tests, and production build.
+
+#### Manual and runtime evidence
+
+- [x] Browser acceptance ran with PostgreSQL healthy, the backend on `8082`/`8081`, and the
+      frontend on `localhost:5173`.
+- [x] The AI-disabled full-stack match ran with deterministic fallback dialogue; Gremlin vs Regent
+      reached 111 moves and the viewer rendered 195 activity events. The response metric reported
+      the `deterministic_fallback` source with the `ai_disabled` reason.
+- [x] The roster exposed all four selectable personalities (Blaze, Vesper, Gremlin, and Regent);
+      Gremlin vs Regent and Blaze vs Vesper starts preserved the correct player associations.
+- [x] Refresh/reconnect hydration preserved the same 195-event activity count without duplicate
+      `Match started` entries.
+- [x] Stop/resume browser evidence showed Blaze vs Vesper stopped after four moves, then resumed
+      the same match ID from move four and continued live play.
+- [ ] Random-rivalry selection was not exercised through the owner-controls UI in this pass.
+- [ ] Real-provider and controlled Groq-failure checks were not run; no provider request was made
+      and local credentials were not inspected or exposed.
+
 ## Phase 1 end-to-end acceptance
 
 Use the normal local-development topology so the management and application ports remain

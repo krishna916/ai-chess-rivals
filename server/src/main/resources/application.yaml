@@ -10,6 +10,10 @@ spring:
     chat:
       client:
         enabled: false
+      observations:
+        log-prompt: false
+        log-completion: false
+        include-error-logging: false
     model:
       chat: none
       embedding: none
@@ -42,7 +46,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when-authorized

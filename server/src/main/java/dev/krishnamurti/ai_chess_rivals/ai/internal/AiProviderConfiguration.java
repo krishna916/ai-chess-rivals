@@ -4,6 +4,7 @@ import com.google.genai.Client;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
 import dev.krishnamurti.ai_chess_rivals.ai.config.AiProperties;
+import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -23,10 +24,11 @@ import org.springframework.core.retry.RetryTemplate;
 class AiProviderConfiguration {
 
   @Bean("groqChatModel")
-  ChatModel groqChatModel(AiProperties properties) {
+  ChatModel groqChatModel(AiProperties properties, ObservationRegistry observationRegistry) {
     AiProperties.Groq groq = properties.groq();
     return OpenAiChatModel.builder()
         .options(groqOptions(groq.apiKey(), groq.baseUrl(), groq.model(), groq.timeout()))
+        .observationRegistry(observationRegistry)
         .build();
   }
 
@@ -43,7 +45,7 @@ class AiProviderConfiguration {
   }
 
   @Bean("geminiChatModel")
-  ChatModel geminiChatModel(AiProperties properties) {
+  ChatModel geminiChatModel(AiProperties properties, ObservationRegistry observationRegistry) {
     AiProperties.Gemini gemini = properties.gemini();
     Client client =
         Client.builder()
@@ -55,6 +57,7 @@ class AiProviderConfiguration {
         .genAiClient(client)
         .options(GoogleGenAiChatOptions.builder().model(gemini.model()).build())
         .retryTemplate(noRetryTemplate())
+        .observationRegistry(observationRegistry)
         .build();
   }
 
