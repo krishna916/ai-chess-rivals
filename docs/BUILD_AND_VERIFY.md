@@ -30,8 +30,8 @@ Pull requests targeting `master` and pushes to `master` run the `CI` workflow. A
 
 - `Backend verification` runs for `server/**`, `scripts/**`, or CI workflow changes, prepares the
   pinned Linux Stockfish binary with `./server/mvnw -f server/pom.xml generate-resources -Plinux`,
-  sets `STOCKFISH_PATH` to that executable, and executes `./server/mvnw -f server/pom.xml verify`
-  with Java 25.
+  starts PostgreSQL 17 on `localhost:55433` for the database integration tests, sets `STOCKFISH_PATH`
+  to that executable, and executes `./server/mvnw -f server/pom.xml verify` with Java 25.
 - `Frontend verification` runs for `client/**`, `scripts/**`, or CI workflow changes, installs
   dependencies with `npm ci`, and executes `npm run verify` with Node.js 22.
 - `Native image verification` runs only for `server/**` or CI workflow changes, only after backend
@@ -42,9 +42,10 @@ Frontend-only changes therefore do not compile the GraalVM native image. Documen
 changes still create the lightweight `Detect changes` check, while irrelevant backend/frontend
 jobs are reported as skipped.
 
-The automated verification suite requires no OpenRouter credentials and does not start
-PostgreSQL. AI remains disabled by default in tests, and provider tests must use local stubs/fakes
-rather than real API calls.
+The automated verification suite requires no OpenRouter credentials. The backend CI job starts
+PostgreSQL 17 on `localhost:55433` so Maven Failsafe executes the database integration tests; AI
+remains disabled by default in tests, and provider tests use local stubs/fakes rather than real API
+calls.
 
 The native CI job is verification only. It does not publish an image, log into GHCR, or deploy to
 Render; image publication and deployment remain separate work.
@@ -86,14 +87,17 @@ server\mvnw.cmd -f server\pom.xml verify
 ```
 
 The verify lifecycle enforces Java 25 and Maven 3.9+, checks Java formatting, compiles with
-Error Prone, runs tests (including Spring Modulith structure verification), and runs SpotBugs.
+Error Prone, runs unit tests (including Spring Modulith structure verification), runs the `*IT`
+PostgreSQL integration tests through Maven Failsafe, and runs SpotBugs. Start PostgreSQL 17 on
+`localhost:55433` before running the full lifecycle locally.
 Apply Java formatting with `server\mvnw.cmd -f server\pom.xml spotless:apply` on Windows or
 `./server/mvnw -f server/pom.xml spotless:apply` on POSIX systems.
 
-### Optional dialogue persistence PostgreSQL integration test
+### PostgreSQL integration tests
 
-The explicit `DialoguePersistencePostgresIT` is excluded from the normal Surefire run. Run it
-against an isolated PostgreSQL 17 container and keep the normal verifier independent of Docker:
+The explicit `DialoguePersistencePostgresIT` and `AiResponseSourceMigrationPostgresIT` are excluded
+from the normal Surefire run and included by Maven Failsafe during `verify`. Run the full lifecycle
+against an isolated PostgreSQL 17 container:
 
 ```powershell
 docker run --name ai-chess-rivals-dialogue-it --rm -d `
@@ -101,14 +105,14 @@ docker run --name ai-chess-rivals-dialogue-it --rm -d `
   -e POSTGRES_PASSWORD=secretpassword `
   -p 55433:5432 postgres:17-alpine
 
-server\mvnw.cmd -f server\pom.xml -Dtest=DialoguePersistencePostgresIT test
+server\mvnw.cmd -f server\pom.xml verify
 
 docker stop ai-chess-rivals-dialogue-it
 ```
 
-The test pins both datasource and Flyway URLs to `localhost:55433`, validates Flyway V1–V5 and
-Hibernate schema mapping, and proves dialogue idempotency, chronological history, and last-four
-context behavior. The separate `AiResponseSourceMigrationPostgresIT` creates a disposable database,
+The tests pin both datasource and Flyway URLs to `localhost:55433`, validate Flyway V1–V5 and
+Hibernate schema mapping, prove dialogue idempotency, chronological history, and last-four context
+behavior, and verify the V4-to-V5 response-source migration. The migration test creates a disposable database,
 migrates through V4, seeds legacy Groq/Gemini rows, applies V5, and asserts the provider-neutral
 values. Do not point either test at the normal development database or volume.
 

@@ -151,6 +151,7 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 *   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
 *   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`, with `server/spotbugs-exclude.xml` limited to Hibernate-generated accessors on the personality and dialogue entities plus the persistence service's defensive constructor validation.
 *   **Maven Enforcer Plugin** (`v3.6.3`): Requires Java 25 and Maven 3.9 or newer.
+*   **Maven Failsafe Plugin** (`v3.5.6`): Runs `*IT` PostgreSQL integration tests during the Maven `verify` lifecycle.
 *   **Spring Modulith verification**: A focused test validates module cycles and dependency boundaries.
 
 ### Dependency Reference Table (`server/pom.xml`)
