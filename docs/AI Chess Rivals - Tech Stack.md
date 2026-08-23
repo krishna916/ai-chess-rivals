@@ -99,20 +99,20 @@ The backend is a **Spring Boot** application targeting **Java 25**, compiled to 
 ### Spring AI and LLM Providers
 
 - Spring AI is the required integration layer for Phase 2.
-- Groq is primary through the OpenAI-compatible integration.
-- Gemini is the only automatic fallback.
-- The application creates both provider `ChatModel`/`ChatClient` pairs explicitly, so Spring AI's generic single-model `ChatClient.Builder` auto-configuration is disabled with `spring.ai.chat.client.enabled=false`.
-- Provider and model names are configured through environment-backed application properties.
-- Phase 2 uses `ChatClient`, provider-specific `ChatModel` beans/configuration, prompt templates, structured output mapping, a lightweight Advisor, and Actuator/Micrometer observability.
+- OpenRouter is the single OpenAI-compatible remote API surface.
+- Phase 2 routes one specific configurable `:free` primary model to one configurable ultra-low-cost remote fallback, then deterministic personality-specific fallback.
+- The application creates both `ChatModel`/`ChatClient` pairs explicitly, so Spring AI's generic single-model `ChatClient.Builder` auto-configuration is disabled with `spring.ai.chat.client.enabled=false`.
+- The OpenRouter key, base URL, model IDs, and timeouts are configured through environment-backed application properties.
+- Phase 2 uses `ChatClient`, OpenAI-compatible `ChatModel` beans/configuration, prompt templates, structured output mapping, a lightweight Advisor, and Actuator/Micrometer observability.
 - Tool calling, chat memory, autonomous agents, and multi-step workflows are deferred to Phase 3.
 
 Spring AI 2.0.0 is the current Phase 2 provider layer added by issue #38. The BOM manages the
-provider starter versions used for Groq primary access and Gemini fallback.
+OpenAI-compatible starter used for OpenRouter access.
 
 ### Native AI topology
 
 The production GraalVM artifact treats AI enablement as a build-time Spring AOT choice. Direct
-production Docker builds compile the Groq/Gemini + enabled `AiChatGateway` topology using
+production Docker builds compile the OpenRouter primary/fallback + enabled `AiChatGateway` topology using
 non-secret placeholders only for AOT processing; real provider keys and model names are supplied
 at runtime. Docker Compose maps its existing `AI_ENABLED` value into the native build argument so
 local AI-disabled images remain straightforward. CI starts the actual native image and verifies
@@ -122,7 +122,7 @@ an additional Actuator endpoint.
 
 ### Phase 2 Dialogue Generation
 
-The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs Groq → Gemini → deterministic fallback.
+The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs OpenRouter primary → OpenRouter fallback → deterministic fallback.
 
 ### Issue #43 Dialogue Persistence and Match Lifecycle
 
@@ -183,8 +183,7 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 | Artifact ID | Group ID | Version | Status | Purpose |
 |---|---|---|---|---|
 | `spring-ai-bom` | `org.springframework.ai` | 2.0.0 | Current | Align Spring AI module versions |
-| `spring-ai-starter-model-openai` | `org.springframework.ai` | BOM-managed | Current | OpenAI-compatible model integration used for Groq |
-| `spring-ai-starter-model-google-genai` | `org.springframework.ai` | BOM-managed | Current | Google GenAI model integration used for Gemini fallback |
+| `spring-ai-starter-model-openai` | `org.springframework.ai` | BOM-managed | Current | OpenAI-compatible model integration used for OpenRouter primary and fallback |
 
 These artifacts are current Phase 2 dependencies managed by the Spring AI 2.0.0 BOM.
 
@@ -213,7 +212,7 @@ Stockfish is used as a local executable process communicating over UCI (stdin/st
 Backend move pacing is configured through Spring `Duration` properties and environment-backed defaults.
 *   **Property Binding**: `app.game.move-delay.min` and `app.game.move-delay.max`.
 *   **Environment Variables**: `GAME_MOVE_DELAY_MIN` and `GAME_MOVE_DELAY_MAX`.
-*   **Default Range**: `3s` to `10s` inclusive between completed non-terminal moves.
+*   **Default Range**: `7s` to `12s` inclusive between completed non-terminal moves.
 *   **Local Fast Mode**: Set both values to `0s` to keep the same pacing code path without introducing a real delay.
 
 ### 4. Owner Match-Control Guard

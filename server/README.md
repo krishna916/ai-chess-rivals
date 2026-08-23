@@ -91,8 +91,11 @@ is configured.
 
 The backend waits for a random duration after each non-terminal move has been
 broadcast and before it requests the next move. Configure the inclusive range
-with `GAME_MOVE_DELAY_MIN` and `GAME_MOVE_DELAY_MAX` (defaults: `3s` and `10s`).
-Set both to `0s` for fast local runs and integration-style verification.
+with `GAME_MOVE_DELAY_MIN` and `GAME_MOVE_DELAY_MAX` (defaults: `7s` and `12s`).
+The wider pacing gives viewers enough time to read and react to dialogue, while
+keeping normal gameplay comfortably below OpenRouter's 20 RPM free-model limit
+and reducing fallback spend. Set both to `0s` for fast local runs and
+integration-style verification only.
 Stopping a match interrupts an active wait; the latest in-progress position
 remains available for the existing resume flow.
 
@@ -293,13 +296,16 @@ Connect to the PostgreSQL instance using any database client (such as DBeaver, p
 
 Spring AOT fixes `@ConditionalOnProperty` bean presence while the native image is built. The
 production Dockerfile therefore compiles with the AI-enabled topology by default using fixed,
-non-secret placeholder provider values. Those placeholders exist only for AOT processing; real
-Groq/Gemini credentials are not Docker build inputs and are not copied into the runtime image.
+non-secret OpenRouter placeholders. Those placeholders exist only for AOT processing; the real
+OpenRouter key and model values are not Docker build inputs and are not copied into the runtime
+image.
 
-At runtime on Render, configure `AI_ENABLED=true`, then set `AI_GROQ_API_KEY` and
-`AI_GEMINI_API_KEY` to the real provider secrets stored in Render and set `AI_GROQ_MODEL` and
-`AI_GEMINI_MODEL` to the model names selected for deployment. `AI_GROQ_BASE_URL` may keep its
-existing default unless Groq-compatible routing changes.
+At runtime on Render, configure `AI_ENABLED=true`, one `AI_OPENROUTER_API_KEY`, and
+`AI_OPENROUTER_BASE_URL`. `AI_OPENROUTER_PRIMARY_MODEL` must be a specific `:free` model, not
+`openrouter/free`, so personality voice remains consistent. The fallback defaults to
+`~deepseek/deepseek-v4-flash-latest` for low cost and reliability rather than benchmark
+leadership. Primary/fallback timeouts default to `8s`/`12s`, and each model gets no same-model
+retry.
 
 For JVM development, `AI_ENABLED=false` remains the default and no provider credentials are
 required. Docker Compose maps `AI_ENABLED` to both the native build topology and runtime value;
@@ -321,8 +327,10 @@ committed files:
 - `MATCH_COOLDOWN`: `60s` (or the desired Spring duration)
 - `MATCH_DAILY_START_LIMIT`: `12` (or the desired positive limit)
 - `AI_ENABLED`: `true` for the production AI-enabled native image
-- `AI_GROQ_API_KEY`: (Groq API key stored as a Render secret)
-- `AI_GROQ_MODEL`: (Groq model name selected for deployment)
-- `AI_GEMINI_API_KEY`: (Gemini API key stored as a Render secret)
-- `AI_GEMINI_MODEL`: (Gemini model name selected for deployment)
+- `AI_OPENROUTER_API_KEY`: (OpenRouter API key stored as a Render secret)
+- `AI_OPENROUTER_BASE_URL`: `https://openrouter.ai/api/v1`
+- `AI_OPENROUTER_PRIMARY_MODEL`: (specific `:free` OpenRouter model selected for deployment)
+- `AI_OPENROUTER_FALLBACK_MODEL`: `~deepseek/deepseek-v4-flash-latest` or another approved low-cost model
+- `AI_OPENROUTER_PRIMARY_TIMEOUT`: `8s`
+- `AI_OPENROUTER_FALLBACK_TIMEOUT`: `12s`
 

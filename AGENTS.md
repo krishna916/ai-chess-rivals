@@ -248,8 +248,9 @@ Examples include:
 
 Keep the chess layer independent from AI-specific logic.
 
-Phase 2 uses Spring AI as the required LLM integration layer. Groq is primary through the
-OpenAI-compatible integration, Gemini is the only automatic fallback, and provider/model names are
+Phase 2 uses Spring AI through OpenRouter's OpenAI-compatible API. A specific configurable `:free`
+model is the remote primary, one configurable ultra-low-cost model is the single remote fallback,
+and deterministic personality-specific dialogue is the final fallback. Provider/model names remain
 environment-configurable.
 
 ---

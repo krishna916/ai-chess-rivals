@@ -42,7 +42,7 @@ Frontend-only changes therefore do not compile the GraalVM native image. Documen
 changes still create the lightweight `Detect changes` check, while irrelevant backend/frontend
 jobs are reported as skipped.
 
-The automated verification suite requires no Groq/Gemini credentials and does not start
+The automated verification suite requires no OpenRouter credentials and does not start
 PostgreSQL. AI remains disabled by default in tests, and provider tests must use local stubs/fakes
 rather than real API calls.
 
@@ -58,11 +58,11 @@ disposable PostgreSQL 17 container using fake runtime provider values.
 `AiGatewayConfiguration` emits a small application-owned startup marker for the topology that was
 constructed. After the native application becomes healthy, CI captures its container logs,
 requires the AI-enabled gateway marker, and requires the AI-disabled gateway marker to be absent.
-Because construction of the enabled gateway requires both qualified provider clients to resolve,
+Because construction of the enabled gateway requires both qualified OpenRouter clients to resolve,
 this verifies the enabled provider/gateway chain without depending on Spring Framework internal
 bean-creation logs or exposing an additional Actuator endpoint. CI also verifies that provider
 key/model environment values are not present in the final image configuration. The check performs
-no real Groq/Gemini request and requires no provider secret.
+no real OpenRouter request and requires no provider secret.
 
 Normal JVM verification continues to use the default AI-disabled mode. For Docker Compose,
 changing `AI_ENABLED` requires rebuilding the backend because the native bean topology is selected
@@ -128,7 +128,7 @@ chaining.
 ## Phase 2 AI observability and resilience verification
 
 The Phase 2 automated tests are credential-safe. They use local provider stubs and deterministic
-exceptions, never real Groq or Gemini requests, and do not log prompts, completions, personality
+exceptions, never real OpenRouter requests, and do not log prompts, completions, personality
 text, or API keys. Run the normal repository verifier with AI disabled before any manual provider
 check:
 
@@ -152,11 +152,22 @@ $env:MATCH_COOLDOWN = "0s"
 value with a minimum of one millisecond; six plies are enough for a short acceptance match while
 still exercising start dialogue and move-reaction context.
 
-When exercising real dialogue generation, set `AI_ENABLED=true` and provide
-`AI_GROQ_API_KEY`, `AI_GROQ_MODEL`, `AI_GEMINI_API_KEY`, and `AI_GEMINI_MODEL` through an ignored
-local environment file or the process environment. Never paste those values into this document,
-the terminal transcript, issue comments, or application logs. The configured provider timeouts are
-8 seconds for Groq and 12 seconds for Gemini; failover is bounded and does not retry a provider.
+When exercising real dialogue generation, set `AI_ENABLED=true` and provide the following through
+an ignored local environment file or the process environment. Never paste the key into this
+document, the terminal transcript, issue comments, or application logs:
+
+```text
+AI_OPENROUTER_API_KEY=<secret supplied only in the local shell or deployment secret store>
+AI_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+AI_OPENROUTER_PRIMARY_MODEL=inclusionai/ling-3.0-flash:free
+AI_OPENROUTER_FALLBACK_MODEL=~deepseek/deepseek-v4-flash-latest
+AI_OPENROUTER_PRIMARY_TIMEOUT=8s
+AI_OPENROUTER_FALLBACK_TIMEOUT=12s
+```
+
+The primary must be a specific `:free` model, not `openrouter/free`. The remote flow is bounded:
+one primary attempt, exactly one remote-fallback attempt, then deterministic personality-specific
+fallback. There is no same-model retry.
 
 Inspect the management endpoint while a match is running:
 
@@ -168,28 +179,24 @@ http://localhost:8081/actuator/metrics/ai.gateway.responses
 ```
 
 The metrics use only low-cardinality provider, outcome, target, source, and reason tags. Confirm
-that a successful primary response records `groq` plus `success` and `primary`; a provider failure
-records the corresponding failure or timeout and a Gemini or deterministic-fallback activation;
-and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`.
+that a successful primary response records `primary` plus `success` and `primary`; a remote failure
+records the corresponding failure or timeout and a `remote_fallback` or deterministic-fallback
+activation; and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`.
 
-To exercise the Groq-to-Gemini path without sending a request to Groq, set the Groq base URL to a
-closed loopback port. Keep the Groq values syntactically valid but non-secret, and provide a valid
-Gemini configuration only when that provider request is authorized for the local acceptance run:
+To exercise the controlled remote-fallback path, keep the real OpenRouter key and fallback model,
+but set the primary model to an intentionally invalid ID that still satisfies startup policy:
 
 ```powershell
 $env:AI_ENABLED = "true"
-$env:AI_GROQ_API_KEY = "dummy-groq-key"
-$env:AI_GROQ_MODEL = "dummy-groq-model"
-$env:AI_GROQ_BASE_URL = "http://127.0.0.1:9/v1"
-# Set AI_GEMINI_API_KEY and AI_GEMINI_MODEL from the ignored local environment only.
-$groqPortOpen = Test-NetConnection -ComputerName 127.0.0.1 -Port 9 -InformationLevel Quiet -WarningAction SilentlyContinue
-if ($groqPortOpen) { throw "Port 9 is occupied; choose another closed loopback port before continuing." }
+$env:AI_OPENROUTER_PRIMARY_MODEL = "invalid/forced-primary-failure:free"
+$env:AI_OPENROUTER_FALLBACK_MODEL = "~deepseek/deepseek-v4-flash-latest"
+# Keep AI_OPENROUTER_API_KEY in the ignored local environment only.
 ```
 
-The preflight aborts if port 9 is occupied. When it is closed, the Groq connection is expected to
-refuse immediately, so the observed result should be a bounded Gemini attempt followed by either a
-Gemini response or the deterministic fallback. Do not use a production key against an uncontrolled
-endpoint.
+Restart the backend, start one short match, and confirm one `primary` failure activates
+`remote_fallback` exactly once, followed by a successful remote-fallback response and continued
+dialogue/match progress. Restore the real primary model immediately after the run. Do not use a
+production key against an uncontrolled endpoint.
 
 For the manual Phase 2 acceptance pass, record only observations that were actually made:
 
@@ -199,7 +206,7 @@ For the manual Phase 2 acceptance pass, record only observations that were actua
 - [ ] Disconnect and reconnect restore the authoritative state without duplicate dialogue or moves.
 - [ ] Stopping and resuming a match preserves the latest valid board and dialogue ordering.
 - [ ] An AI-disabled match remains playable with deterministic fallback dialogue and response metrics.
-- [ ] A controlled Groq failure activates Gemini or deterministic fallback and emits safe metrics/logs.
+- [ ] A controlled primary failure activates remote fallback or deterministic fallback and emits safe metrics/logs.
 - [ ] No prompt, completion, personality text, or credential appears in captured application output.
 
 The dated acceptance record below this section must list the environment, checks performed, and any
@@ -233,7 +240,7 @@ but they do not count as browser or real-provider observations.
 - [x] Stop/resume browser evidence showed Blaze vs Vesper stopped after four moves, then resumed
       the same match ID from move four and continued live play.
 - [ ] Random-rivalry selection was not exercised through the owner-controls UI in this pass.
-- [ ] Real-provider and controlled Groq-failure checks were not run; no provider request was made
+- [ ] Real-provider and controlled OpenRouter-failure checks were not run; no provider request was made
       and local credentials were not inspected or exposed.
 
 ## Phase 1 end-to-end acceptance

@@ -38,7 +38,7 @@ To preserve the simplicity and focus of this showcase project (as outlined in th
 
 - **LLM Boundary**: LLMs must be used *exclusively* for entertainment (trash talk, match commentary, mocking, reactions). **Never** write code that attempts to calculate chess moves or validate rules via LLMs.
 - **Stockfish Boundary**: Stockfish is the sole engine responsible for move legality, candidate move generation, and positional evaluation. It must never handle personality traits, and personality code must never select, validate, or replace a chess move.
-- **Phase 2 AI Boundary**: Phase 2 uses Spring AI; Groq is primary and Gemini is the only automatic fallback.
+- **Phase 2 AI Boundary**: Phase 2 uses Spring AI through OpenRouter's OpenAI-compatible API. A specific configurable `:free` model is the remote primary, one configurable ultra-low-cost model is the single remote fallback, and deterministic personality-specific dialogue is the final fallback.
 - **Provider Configuration**: Provider and model names are environment-configurable.
 - **Phase 3 Deferrals**: Tools, chat memory, autonomous agents, and multi-step workflows are Phase 3 concerns.
 - **Out of Scope (MVP constraints)**: Do **not** implement vector databases, user registration/accounts, multiplayer matches, complex multi-agent orchestrators, or microservices. Keep code explicitly modular-monolithic (using Spring Modulith).
