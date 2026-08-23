@@ -17,7 +17,8 @@ export type DialogueEmotion =
   | "DEFIANT";
 export type DialogueReactionType =
   "GAME_START" | "MOVE_REACTION" | "VICTORY" | "DEFEAT" | "DRAW";
-export type AiResponseSource = "GROQ" | "GEMINI" | "DETERMINISTIC_FALLBACK";
+export type AiResponseSource =
+  "REMOTE_PRIMARY" | "REMOTE_FALLBACK" | "DETERMINISTIC_FALLBACK";
 
 export interface BaseMessage {
   type: string;
