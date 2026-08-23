@@ -20,9 +20,9 @@ class AiPropertiesBindingTest {
                   ValidationAutoConfiguration.class))
           .withUserConfiguration(ValidationConfiguration.class, AiConfig.class)
           .withPropertyValues(
-              "app.ai.groq.base-url=https://api.groq.com/openai/v1",
-              "app.ai.groq.timeout=8s",
-              "app.ai.gemini.timeout=12s");
+              "app.ai.openrouter.base-url=https://openrouter.ai/api/v1",
+              "app.ai.openrouter.primary-timeout=8s",
+              "app.ai.openrouter.fallback-timeout=12s");
 
   @Test
   void disabledModeStartsWithoutProviderCredentials() {
@@ -40,18 +40,20 @@ class AiPropertiesBindingTest {
     contextRunner
         .withPropertyValues(
             "app.ai.enabled=true",
-            "app.ai.groq.api-key=test-groq-key",
-            "app.ai.groq.model=test-groq-model",
-            "app.ai.gemini.api-key=test-gemini-key",
-            "app.ai.gemini.model=test-gemini-model")
+            "app.ai.openrouter.api-key=test-openrouter-key",
+            "app.ai.openrouter.primary-model=inclusionai/ling-3.0-flash:free",
+            "app.ai.openrouter.fallback-model=~deepseek/deepseek-v4-flash-latest")
         .run(
             context -> {
               assertThat(context).hasNotFailed();
               AiProperties properties = context.getBean(AiProperties.class);
-              assertThat(properties.groq().model()).isEqualTo("test-groq-model");
-              assertThat(properties.groq().timeout()).isEqualTo(Duration.ofSeconds(8));
-              assertThat(properties.gemini().model()).isEqualTo("test-gemini-model");
-              assertThat(properties.gemini().timeout()).isEqualTo(Duration.ofSeconds(12));
+              assertThat(properties.openrouter().primaryModel())
+                  .isEqualTo("inclusionai/ling-3.0-flash:free");
+              assertThat(properties.openrouter().primaryTimeout()).isEqualTo(Duration.ofSeconds(8));
+              assertThat(properties.openrouter().fallbackModel())
+                  .isEqualTo("~deepseek/deepseek-v4-flash-latest");
+              assertThat(properties.openrouter().fallbackTimeout())
+                  .isEqualTo(Duration.ofSeconds(12));
             });
   }
 
@@ -65,14 +67,25 @@ class AiPropertiesBindingTest {
   @Test
   void rejectsNonPositiveProviderTimeout() {
     contextRunner
-        .withPropertyValues("app.ai.enabled=false", "app.ai.groq.timeout=0s")
+        .withPropertyValues("app.ai.enabled=false", "app.ai.openrouter.primary-timeout=0s")
         .run(context -> assertThat(context).hasFailed());
   }
 
   @Test
-  void rejectsGeminiTimeoutBeyondHttpOptionsRange() {
+  void rejectsNonPositiveFallbackTimeout() {
     contextRunner
-        .withPropertyValues("app.ai.enabled=false", "app.ai.gemini.timeout=2147483648ms")
+        .withPropertyValues("app.ai.enabled=false", "app.ai.openrouter.fallback-timeout=-1s")
+        .run(context -> assertThat(context).hasFailed());
+  }
+
+  @Test
+  void enabledModeRejectsRandomOpenRouterFreeRoute() {
+    contextRunner
+        .withPropertyValues(
+            "app.ai.enabled=true",
+            "app.ai.openrouter.api-key=test-openrouter-key",
+            "app.ai.openrouter.primary-model=openrouter/free",
+            "app.ai.openrouter.fallback-model=~deepseek/deepseek-v4-flash-latest")
         .run(context -> assertThat(context).hasFailed());
   }
 }

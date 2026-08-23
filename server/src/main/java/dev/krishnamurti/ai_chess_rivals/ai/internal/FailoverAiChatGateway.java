@@ -18,14 +18,14 @@ final class FailoverAiChatGateway implements AiChatGateway {
 
   private static final Logger log = LoggerFactory.getLogger(FailoverAiChatGateway.class);
 
-  private final ProviderChatClient groq;
-  private final ProviderChatClient gemini;
+  private final ProviderChatClient primary;
+  private final ProviderChatClient remoteFallback;
   private final AiGatewayMetrics metrics;
 
   FailoverAiChatGateway(
-      ProviderChatClient groq, ProviderChatClient gemini, AiGatewayMetrics metrics) {
-    this.groq = Objects.requireNonNull(groq, "groq must not be null");
-    this.gemini = Objects.requireNonNull(gemini, "gemini must not be null");
+      ProviderChatClient primary, ProviderChatClient remoteFallback, AiGatewayMetrics metrics) {
+    this.primary = Objects.requireNonNull(primary, "primary must not be null");
+    this.remoteFallback = Objects.requireNonNull(remoteFallback, "remoteFallback must not be null");
     this.metrics = Objects.requireNonNull(metrics, "metrics must not be null");
   }
 
@@ -34,18 +34,19 @@ final class FailoverAiChatGateway implements AiChatGateway {
     Objects.requireNonNull(request, "request must not be null");
     Objects.requireNonNull(validator, "validator must not be null");
 
-    ProviderAttempt groqAttempt = attempt("groq", groq, request.prompt(), validator);
-    if (groqAttempt.outcome() == ProviderOutcome.SUCCESS) {
-      return selected(groqAttempt.response(), AiResponseSource.GROQ, "primary");
+    ProviderAttempt primaryAttempt = attempt("primary", primary, request.prompt(), validator);
+    if (primaryAttempt.outcome() == ProviderOutcome.SUCCESS) {
+      return selected(primaryAttempt.response(), AiResponseSource.REMOTE_PRIMARY, "primary");
     }
 
-    activateFallback("gemini", groqAttempt.outcome());
-    ProviderAttempt geminiAttempt = attempt("gemini", gemini, request.prompt(), validator);
-    if (geminiAttempt.outcome() == ProviderOutcome.SUCCESS) {
-      return selected(geminiAttempt.response(), AiResponseSource.GEMINI, "fallback");
+    activateFallback("remote_fallback", primaryAttempt.outcome());
+    ProviderAttempt fallbackAttempt =
+        attempt("remote_fallback", remoteFallback, request.prompt(), validator);
+    if (fallbackAttempt.outcome() == ProviderOutcome.SUCCESS) {
+      return selected(fallbackAttempt.response(), AiResponseSource.REMOTE_FALLBACK, "fallback");
     }
 
-    activateFallback("deterministic_fallback", geminiAttempt.outcome());
+    activateFallback("deterministic_fallback", fallbackAttempt.outcome());
     return selected(
         request.deterministicFallback(),
         AiResponseSource.DETERMINISTIC_FALLBACK,
@@ -132,8 +133,8 @@ final class FailoverAiChatGateway implements AiChatGateway {
 
   private static String sourceTag(AiResponseSource source) {
     return switch (source) {
-      case GROQ -> "groq";
-      case GEMINI -> "gemini";
+      case REMOTE_PRIMARY -> "primary";
+      case REMOTE_FALLBACK -> "remote_fallback";
       case DETERMINISTIC_FALLBACK -> "deterministic_fallback";
     };
   }

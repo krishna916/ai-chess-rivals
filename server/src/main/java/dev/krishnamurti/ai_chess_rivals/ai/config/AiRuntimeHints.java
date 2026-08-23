@@ -23,20 +23,10 @@ final class AiRuntimeHints implements RuntimeHintsRegistrar {
     hints
         .reflection()
         .registerType(
-            AiProperties.Groq.class,
+            AiProperties.OpenRouter.class,
             typeHint ->
                 typeHint
                     .withMembers(MemberCategory.ACCESS_DECLARED_FIELDS)
-                    .withMethod("isTimeoutPositive", List.of(), ExecutableMode.INVOKE));
-
-    hints
-        .reflection()
-        .registerType(
-            AiProperties.Gemini.class,
-            typeHint ->
-                typeHint
-                    .withMembers(MemberCategory.ACCESS_DECLARED_FIELDS)
-                    .withMethod(
-                        "isTimeoutWithinHttpOptionsRange", List.of(), ExecutableMode.INVOKE));
+                    .withMethod("areTimeoutsPositive", List.of(), ExecutableMode.INVOKE));
   }
 }
