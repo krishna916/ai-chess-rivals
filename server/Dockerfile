@@ -20,10 +20,9 @@ ARG AI_NATIVE_BUILD_ENABLED=true
 
 # Package application as native image & download linux stockfish binary
 RUN AI_ENABLED="${AI_NATIVE_BUILD_ENABLED}" \
-    AI_GROQ_API_KEY="aot-build-placeholder-groq-key" \
-    AI_GROQ_MODEL="aot-build-placeholder-groq-model" \
-    AI_GEMINI_API_KEY="aot-build-placeholder-gemini-key" \
-    AI_GEMINI_MODEL="aot-build-placeholder-gemini-model" \
+    AI_OPENROUTER_API_KEY="aot-build-placeholder-openrouter-key" \
+    AI_OPENROUTER_PRIMARY_MODEL="aot-build-placeholder-primary:free" \
+    AI_OPENROUTER_FALLBACK_MODEL="aot-build-placeholder-fallback" \
     ./mvnw clean package native:compile -B -DskipTests -Pnative -Plinux
 
 # --- Runtime Stage ---

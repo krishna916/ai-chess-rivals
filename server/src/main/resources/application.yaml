@@ -54,15 +54,13 @@ management:
 app:
   ai:
     enabled: ${AI_ENABLED:false}
-    groq:
-      api-key: ${AI_GROQ_API_KEY:}
-      base-url: ${AI_GROQ_BASE_URL:https://api.groq.com/openai/v1}
-      model: ${AI_GROQ_MODEL:}
-      timeout: 8s
-    gemini:
-      api-key: ${AI_GEMINI_API_KEY:}
-      model: ${AI_GEMINI_MODEL:}
-      timeout: 12s
+    openrouter:
+      api-key: ${AI_OPENROUTER_API_KEY:}
+      base-url: ${AI_OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+      primary-model: ${AI_OPENROUTER_PRIMARY_MODEL:}
+      fallback-model: ${AI_OPENROUTER_FALLBACK_MODEL:~deepseek/deepseek-v4-flash-latest}
+      primary-timeout: ${AI_OPENROUTER_PRIMARY_TIMEOUT:8s}
+      fallback-timeout: ${AI_OPENROUTER_FALLBACK_TIMEOUT:12s}
   owner:
     control-token: ${OWNER_CONTROL_TOKEN:}
   match:
@@ -84,8 +82,8 @@ app:
     move-think-time-millis: ${GAME_MOVE_THINK_TIME_MILLIS:250}
     max-plies: ${GAME_MAX_PLIES:300}
     move-delay:
-      min: ${GAME_MOVE_DELAY_MIN:3s}
-      max: ${GAME_MOVE_DELAY_MAX:10s}
+      min: ${GAME_MOVE_DELAY_MIN:7s}
+      max: ${GAME_MOVE_DELAY_MAX:12s}
   websocket:
     allowed-origins:
       - ${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}
