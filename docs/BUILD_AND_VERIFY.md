@@ -261,6 +261,9 @@ but they do not count as browser or real-provider observations.
 - [ ] The local native-image Docker build did not produce a result; Docker Desktop terminated the
       build stream with `rpc error: code = Unavailable desc = error reading from server: EOF` during
       GraalVM compilation. No source-level native-image failure was reported.
+- [x] GitHub Actions run `32650368156` passed backend, frontend, and native-image verification,
+      including the production native image build, AI-enabled topology startup, and no-baked-provider
+      environment checks.
 
 #### Manual and runtime evidence
 
