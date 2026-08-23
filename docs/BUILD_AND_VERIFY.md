@@ -161,7 +161,7 @@ document, the terminal transcript, issue comments, or application logs:
 ```text
 AI_OPENROUTER_API_KEY=<secret supplied only in the local shell or deployment secret store>
 AI_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-AI_OPENROUTER_PRIMARY_MODEL=inclusionai/ling-3.0-flash:free
+AI_OPENROUTER_PRIMARY_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 AI_OPENROUTER_FALLBACK_MODEL=~deepseek/deepseek-v4-flash-latest
 AI_OPENROUTER_PRIMARY_TIMEOUT=8s
 AI_OPENROUTER_FALLBACK_TIMEOUT=12s
@@ -208,7 +208,8 @@ For the manual Phase 2 acceptance pass, record only observations that were actua
 - [ ] Disconnect and reconnect restore the authoritative state without duplicate dialogue or moves.
 - [ ] Stopping and resuming a match preserves the latest valid board and dialogue ordering.
 - [ ] An AI-disabled match remains playable with deterministic fallback dialogue and response metrics.
-- [ ] A controlled primary failure activates remote fallback or deterministic fallback and emits safe metrics/logs.
+- [x] A controlled primary failure activated the bounded remote-fallback/deterministic-fallback path and emitted
+      safe metrics/logs.
 - [ ] No prompt, completion, personality text, or credential appears in captured application output.
 
 The dated acceptance record below this section must list the environment, checks performed, and any
@@ -263,16 +264,26 @@ but they do not count as browser or real-provider observations.
 
 #### Manual and runtime evidence
 
-- [ ] A real OpenRouter primary-success match was not run; no provider credential was available for
-      a controlled request.
-- [ ] The controlled primary-failure path using `invalid/forced-primary-failure:free` was not run;
-      no remote request was made.
+- [x] A real OpenRouter six-ply match ran with primary
+      `nvidia/nemotron-3-ultra-550b-a55b:free` and remote fallback
+      `~deepseek/deepseek-v4-flash-latest`. The match completed six moves and persisted eight dialogue
+      lines, including four `REMOTE_PRIMARY`, three `REMOTE_FALLBACK`, and one `DETERMINISTIC_FALLBACK`
+      source. An isolated primary-only request also returned HTTP 200 with usable content from the
+      configured primary model.
+- [x] The controlled primary-failure path used the process-only override
+      `invalid/forced-primary-failure:free` with the real fallback configuration. Match
+      `6149e3e7-317d-4896-a97a-d511b7d02984` completed one ply; one remote-fallback response and
+      deterministic fallback responses were persisted, with fresh counters showing one
+      `remote_fallback` response, three `deterministic_fallback` responses, and five primary failures.
+      The override was not written to `.env`.
 - [x] Automated fallback tests covered the one-shot remote-fallback and deterministic-fallback paths,
       including low-cardinality source metrics and safe captured-output assertions.
-- [ ] Browser match, refresh/reconnect, stop/resume, normal 7–12 second pacing, and provider-backed
-      dialogue were not observed in this pass.
+- [ ] Browser match, refresh/reconnect, stop/resume, and normal 7–12 second pacing were not observed
+      in this pass. The real-provider runs used `0s` pacing only as verification acceleration; the
+      documented 7–12 second production defaults were unchanged.
 - [x] No secret, prompt, completion, or personality text was exposed by the automated verification
-      output; the ignored local environment was inspected by variable names only.
+      output or the recorded runtime evidence; the ignored local environment was inspected by variable
+      names only.
 
 ## Phase 1 end-to-end acceptance
 
