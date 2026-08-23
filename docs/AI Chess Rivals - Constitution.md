@@ -150,8 +150,8 @@ LLMs never calculate, select, validate, or replace chess moves.
 
 Spring AI is the required Phase 2 integration layer for LLM providers.
 
-- Groq is the default primary provider through Spring AI's OpenAI-compatible integration.
-- Gemini is the only automatic fallback provider.
+- OpenRouter is the configured remote provider through Spring AI's OpenAI-compatible integration.
+- The configured OpenRouter fallback model is the only automatic remote fallback.
 - Provider and model names are environment-configurable.
 - Provider failure must never stop or fail a chess match.
 

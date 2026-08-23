@@ -106,9 +106,11 @@ server\mvnw.cmd -f server\pom.xml -Dtest=DialoguePersistencePostgresIT test
 docker stop ai-chess-rivals-dialogue-it
 ```
 
-The test pins both datasource and Flyway URLs to `localhost:55433`, validates Flyway V1–V4 and
+The test pins both datasource and Flyway URLs to `localhost:55433`, validates Flyway V1–V5 and
 Hibernate schema mapping, and proves dialogue idempotency, chronological history, and last-four
-context behavior. Do not point it at the normal development database or volume.
+context behavior. The separate `AiResponseSourceMigrationPostgresIT` creates a disposable database,
+migrates through V4, seeds legacy Groq/Gemini rows, applies V5, and asserts the provider-neutral
+values. Do not point either test at the normal development database or volume.
 
 ## Frontend
 
@@ -252,8 +254,9 @@ but they do not count as browser or real-provider observations.
       generation.
 - [x] The root verifier passed with `AI_ENABLED=false`: backend tests, Spotless, SpotBugs, frontend
       formatting, typecheck, lint, 83 tests, and production build.
-- [x] PostgreSQL 17 was started in the documented disposable container and
-      `DialoguePersistencePostgresIT` passed 2 tests, including Flyway V5 response-source migration.
+- [x] PostgreSQL 17 was started in the documented disposable container;
+      `DialoguePersistencePostgresIT` passed 2 persistence tests and
+      `AiResponseSourceMigrationPostgresIT` passed the V4-to-V5 legacy Groq/Gemini conversion test.
 - [ ] The local native-image Docker build did not produce a result; Docker Desktop terminated the
       build stream with `rpc error: code = Unavailable desc = error reading from server: EOF` during
       GraalVM compilation. No source-level native-image failure was reported.
