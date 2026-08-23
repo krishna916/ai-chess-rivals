@@ -14,9 +14,9 @@ RUN ./mvnw dependency:go-offline -B -Plinux -Pnative
 COPY src/ ./src/
 
 # Spring AOT fixes conditional bean topology at build time.
-# Keep direct Docker builds aligned with the runtime default; CI and production AI images must
-# explicitly pass AI_NATIVE_BUILD_ENABLED=true. Docker Compose maps this arg from AI_ENABLED.
-ARG AI_NATIVE_BUILD_ENABLED=false
+# Direct/production Docker builds compile the AI-enabled topology by default.
+# Docker Compose overrides this arg from AI_ENABLED so local disabled mode remains available.
+ARG AI_NATIVE_BUILD_ENABLED=true
 
 # Package application as native image & download linux stockfish binary
 RUN AI_ENABLED="${AI_NATIVE_BUILD_ENABLED}" \

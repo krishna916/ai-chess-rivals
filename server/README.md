@@ -294,13 +294,12 @@ Connect to the PostgreSQL instance using any database client (such as DBeaver, p
 
 ### Native AI build/runtime contract
 
-Spring AOT fixes `@ConditionalOnProperty` bean presence while the native image is built. The
-Dockerfile defaults to the AI-disabled topology to match the runtime default; CI and production
-AI images must pass `AI_NATIVE_BUILD_ENABLED=true`. Enabled builds use fixed, non-secret OpenRouter
-placeholders only for AOT processing; real provider keys and model values are supplied at runtime
-and are not copied into the image. Render's Docker build settings must include
-`AI_NATIVE_BUILD_ENABLED=true`; setting only the runtime `AI_ENABLED=true` variable cannot change a
-native image that was compiled with the disabled topology.
+Spring AOT fixes `@ConditionalOnProperty` bean presence while the native image is built. Direct/
+production Docker builds compile the AI-enabled topology by default using only non-secret OpenRouter
+placeholder values during AOT processing. Real OpenRouter keys and model IDs are supplied at runtime
+and are not copied into the image. Docker Compose maps `AI_ENABLED` to `AI_NATIVE_BUILD_ENABLED` so
+local AI-disabled images remain straightforward. Changing `AI_ENABLED` for a Compose native image
+requires rebuilding the backend.
 
 At runtime on Render, configure `AI_ENABLED=true`, one `AI_OPENROUTER_API_KEY`, and
 `AI_OPENROUTER_BASE_URL`. `AI_OPENROUTER_PRIMARY_MODEL` must be a specific `:free` model, not
@@ -319,9 +318,6 @@ other topology.
 In Render, set the following environment variables in your web service dashboard to point to Neon
 and configure the application. Keep provider secrets and model values in Render rather than in
 committed files:
-
-Set the Docker build argument `AI_NATIVE_BUILD_ENABLED=true` in the Render service's build settings
-for the production AI image. This is a build-time setting, not a runtime environment variable.
 
 - `SPRING_DATASOURCE_URL`: (Your Neon JDBC connection string)
 - `SPRING_DATASOURCE_USERNAME`: (Your Neon database username)
