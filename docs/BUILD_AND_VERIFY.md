@@ -243,6 +243,34 @@ but they do not count as browser or real-provider observations.
 - [ ] Real-provider and controlled OpenRouter-failure checks were not run; no provider request was made
       and local credentials were not inspected or exposed.
 
+### Acceptance record — 2026-08-23
+
+#### Automated evidence
+
+- [x] The focused backend regression slice passed: 46 tests, including OpenRouter topology,
+      provider-neutral response sources, failover metrics, runtime hints, pacing, and dialogue
+      generation.
+- [x] The root verifier passed with `AI_ENABLED=false`: backend tests, Spotless, SpotBugs, frontend
+      formatting, typecheck, lint, 83 tests, and production build.
+- [x] PostgreSQL 17 was started in the documented disposable container and
+      `DialoguePersistencePostgresIT` passed 2 tests, including Flyway V5 response-source migration.
+- [ ] The local native-image Docker build did not produce a result; Docker Desktop terminated the
+      build stream with `rpc error: code = Unavailable desc = error reading from server: EOF` during
+      GraalVM compilation. No source-level native-image failure was reported.
+
+#### Manual and runtime evidence
+
+- [ ] A real OpenRouter primary-success match was not run; no provider credential was available for
+      a controlled request.
+- [ ] The controlled primary-failure path using `invalid/forced-primary-failure:free` was not run;
+      no remote request was made.
+- [x] Automated fallback tests covered the one-shot remote-fallback and deterministic-fallback paths,
+      including low-cardinality source metrics and safe captured-output assertions.
+- [ ] Browser match, refresh/reconnect, stop/resume, normal 7–12 second pacing, and provider-backed
+      dialogue were not observed in this pass.
+- [x] No secret, prompt, completion, or personality text was exposed by the automated verification
+      output; the ignored local environment was inspected by variable names only.
+
 ## Phase 1 end-to-end acceptance
 
 Use the normal local-development topology so the management and application ports remain

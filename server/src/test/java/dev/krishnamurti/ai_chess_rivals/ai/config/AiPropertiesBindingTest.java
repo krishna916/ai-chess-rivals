@@ -65,7 +65,7 @@ class AiPropertiesBindingTest {
   }
 
   @Test
-  void rejectsNonPositiveProviderTimeout() {
+  void rejectsNonPositivePrimaryTimeout() {
     contextRunner
         .withPropertyValues("app.ai.enabled=false", "app.ai.openrouter.primary-timeout=0s")
         .run(context -> assertThat(context).hasFailed());

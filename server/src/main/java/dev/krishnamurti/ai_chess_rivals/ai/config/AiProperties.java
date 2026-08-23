@@ -14,11 +14,11 @@ public record AiProperties(boolean enabled, @Valid @NotNull OpenRouter openroute
       message =
           "When app.ai.enabled=true, OpenRouter API key/base URL, a specific :free primary model (not openrouter/free), and fallback model must be configured")
   public boolean isEnabledConfigurationComplete() {
+    if (openrouter == null || !openrouter.areTimeoutsPositive()) {
+      return false;
+    }
     if (!enabled) {
       return true;
-    }
-    if (openrouter == null) {
-      return false;
     }
     return hasText(openrouter.apiKey())
         && hasText(openrouter.baseUrl())
