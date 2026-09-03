@@ -1,7 +1,7 @@
 package dev.krishnamurti.ai_chess_rivals.ai.api;
 
 public enum AiResponseSource {
-  GROQ,
-  GEMINI,
+  REMOTE_PRIMARY,
+  REMOTE_FALLBACK,
   DETERMINISTIC_FALLBACK
 }

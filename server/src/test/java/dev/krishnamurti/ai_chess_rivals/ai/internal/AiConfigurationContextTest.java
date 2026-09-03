@@ -39,9 +39,9 @@ class AiConfigurationContextTest {
           .withBean(ObservationRegistry.class, ObservationRegistry::create)
           .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
           .withPropertyValues(
-              "app.ai.groq.base-url=https://api.groq.com/openai/v1",
-              "app.ai.groq.timeout=8s",
-              "app.ai.gemini.timeout=12s");
+              "app.ai.openrouter.base-url=https://openrouter.ai/api/v1",
+              "app.ai.openrouter.primary-timeout=8s",
+              "app.ai.openrouter.fallback-timeout=12s");
 
   @Test
   void disabledModeCreatesOnlyFallbackGateway(CapturedOutput output) {
@@ -72,7 +72,8 @@ class AiConfigurationContextTest {
                   .isEqualTo(1.0);
               assertThat(output.getAll())
                   .contains("AI gateway topology: disabled")
-                  .doesNotContain("AI gateway topology: enabled (Groq -> Gemini)");
+                  .doesNotContain(
+                      "AI gateway topology: enabled (OpenRouter primary -> OpenRouter fallback -> deterministic fallback)");
             });
   }
 
@@ -81,22 +82,33 @@ class AiConfigurationContextTest {
     contextRunner
         .withPropertyValues(
             "app.ai.enabled=true",
-            "app.ai.groq.api-key=test-groq-key",
-            "app.ai.groq.model=test-groq-model",
-            "app.ai.gemini.api-key=test-gemini-key",
-            "app.ai.gemini.model=test-gemini-model")
+            "app.ai.openrouter.api-key=test-openrouter-key",
+            "app.ai.openrouter.primary-model=inclusionai/ling-3.0-flash:free",
+            "app.ai.openrouter.fallback-model=~deepseek/deepseek-v4-flash-latest")
         .run(
             context -> {
               assertThat(context).hasNotFailed();
-              assertThat(context).hasBean("groqChatModel");
-              assertThat(context).hasBean("groqChatClient");
-              assertThat(context).hasBean("geminiChatModel");
-              assertThat(context).hasBean("geminiChatClient");
+              assertThat(context).hasBean("openRouterPrimaryChatModel");
+              assertThat(context).hasBean("openRouterPrimaryChatClient");
+              assertThat(context).hasBean("openRouterFallbackChatModel");
+              assertThat(context).hasBean("openRouterFallbackChatClient");
               assertThat(context).hasSingleBean(AiChatGateway.class);
               assertThat(context).hasSingleBean(AiGatewayMetrics.class);
               assertThat(output.getAll())
-                  .contains("AI gateway topology: enabled (Groq -> Gemini)")
+                  .contains(
+                      "AI gateway topology: enabled (OpenRouter primary -> OpenRouter fallback -> deterministic fallback)")
                   .doesNotContain("AI gateway topology: disabled");
             });
+  }
+
+  @Test
+  void enabledModeRejectsRandomOpenRouterFreeRoute() {
+    contextRunner
+        .withPropertyValues(
+            "app.ai.enabled=true",
+            "app.ai.openrouter.api-key=test-openrouter-key",
+            "app.ai.openrouter.primary-model=openrouter/free",
+            "app.ai.openrouter.fallback-model=~deepseek/deepseek-v4-flash-latest")
+        .run(context -> assertThat(context).hasFailed());
   }
 }

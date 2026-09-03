@@ -1,57 +1,39 @@
 package dev.krishnamurti.ai_chess_rivals.ai.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.google.genai.types.HttpOptions;
 import java.time.Duration;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.core.retry.RetryException;
-import org.springframework.core.retry.RetryTemplate;
 
 class AiProviderConfigurationTest {
 
   @Test
-  void groqOptionsUseConfiguredEndpointModelTimeoutAndNoRetries() {
-    OpenAiChatOptions options =
-        AiProviderConfiguration.groqOptions(
-            "test-groq-key",
-            "https://api.groq.com/openai/v1",
-            "test-groq-model",
+  void openRouterOptionsUseSharedEndpointModelTimeoutAndNoRetries() {
+    OpenAiChatOptions primary =
+        AiProviderConfiguration.openRouterOptions(
+            "test-openrouter-key",
+            "https://openrouter.ai/api/v1",
+            "inclusionai/ling-3.0-flash:free",
             Duration.ofSeconds(8));
 
-    assertThat(options.getApiKey()).isEqualTo("test-groq-key");
-    assertThat(options.getBaseUrl()).isEqualTo("https://api.groq.com/openai/v1");
-    assertThat(options.getModel()).isEqualTo("test-groq-model");
-    assertThat(options.getTimeout()).isEqualTo(Duration.ofSeconds(8));
-    assertThat(options.getMaxRetries()).isZero();
-  }
+    assertThat(primary.getApiKey()).isEqualTo("test-openrouter-key");
+    assertThat(primary.getBaseUrl()).isEqualTo("https://openrouter.ai/api/v1");
+    assertThat(primary.getModel()).isEqualTo("inclusionai/ling-3.0-flash:free");
+    assertThat(primary.getTimeout()).isEqualTo(Duration.ofSeconds(8));
+    assertThat(primary.getMaxRetries()).isZero();
 
-  @Test
-  void geminiHttpOptionsUseTwelveSecondTimeoutAndSingleSdkAttempt() {
-    HttpOptions options = AiProviderConfiguration.geminiHttpOptions(Duration.ofSeconds(12));
+    OpenAiChatOptions fallback =
+        AiProviderConfiguration.openRouterOptions(
+            "test-openrouter-key",
+            "https://openrouter.ai/api/v1",
+            "~deepseek/deepseek-v4-flash-latest",
+            Duration.ofSeconds(12));
 
-    assertThat(options.timeout()).contains(12_000);
-    assertThat(options.retryOptions()).isPresent();
-    assertThat(options.retryOptions().orElseThrow().attempts()).contains(1);
-  }
-
-  @Test
-  void springRetryTemplateDoesNotRetryGeminiCall() {
-    RetryTemplate retryTemplate = AiProviderConfiguration.noRetryTemplate();
-    AtomicInteger attempts = new AtomicInteger();
-
-    assertThatThrownBy(
-            () ->
-                retryTemplate.execute(
-                    () -> {
-                      attempts.incrementAndGet();
-                      throw new IllegalStateException("provider failure");
-                    }))
-        .isInstanceOf(RetryException.class);
-
-    assertThat(attempts).hasValue(1);
+    assertThat(fallback.getApiKey()).isEqualTo("test-openrouter-key");
+    assertThat(fallback.getBaseUrl()).isEqualTo("https://openrouter.ai/api/v1");
+    assertThat(fallback.getModel()).isEqualTo("~deepseek/deepseek-v4-flash-latest");
+    assertThat(fallback.getTimeout()).isEqualTo(Duration.ofSeconds(12));
+    assertThat(fallback.getMaxRetries()).isZero();
   }
 }

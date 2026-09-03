@@ -130,7 +130,7 @@ class DialogueGenerationServiceTest {
     assertThat(result.text()).isEqualTo("Efficient—for me.");
     assertThat(result.emotion()).isEqualTo(DialogueEmotion.CALM);
     assertThat(result.reactionType()).isEqualTo(DialogueReactionType.MOVE_REACTION);
-    assertThat(result.source()).isEqualTo(AiResponseSource.GROQ);
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_PRIMARY);
     assertThat(requests).hasSize(1);
     assertThat(requests.getFirst().prompt())
         .contains("Move owner: Blaze")
@@ -220,7 +220,7 @@ class DialogueGenerationServiceTest {
                   "{\"text\":\"Efficient—for me.\",\"emotion\":\"CALM\",\"reactionType\":\""
                       + reactionFor(request.prompt())
                       + "\"}",
-                  AiResponseSource.GROQ);
+                  AiResponseSource.REMOTE_PRIMARY);
             });
   }
 

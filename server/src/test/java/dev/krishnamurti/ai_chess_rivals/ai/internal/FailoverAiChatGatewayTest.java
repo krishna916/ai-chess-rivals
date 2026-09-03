@@ -29,98 +29,103 @@ class FailoverAiChatGatewayTest {
     meterRegistry = new SimpleMeterRegistry();
   }
 
-  private FailoverAiChatGateway gateway(ProviderChatClient groq, ProviderChatClient gemini) {
-    return new FailoverAiChatGateway(groq, gemini, new AiGatewayMetrics(meterRegistry));
+  private FailoverAiChatGateway gateway(
+      ProviderChatClient primary, ProviderChatClient remoteFallback) {
+    return new FailoverAiChatGateway(primary, remoteFallback, new AiGatewayMetrics(meterRegistry));
   }
 
   @Test
-  void returnsGroqResultWithoutCallingGemini() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+  void returnsPrimaryResultWithoutCallingRemoteFallback() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        gateway(returning("groq response", groqCalls), returning("gemini response", geminiCalls));
+        gateway(
+            returning("primary response", primaryCalls),
+            returning("fallback response", remoteFallbackCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
-    assertThat(result.content()).isEqualTo("groq response");
-    assertThat(result.source()).isEqualTo(AiResponseSource.GROQ);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(0);
+    assertThat(result.content()).isEqualTo("primary response");
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_PRIMARY);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(0);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.RESPONSES)
-                .tags("source", "groq", "reason", "primary")
+                .tags("source", "primary", "reason", "primary")
                 .counter()
                 .count())
         .isEqualTo(1.0);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.PROVIDER_DURATION)
-                .tags("provider", "groq", "outcome", "success")
+                .tags("provider", "primary", "outcome", "success")
                 .timer()
                 .count())
         .isEqualTo(1L);
   }
 
   @Test
-  void groqFailureInvokesGeminiExactlyOnce() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+  void primaryFailureInvokesRemoteFallbackExactlyOnce() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        gateway(failing(groqCalls), returning("gemini response", geminiCalls));
+        gateway(failing(primaryCalls), returning("fallback response", remoteFallbackCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
-    assertThat(result.content()).isEqualTo("gemini response");
-    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(result.content()).isEqualTo("fallback response");
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_FALLBACK);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
-                .tags("target", "gemini", "reason", "failure")
+                .tags("target", "remote_fallback", "reason", "failure")
                 .counter()
                 .count())
         .isEqualTo(1.0);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.RESPONSES)
-                .tags("source", "gemini", "reason", "fallback")
+                .tags("source", "remote_fallback", "reason", "fallback")
                 .counter()
                 .count())
         .isEqualTo(1.0);
   }
 
   @Test
-  void invalidGroqResultInvokesGeminiExactlyOnce() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+  void invalidPrimaryResultInvokesRemoteFallbackExactlyOnce() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        gateway(returning("invalid", groqCalls), returning("valid", geminiCalls));
+        gateway(returning("invalid", primaryCalls), returning("valid", remoteFallbackCalls));
     AiResponseValidator validator = "valid"::equals;
 
     AiChatResult result = gateway.generate(REQUEST, validator);
 
     assertThat(result.content()).isEqualTo("valid");
-    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_FALLBACK);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
-                .tags("target", "gemini", "reason", "validation_failure")
+                .tags("target", "remote_fallback", "reason", "validation_failure")
                 .counter()
                 .count())
         .isEqualTo(1.0);
   }
 
   @Test
-  void validatorExceptionAlsoFallsThroughToGemini() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+  void validatorExceptionAlsoFallsThroughToRemoteFallback() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     AtomicInteger validations = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        gateway(returning("groq response", groqCalls), returning("gemini response", geminiCalls));
+        gateway(
+            returning("primary response", primaryCalls),
+            returning("fallback response", remoteFallbackCalls));
     AiResponseValidator validator =
         response -> {
           if (validations.getAndIncrement() == 0) {
@@ -131,27 +136,27 @@ class FailoverAiChatGatewayTest {
 
     AiChatResult result = gateway.generate(REQUEST, validator);
 
-    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_FALLBACK);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
   }
 
   @Test
-  void bothProvidersFailReturnsDeterministicFallback() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
-    FailoverAiChatGateway gateway = gateway(failing(groqCalls), failing(geminiCalls));
+  void bothRemoteAttemptsFailReturnsDeterministicFallback() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
+    FailoverAiChatGateway gateway = gateway(failing(primaryCalls), failing(remoteFallbackCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
     assertThat(result.content()).isEqualTo("deterministic fallback");
     assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
-                .tags("target", "gemini", "reason", "failure")
+                .tags("target", "remote_fallback", "reason", "failure")
                 .counter()
                 .count())
         .isEqualTo(1.0);
@@ -172,58 +177,59 @@ class FailoverAiChatGatewayTest {
   }
 
   @Test
-  void invalidGeminiResultReturnsDeterministicFallback() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
-    FailoverAiChatGateway gateway = gateway(returning("", groqCalls), returning("", geminiCalls));
+  void invalidRemoteFallbackResultReturnsDeterministicFallback() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
+    FailoverAiChatGateway gateway =
+        gateway(returning("", primaryCalls), returning("", remoteFallbackCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
     assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
   }
 
   @Test
-  void groqTimeoutIsObservableAndFallsBackToGemini() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+  void primaryTimeoutIsObservableAndFallsBackToRemoteFallback() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     FailoverAiChatGateway gateway =
-        gateway(timingOut(groqCalls), returning("gemini response", geminiCalls));
+        gateway(timingOut(primaryCalls), returning("fallback response", remoteFallbackCalls));
 
     AiChatResult result = gateway.generate(REQUEST, AiResponseValidator.nonBlank());
 
-    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_FALLBACK);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.PROVIDER_DURATION)
-                .tags("provider", "groq", "outcome", "timeout")
+                .tags("provider", "primary", "outcome", "timeout")
                 .timer()
                 .count())
         .isEqualTo(1L);
     assertThat(
             meterRegistry
                 .get(AiGatewayMetrics.FALLBACK_ACTIVATIONS)
-                .tags("target", "gemini", "reason", "timeout")
+                .tags("target", "remote_fallback", "reason", "timeout")
                 .counter()
                 .count())
         .isEqualTo(1.0);
   }
 
   @Test
-  void malformedGroqStructuredOutputFallsThroughToValidGemini() {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+  void malformedPrimaryStructuredOutputFallsThroughToValidRemoteFallback() {
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     BeanOutputConverter<StructuredDialogue> converter =
         new BeanOutputConverter<>(StructuredDialogue.class);
     FailoverAiChatGateway gateway =
         gateway(
-            returning("not-json", groqCalls),
+            returning("not-json", primaryCalls),
             returning(
                 "{\"text\":\"A measured reply.\",\"emotion\":\"CALM\",\"reactionType\":\"MOVE_REACTION\"}",
-                geminiCalls));
+                remoteFallbackCalls));
 
     AiChatResult result =
         gateway.generate(
@@ -241,19 +247,21 @@ class FailoverAiChatGatewayTest {
             });
 
     assertThat(result.content()).contains("A measured reply.");
-    assertThat(result.source()).isEqualTo(AiResponseSource.GEMINI);
-    assertThat(groqCalls).hasValue(1);
-    assertThat(geminiCalls).hasValue(1);
+    assertThat(result.source()).isEqualTo(AiResponseSource.REMOTE_FALLBACK);
+    assertThat(primaryCalls).hasValue(1);
+    assertThat(remoteFallbackCalls).hasValue(1);
   }
 
   @Test
   void providerLogsContainOnlySafeMetadata(CapturedOutput output) {
-    AtomicInteger groqCalls = new AtomicInteger();
-    AtomicInteger geminiCalls = new AtomicInteger();
+    AtomicInteger primaryCalls = new AtomicInteger();
+    AtomicInteger remoteFallbackCalls = new AtomicInteger();
     AiChatRequest request =
         new AiChatRequest("SECRET_PROMPT_DO_NOT_LOG", "SECRET_FALLBACK_DO_NOT_LOG");
     FailoverAiChatGateway gateway =
-        gateway(returning("SECRET_RAW_RESPONSE_DO_NOT_LOG", groqCalls), failing(geminiCalls));
+        gateway(
+            returning("SECRET_RAW_RESPONSE_DO_NOT_LOG", primaryCalls),
+            failing(remoteFallbackCalls));
 
     AiChatResult result;
     try (MDC.MDCCloseable ignoredMatch = MDC.putCloseable("matchId", "match-123");
@@ -264,9 +272,9 @@ class FailoverAiChatGatewayTest {
 
     assertThat(result.source()).isEqualTo(AiResponseSource.DETERMINISTIC_FALLBACK);
     assertThat(output.getAll())
-        .contains("provider=groq")
+        .contains("provider=primary")
         .contains("outcome=validation_failure")
-        .contains("target=gemini")
+        .contains("target=remote_fallback")
         .contains("source=deterministic_fallback")
         .contains("matchId=match-123")
         .contains("triggerType=MOVE")

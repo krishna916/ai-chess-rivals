@@ -118,7 +118,7 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void persistsBeforePublishingNewDialogue() {
-    GeneratedDialogue generated = generated(AiResponseSource.GROQ);
+    GeneratedDialogue generated = generated(AiResponseSource.REMOTE_PRIMARY);
     PersistedDialogue saved = persisted(1);
     when(dialogueGenerator.generateMove(any())).thenReturn(Optional.of(generated));
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated))
@@ -133,7 +133,7 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void doesNotPublishWhenPersistenceReportsDuplicate() {
-    GeneratedDialogue generated = generated(AiResponseSource.GROQ);
+    GeneratedDialogue generated = generated(AiResponseSource.REMOTE_PRIMARY);
     when(dialogueGenerator.generateMove(any())).thenReturn(Optional.of(generated));
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated))
         .thenReturn(Optional.empty());
@@ -192,7 +192,7 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void persistenceFailureDoesNotEscapeOrPublish() {
-    GeneratedDialogue generated = generated(AiResponseSource.GROQ);
+    GeneratedDialogue generated = generated(AiResponseSource.REMOTE_PRIMARY);
     when(dialogueGenerator.generateMove(any())).thenReturn(Optional.of(generated));
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.MOVE, 1, generated))
         .thenThrow(new IllegalStateException("database"));
@@ -204,7 +204,7 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void staleAuthorityDiscardsGeneratedLineBeforePersistence() {
-    GeneratedDialogue generated = generated(AiResponseSource.GROQ);
+    GeneratedDialogue generated = generated(AiResponseSource.REMOTE_PRIMARY);
     AtomicBoolean authoritative = new AtomicBoolean(true);
     when(dialogueGenerator.generateMove(any()))
         .thenAnswer(
@@ -221,8 +221,8 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void gameStartPublishesOnlyNewlyPersistedSpeaker() {
-    GeneratedDialogue white = generated(AiResponseSource.GROQ, "blaze");
-    GeneratedDialogue black = generated(AiResponseSource.GEMINI, "vesper");
+    GeneratedDialogue white = generated(AiResponseSource.REMOTE_PRIMARY, "blaze");
+    GeneratedDialogue black = generated(AiResponseSource.REMOTE_FALLBACK, "vesper");
     PersistedDialogue savedBlack = persisted(4);
     when(dialogueGenerator.generateStart(any())).thenReturn(List.of(white, black));
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.GAME_START, 0, white))
@@ -238,8 +238,8 @@ class MatchDialogueCoordinatorTest {
 
   @Test
   void gameEndUsesResultOutcomesAndPublishesOnlyNewlyPersistedSpeaker() {
-    GeneratedDialogue winner = generated(AiResponseSource.GROQ, "blaze");
-    GeneratedDialogue loser = generated(AiResponseSource.GROQ, "vesper");
+    GeneratedDialogue winner = generated(AiResponseSource.REMOTE_PRIMARY, "blaze");
+    GeneratedDialogue loser = generated(AiResponseSource.REMOTE_PRIMARY, "vesper");
     PersistedDialogue savedLoser = persisted(5);
     when(dialogueGenerator.generateEnd(any())).thenReturn(List.of(winner, loser));
     when(historyStore.persistIfAbsent(MATCH_ID, DialogueTriggerType.GAME_END, 12, winner))
@@ -317,7 +317,7 @@ class MatchDialogueCoordinatorTest {
         "Persisted line",
         DialogueEmotion.CONFIDENT,
         DialogueReactionType.MOVE_REACTION,
-        AiResponseSource.GROQ,
+        AiResponseSource.REMOTE_PRIMARY,
         Instant.parse("2026-08-16T00:00:00Z"));
   }
 }

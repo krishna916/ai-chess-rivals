@@ -45,8 +45,8 @@ final class AiGatewayMetrics {
 
   private static String sourceTag(AiResponseSource source) {
     return switch (source) {
-      case GROQ -> "groq";
-      case GEMINI -> "gemini";
+      case REMOTE_PRIMARY -> "primary";
+      case REMOTE_FALLBACK -> "remote_fallback";
       case DETERMINISTIC_FALLBACK -> "deterministic_fallback";
     };
   }

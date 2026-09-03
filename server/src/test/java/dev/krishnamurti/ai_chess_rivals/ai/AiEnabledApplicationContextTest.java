@@ -19,10 +19,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest(
     properties = {
       "app.ai.enabled=true",
-      "app.ai.groq.api-key=test-groq-key",
-      "app.ai.groq.model=test-groq-model",
-      "app.ai.gemini.api-key=test-gemini-key",
-      "app.ai.gemini.model=test-gemini-model",
+      "app.ai.openrouter.api-key=test-openrouter-key",
+      "app.ai.openrouter.primary-model=inclusionai/ling-3.0-flash:free",
+      "app.ai.openrouter.fallback-model=~deepseek/deepseek-v4-flash-latest",
       "app.owner.control-token=test-owner-token",
       "spring.autoconfigure.exclude="
           + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
@@ -43,9 +42,9 @@ class AiEnabledApplicationContextTest {
   @Test
   void enabledAiModeUsesOnlyExplicitProviderClients() {
     assertThat(context.getBeansOfType(ChatModel.class))
-        .containsOnlyKeys("groqChatModel", "geminiChatModel");
+        .containsOnlyKeys("openRouterPrimaryChatModel", "openRouterFallbackChatModel");
     assertThat(context.getBeansOfType(ChatClient.class))
-        .containsOnlyKeys("groqChatClient", "geminiChatClient");
+        .containsOnlyKeys("openRouterPrimaryChatClient", "openRouterFallbackChatClient");
     assertThat(context.getBeansOfType(ChatClient.Builder.class)).isEmpty();
     assertThat(context.getBeansOfType(AiChatGateway.class)).hasSize(1);
     assertThat(environment.getProperty("spring.ai.chat.observations.log-prompt", Boolean.class))

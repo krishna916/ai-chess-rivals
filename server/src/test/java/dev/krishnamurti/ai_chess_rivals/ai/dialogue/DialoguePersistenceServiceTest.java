@@ -123,7 +123,7 @@ class DialoguePersistenceServiceTest {
         text,
         DialogueEmotion.CONFIDENT,
         DialogueReactionType.MOVE_REACTION,
-        AiResponseSource.GROQ);
+        AiResponseSource.REMOTE_PRIMARY);
   }
 
   private static PersonalityPromptProfile profile(String key, String displayName) {
@@ -147,7 +147,7 @@ class DialoguePersistenceServiceTest {
             "Line " + id,
             DialogueEmotion.CONFIDENT,
             DialogueReactionType.MOVE_REACTION,
-            AiResponseSource.GROQ,
+            AiResponseSource.REMOTE_PRIMARY,
             Instant.parse("2026-08-16T00:00:00Z").plusSeconds(id));
     assignId(entity, id);
     return entity;

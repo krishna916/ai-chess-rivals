@@ -22,11 +22,12 @@ class AiGatewayConfiguration {
   @Bean
   @ConditionalOnProperty(prefix = "app.ai", name = "enabled", havingValue = "true")
   AiChatGateway enabledAiChatGateway(
-      @Qualifier("groqProviderChatClient") ProviderChatClient groq,
-      @Qualifier("geminiProviderChatClient") ProviderChatClient gemini,
+      @Qualifier("openRouterPrimaryProviderChatClient") ProviderChatClient primary,
+      @Qualifier("openRouterFallbackProviderChatClient") ProviderChatClient remoteFallback,
       AiGatewayMetrics metrics) {
-    log.info("AI gateway topology: enabled (Groq -> Gemini)");
-    return new FailoverAiChatGateway(groq, gemini, metrics);
+    log.info(
+        "AI gateway topology: enabled (OpenRouter primary -> OpenRouter fallback -> deterministic fallback)");
+    return new FailoverAiChatGateway(primary, remoteFallback, metrics);
   }
 
   @Bean

@@ -82,6 +82,20 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aichessrivals_it
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secretpassword
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aichessrivals_it"
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -201,10 +215,9 @@ jobs:
             -e SPRING_FLYWAY_PASSWORD=secretpassword \
             -e OWNER_CONTROL_TOKEN=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
             -e AI_ENABLED=true \
-            -e AI_GROQ_API_KEY=ci-runtime-groq-key \
-            -e AI_GROQ_MODEL=ci-runtime-groq-model \
-            -e AI_GEMINI_API_KEY=ci-runtime-gemini-key \
-            -e AI_GEMINI_MODEL=ci-runtime-gemini-model \
+            -e AI_OPENROUTER_API_KEY=ci-runtime-openrouter-key \
+            -e AI_OPENROUTER_PRIMARY_MODEL=ci-runtime-primary:free \
+            -e AI_OPENROUTER_FALLBACK_MODEL=ci-runtime-fallback \
             ai-chess-rivals:native-ci
 
           for attempt in {1..60}; do
@@ -228,7 +241,7 @@ jobs:
           log_file="/tmp/native-ai-app.log"
           docker logs "$app" > "$log_file" 2>&1
 
-          enabled_marker="AI gateway topology: enabled (Groq -> Gemini)"
+          enabled_marker="AI gateway topology: enabled (OpenRouter primary -> OpenRouter fallback -> deterministic fallback)"
           disabled_marker="AI gateway topology: disabled"
 
           if ! grep -Fq "$enabled_marker" "$log_file"; then
@@ -248,8 +261,8 @@ jobs:
           fi
 
           image_env="$(docker image inspect ai-chess-rivals:native-ci --format '{{range .Config.Env}}{{println .}}{{end}}')"
-          if grep -Eq '^AI_(GROQ|GEMINI)_(API_KEY|MODEL)=' <<< "$image_env"; then
-            echo "Provider credential/model environment values are baked into the final image"
+          if grep -Eq '^AI_OPENROUTER_(API_KEY|PRIMARY_MODEL|FALLBACK_MODEL)=' <<< "$image_env"; then
+            echo "OpenRouter credential/model environment values are baked into the final image"
             exit 1
           fi
 

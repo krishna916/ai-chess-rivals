@@ -30,6 +30,7 @@
 		<java.version>25</java.version>
 		<error-prone.version>2.50.0</error-prone.version>
 		<maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+		<maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
 		<spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
 		<spotless-maven-plugin.version>3.8.0</spotless-maven-plugin.version>
 		<spring-modulith.version>2.1.0</spring-modulith.version>
@@ -82,10 +83,6 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-openai</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-starter-model-google-genai</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>joda-time</groupId>
@@ -252,6 +249,25 @@
 								</requireMavenVersion>
 							</rules>
 						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<version>${maven-failsafe-plugin.version}</version>
+				<executions>
+					<execution>
+						<id>integration-test</id>
+						<goals>
+							<goal>integration-test</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>verify</id>
+						<goals>
+							<goal>verify</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>

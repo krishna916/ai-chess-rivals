@@ -1,71 +1,75 @@
 package dev.krishnamurti.ai_chess_rivals.ai.internal;
 
-import com.google.genai.Client;
-import com.google.genai.types.HttpOptions;
-import com.google.genai.types.HttpRetryOptions;
 import dev.krishnamurti.ai_chess_rivals.ai.config.AiProperties;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.google.genai.GoogleGenAiChatModel;
-import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.retry.RetryPolicy;
-import org.springframework.core.retry.RetryTemplate;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "app.ai", name = "enabled", havingValue = "true")
 class AiProviderConfiguration {
 
-  @Bean("groqChatModel")
-  ChatModel groqChatModel(AiProperties properties, ObservationRegistry observationRegistry) {
-    AiProperties.Groq groq = properties.groq();
+  @Bean("openRouterPrimaryChatModel")
+  ChatModel openRouterPrimaryChatModel(
+      AiProperties properties, ObservationRegistry observationRegistry) {
+    AiProperties.OpenRouter openrouter = properties.openrouter();
     return OpenAiChatModel.builder()
-        .options(groqOptions(groq.apiKey(), groq.baseUrl(), groq.model(), groq.timeout()))
+        .options(
+            openRouterOptions(
+                openrouter.apiKey(),
+                openrouter.baseUrl(),
+                openrouter.primaryModel(),
+                openrouter.primaryTimeout()))
         .observationRegistry(observationRegistry)
         .build();
   }
 
-  @Bean("groqChatClient")
-  ChatClient groqChatClient(
-      @Qualifier("groqChatModel") ChatModel chatModel,
+  @Bean("openRouterPrimaryChatClient")
+  ChatClient openRouterPrimaryChatClient(
+      @Qualifier("openRouterPrimaryChatModel") ChatModel chatModel,
       DialogueBoundaryAdvisor dialogueBoundaryAdvisor) {
     return ChatClient.builder(chatModel).defaultAdvisors(dialogueBoundaryAdvisor).build();
   }
 
-  @Bean("groqProviderChatClient")
-  ProviderChatClient groqProviderChatClient(@Qualifier("groqChatClient") ChatClient chatClient) {
+  @Bean("openRouterPrimaryProviderChatClient")
+  ProviderChatClient openRouterPrimaryProviderChatClient(
+      @Qualifier("openRouterPrimaryChatClient") ChatClient chatClient) {
     return prompt -> chatClient.prompt().user(prompt).call().content();
   }
 
-  @Bean("geminiChatModel")
-  ChatModel geminiChatModel(AiProperties properties, ObservationRegistry observationRegistry) {
-    AiProperties.Gemini gemini = properties.gemini();
-    Client client =
-        Client.builder()
-            .apiKey(gemini.apiKey())
-            .httpOptions(geminiHttpOptions(gemini.timeout()))
-            .build();
-
-    return GoogleGenAiChatModel.builder()
-        .genAiClient(client)
-        .options(GoogleGenAiChatOptions.builder().model(gemini.model()).build())
-        .retryTemplate(noRetryTemplate())
+  @Bean("openRouterFallbackChatModel")
+  ChatModel openRouterFallbackChatModel(
+      AiProperties properties, ObservationRegistry observationRegistry) {
+    AiProperties.OpenRouter openrouter = properties.openrouter();
+    return OpenAiChatModel.builder()
+        .options(
+            openRouterOptions(
+                openrouter.apiKey(),
+                openrouter.baseUrl(),
+                openrouter.fallbackModel(),
+                openrouter.fallbackTimeout()))
         .observationRegistry(observationRegistry)
         .build();
   }
 
-  @Bean("geminiChatClient")
-  ChatClient geminiChatClient(
-      @Qualifier("geminiChatModel") ChatModel chatModel,
+  @Bean("openRouterFallbackChatClient")
+  ChatClient openRouterFallbackChatClient(
+      @Qualifier("openRouterFallbackChatModel") ChatModel chatModel,
       DialogueBoundaryAdvisor dialogueBoundaryAdvisor) {
     return ChatClient.builder(chatModel).defaultAdvisors(dialogueBoundaryAdvisor).build();
+  }
+
+  @Bean("openRouterFallbackProviderChatClient")
+  ProviderChatClient openRouterFallbackProviderChatClient(
+      @Qualifier("openRouterFallbackChatClient") ChatClient chatClient) {
+    return prompt -> chatClient.prompt().user(prompt).call().content();
   }
 
   @Bean
@@ -73,13 +77,7 @@ class AiProviderConfiguration {
     return new DialogueBoundaryAdvisor();
   }
 
-  @Bean("geminiProviderChatClient")
-  ProviderChatClient geminiProviderChatClient(
-      @Qualifier("geminiChatClient") ChatClient chatClient) {
-    return prompt -> chatClient.prompt().user(prompt).call().content();
-  }
-
-  static OpenAiChatOptions groqOptions(
+  static OpenAiChatOptions openRouterOptions(
       String apiKey, String baseUrl, String model, Duration timeout) {
     return OpenAiChatOptions.builder()
         .apiKey(apiKey)
@@ -88,16 +86,5 @@ class AiProviderConfiguration {
         .timeout(timeout)
         .maxRetries(0)
         .build();
-  }
-
-  static HttpOptions geminiHttpOptions(Duration timeout) {
-    return HttpOptions.builder()
-        .timeout(Math.toIntExact(timeout.toMillis()))
-        .retryOptions(HttpRetryOptions.builder().attempts(1).build())
-        .build();
-  }
-
-  static RetryTemplate noRetryTemplate() {
-    return new RetryTemplate(RetryPolicy.builder().maxRetries(0).build());
   }
 }

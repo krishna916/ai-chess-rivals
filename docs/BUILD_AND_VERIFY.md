@@ -30,8 +30,8 @@ Pull requests targeting `master` and pushes to `master` run the `CI` workflow. A
 
 - `Backend verification` runs for `server/**`, `scripts/**`, or CI workflow changes, prepares the
   pinned Linux Stockfish binary with `./server/mvnw -f server/pom.xml generate-resources -Plinux`,
-  sets `STOCKFISH_PATH` to that executable, and executes `./server/mvnw -f server/pom.xml verify`
-  with Java 25.
+  starts PostgreSQL 17 on `localhost:55433` for the database integration tests, sets `STOCKFISH_PATH`
+  to that executable, and executes `./server/mvnw -f server/pom.xml verify` with Java 25.
 - `Frontend verification` runs for `client/**`, `scripts/**`, or CI workflow changes, installs
   dependencies with `npm ci`, and executes `npm run verify` with Node.js 22.
 - `Native image verification` runs only for `server/**` or CI workflow changes, only after backend
@@ -42,9 +42,10 @@ Frontend-only changes therefore do not compile the GraalVM native image. Documen
 changes still create the lightweight `Detect changes` check, while irrelevant backend/frontend
 jobs are reported as skipped.
 
-The automated verification suite requires no Groq/Gemini credentials and does not start
-PostgreSQL. AI remains disabled by default in tests, and provider tests must use local stubs/fakes
-rather than real API calls.
+The automated verification suite requires no OpenRouter credentials. The backend CI job starts
+PostgreSQL 17 on `localhost:55433` so Maven Failsafe executes the database integration tests; AI
+remains disabled by default in tests, and provider tests use local stubs/fakes rather than real API
+calls.
 
 The native CI job is verification only. It does not publish an image, log into GHCR, or deploy to
 Render; image publication and deployment remain separate work.
@@ -58,11 +59,11 @@ disposable PostgreSQL 17 container using fake runtime provider values.
 `AiGatewayConfiguration` emits a small application-owned startup marker for the topology that was
 constructed. After the native application becomes healthy, CI captures its container logs,
 requires the AI-enabled gateway marker, and requires the AI-disabled gateway marker to be absent.
-Because construction of the enabled gateway requires both qualified provider clients to resolve,
+Because construction of the enabled gateway requires both qualified OpenRouter clients to resolve,
 this verifies the enabled provider/gateway chain without depending on Spring Framework internal
 bean-creation logs or exposing an additional Actuator endpoint. CI also verifies that provider
 key/model environment values are not present in the final image configuration. The check performs
-no real Groq/Gemini request and requires no provider secret.
+no real OpenRouter request and requires no provider secret.
 
 Normal JVM verification continues to use the default AI-disabled mode. For Docker Compose,
 changing `AI_ENABLED` requires rebuilding the backend because the native bean topology is selected
@@ -86,14 +87,17 @@ server\mvnw.cmd -f server\pom.xml verify
 ```
 
 The verify lifecycle enforces Java 25 and Maven 3.9+, checks Java formatting, compiles with
-Error Prone, runs tests (including Spring Modulith structure verification), and runs SpotBugs.
+Error Prone, runs unit tests (including Spring Modulith structure verification), runs the `*IT`
+PostgreSQL integration tests through Maven Failsafe, and runs SpotBugs. Start PostgreSQL 17 on
+`localhost:55433` before running the full lifecycle locally.
 Apply Java formatting with `server\mvnw.cmd -f server\pom.xml spotless:apply` on Windows or
 `./server/mvnw -f server/pom.xml spotless:apply` on POSIX systems.
 
-### Optional dialogue persistence PostgreSQL integration test
+### PostgreSQL integration tests
 
-The explicit `DialoguePersistencePostgresIT` is excluded from the normal Surefire run. Run it
-against an isolated PostgreSQL 17 container and keep the normal verifier independent of Docker:
+The explicit `DialoguePersistencePostgresIT` and `AiResponseSourceMigrationPostgresIT` are excluded
+from the normal Surefire run and included by Maven Failsafe during `verify`. Run the full lifecycle
+against an isolated PostgreSQL 17 container:
 
 ```powershell
 docker run --name ai-chess-rivals-dialogue-it --rm -d `
@@ -101,14 +105,16 @@ docker run --name ai-chess-rivals-dialogue-it --rm -d `
   -e POSTGRES_PASSWORD=secretpassword `
   -p 55433:5432 postgres:17-alpine
 
-server\mvnw.cmd -f server\pom.xml -Dtest=DialoguePersistencePostgresIT test
+server\mvnw.cmd -f server\pom.xml verify
 
 docker stop ai-chess-rivals-dialogue-it
 ```
 
-The test pins both datasource and Flyway URLs to `localhost:55433`, validates Flyway V1–V4 and
-Hibernate schema mapping, and proves dialogue idempotency, chronological history, and last-four
-context behavior. Do not point it at the normal development database or volume.
+The tests pin both datasource and Flyway URLs to `localhost:55433`, validate Flyway V1–V5 and
+Hibernate schema mapping, prove dialogue idempotency, chronological history, and last-four context
+behavior, and verify the V4-to-V5 response-source migration. The migration test creates a disposable database,
+migrates through V4, seeds legacy Groq/Gemini rows, applies V5, and asserts the provider-neutral
+values. Do not point either test at the normal development database or volume.
 
 ## Frontend
 
@@ -128,7 +134,7 @@ chaining.
 ## Phase 2 AI observability and resilience verification
 
 The Phase 2 automated tests are credential-safe. They use local provider stubs and deterministic
-exceptions, never real Groq or Gemini requests, and do not log prompts, completions, personality
+exceptions, never real OpenRouter requests, and do not log prompts, completions, personality
 text, or API keys. Run the normal repository verifier with AI disabled before any manual provider
 check:
 
@@ -152,11 +158,22 @@ $env:MATCH_COOLDOWN = "0s"
 value with a minimum of one millisecond; six plies are enough for a short acceptance match while
 still exercising start dialogue and move-reaction context.
 
-When exercising real dialogue generation, set `AI_ENABLED=true` and provide
-`AI_GROQ_API_KEY`, `AI_GROQ_MODEL`, `AI_GEMINI_API_KEY`, and `AI_GEMINI_MODEL` through an ignored
-local environment file or the process environment. Never paste those values into this document,
-the terminal transcript, issue comments, or application logs. The configured provider timeouts are
-8 seconds for Groq and 12 seconds for Gemini; failover is bounded and does not retry a provider.
+When exercising real dialogue generation, set `AI_ENABLED=true` and provide the following through
+an ignored local environment file or the process environment. Never paste the key into this
+document, the terminal transcript, issue comments, or application logs:
+
+```text
+AI_OPENROUTER_API_KEY=<secret supplied only in the local shell or deployment secret store>
+AI_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+AI_OPENROUTER_PRIMARY_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+AI_OPENROUTER_FALLBACK_MODEL=~deepseek/deepseek-v4-flash-latest
+AI_OPENROUTER_PRIMARY_TIMEOUT=8s
+AI_OPENROUTER_FALLBACK_TIMEOUT=12s
+```
+
+The primary must be a specific `:free` model, not `openrouter/free`. The remote flow is bounded:
+one primary attempt, exactly one remote-fallback attempt, then deterministic personality-specific
+fallback. There is no same-model retry.
 
 Inspect the management endpoint while a match is running:
 
@@ -168,28 +185,24 @@ http://localhost:8081/actuator/metrics/ai.gateway.responses
 ```
 
 The metrics use only low-cardinality provider, outcome, target, source, and reason tags. Confirm
-that a successful primary response records `groq` plus `success` and `primary`; a provider failure
-records the corresponding failure or timeout and a Gemini or deterministic-fallback activation;
-and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`.
+that a successful primary response records `primary` plus `success` and `primary`; a remote failure
+records the corresponding failure or timeout and a `remote_fallback` or deterministic-fallback
+activation; and an AI-disabled match records `deterministic_fallback` plus `ai_disabled`.
 
-To exercise the Groq-to-Gemini path without sending a request to Groq, set the Groq base URL to a
-closed loopback port. Keep the Groq values syntactically valid but non-secret, and provide a valid
-Gemini configuration only when that provider request is authorized for the local acceptance run:
+To exercise the controlled remote-fallback path, keep the real OpenRouter key and fallback model,
+but set the primary model to an intentionally invalid ID that still satisfies startup policy:
 
 ```powershell
 $env:AI_ENABLED = "true"
-$env:AI_GROQ_API_KEY = "dummy-groq-key"
-$env:AI_GROQ_MODEL = "dummy-groq-model"
-$env:AI_GROQ_BASE_URL = "http://127.0.0.1:9/v1"
-# Set AI_GEMINI_API_KEY and AI_GEMINI_MODEL from the ignored local environment only.
-$groqPortOpen = Test-NetConnection -ComputerName 127.0.0.1 -Port 9 -InformationLevel Quiet -WarningAction SilentlyContinue
-if ($groqPortOpen) { throw "Port 9 is occupied; choose another closed loopback port before continuing." }
+$env:AI_OPENROUTER_PRIMARY_MODEL = "invalid/forced-primary-failure:free"
+$env:AI_OPENROUTER_FALLBACK_MODEL = "~deepseek/deepseek-v4-flash-latest"
+# Keep AI_OPENROUTER_API_KEY in the ignored local environment only.
 ```
 
-The preflight aborts if port 9 is occupied. When it is closed, the Groq connection is expected to
-refuse immediately, so the observed result should be a bounded Gemini attempt followed by either a
-Gemini response or the deterministic fallback. Do not use a production key against an uncontrolled
-endpoint.
+Restart the backend, start one short match, and confirm one `primary` failure activates
+`remote_fallback` exactly once, followed by a successful remote-fallback response and continued
+dialogue/match progress. Restore the real primary model immediately after the run. Do not use a
+production key against an uncontrolled endpoint.
 
 For the manual Phase 2 acceptance pass, record only observations that were actually made:
 
@@ -199,7 +212,8 @@ For the manual Phase 2 acceptance pass, record only observations that were actua
 - [ ] Disconnect and reconnect restore the authoritative state without duplicate dialogue or moves.
 - [ ] Stopping and resuming a match preserves the latest valid board and dialogue ordering.
 - [ ] An AI-disabled match remains playable with deterministic fallback dialogue and response metrics.
-- [ ] A controlled Groq failure activates Gemini or deterministic fallback and emits safe metrics/logs.
+- [x] A controlled primary failure activated the bounded remote-fallback/deterministic-fallback path and emitted
+      safe metrics/logs.
 - [ ] No prompt, completion, personality text, or credential appears in captured application output.
 
 The dated acceptance record below this section must list the environment, checks performed, and any
@@ -233,8 +247,50 @@ but they do not count as browser or real-provider observations.
 - [x] Stop/resume browser evidence showed Blaze vs Vesper stopped after four moves, then resumed
       the same match ID from move four and continued live play.
 - [ ] Random-rivalry selection was not exercised through the owner-controls UI in this pass.
-- [ ] Real-provider and controlled Groq-failure checks were not run; no provider request was made
+- [ ] Real-provider and controlled OpenRouter-failure checks were not run; no provider request was made
       and local credentials were not inspected or exposed.
+
+### Acceptance record — 2026-08-23
+
+#### Automated evidence
+
+- [x] The focused backend regression slice passed: 46 tests, including OpenRouter topology,
+      provider-neutral response sources, failover metrics, runtime hints, pacing, and dialogue
+      generation.
+- [x] The root verifier passed with `AI_ENABLED=false`: backend tests, Spotless, SpotBugs, frontend
+      formatting, typecheck, lint, 83 tests, and production build.
+- [x] PostgreSQL 17 was started in the documented disposable container;
+      `DialoguePersistencePostgresIT` passed 2 persistence tests and
+      `AiResponseSourceMigrationPostgresIT` passed the V4-to-V5 legacy Groq/Gemini conversion test.
+- [ ] The local native-image Docker build did not produce a result; Docker Desktop terminated the
+      build stream with `rpc error: code = Unavailable desc = error reading from server: EOF` during
+      GraalVM compilation. No source-level native-image failure was reported.
+- [x] GitHub Actions run `32650368156` passed backend, frontend, and native-image verification,
+      including the production native image build, AI-enabled topology startup, and no-baked-provider
+      environment checks.
+
+#### Manual and runtime evidence
+
+- [x] A real OpenRouter six-ply match ran with primary
+      `nvidia/nemotron-3-ultra-550b-a55b:free` and remote fallback
+      `~deepseek/deepseek-v4-flash-latest`. The match completed six moves and persisted eight dialogue
+      lines, including four `REMOTE_PRIMARY`, three `REMOTE_FALLBACK`, and one `DETERMINISTIC_FALLBACK`
+      source. An isolated primary-only request also returned HTTP 200 with usable content from the
+      configured primary model.
+- [x] The controlled primary-failure path used the process-only override
+      `invalid/forced-primary-failure:free` with the real fallback configuration. Match
+      `6149e3e7-317d-4896-a97a-d511b7d02984` completed one ply; one remote-fallback response and
+      deterministic fallback responses were persisted, with fresh counters showing one
+      `remote_fallback` response, three `deterministic_fallback` responses, and five primary failures.
+      The override was not written to `.env`.
+- [x] Automated fallback tests covered the one-shot remote-fallback and deterministic-fallback paths,
+      including low-cardinality source metrics and safe captured-output assertions.
+- [ ] Browser match, refresh/reconnect, stop/resume, and normal 7–12 second pacing were not observed
+      in this pass. The real-provider runs used `0s` pacing only as verification acceleration; the
+      documented 7–12 second production defaults were unchanged.
+- [x] No secret, prompt, completion, or personality text was exposed by the automated verification
+      output or the recorded runtime evidence; the ignored local environment was inspected by variable
+      names only.
 
 ## Phase 1 end-to-end acceptance
 

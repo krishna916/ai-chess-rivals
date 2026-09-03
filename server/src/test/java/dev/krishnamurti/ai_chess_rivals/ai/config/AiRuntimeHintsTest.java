@@ -20,12 +20,7 @@ class AiRuntimeHintsTest {
         .isTrue();
     assertThat(
             RuntimeHintsPredicates.reflection()
-                .onMethodInvocation(AiProperties.Groq.class, "isTimeoutPositive")
-                .test(hints))
-        .isTrue();
-    assertThat(
-            RuntimeHintsPredicates.reflection()
-                .onMethodInvocation(AiProperties.Gemini.class, "isTimeoutWithinHttpOptionsRange")
+                .onMethodInvocation(AiProperties.OpenRouter.class, "areTimeoutsPositive")
                 .test(hints))
         .isTrue();
   }
@@ -36,17 +31,14 @@ class AiRuntimeHintsTest {
     new AiRuntimeHints().registerHints(hints, getClass().getClassLoader());
 
     assertFieldAccess(hints, AiProperties.class, "enabled");
-    assertFieldAccess(hints, AiProperties.class, "groq");
-    assertFieldAccess(hints, AiProperties.class, "gemini");
+    assertFieldAccess(hints, AiProperties.class, "openrouter");
 
-    assertFieldAccess(hints, AiProperties.Groq.class, "apiKey");
-    assertFieldAccess(hints, AiProperties.Groq.class, "baseUrl");
-    assertFieldAccess(hints, AiProperties.Groq.class, "model");
-    assertFieldAccess(hints, AiProperties.Groq.class, "timeout");
-
-    assertFieldAccess(hints, AiProperties.Gemini.class, "apiKey");
-    assertFieldAccess(hints, AiProperties.Gemini.class, "model");
-    assertFieldAccess(hints, AiProperties.Gemini.class, "timeout");
+    assertFieldAccess(hints, AiProperties.OpenRouter.class, "apiKey");
+    assertFieldAccess(hints, AiProperties.OpenRouter.class, "baseUrl");
+    assertFieldAccess(hints, AiProperties.OpenRouter.class, "primaryModel");
+    assertFieldAccess(hints, AiProperties.OpenRouter.class, "fallbackModel");
+    assertFieldAccess(hints, AiProperties.OpenRouter.class, "primaryTimeout");
+    assertFieldAccess(hints, AiProperties.OpenRouter.class, "fallbackTimeout");
   }
 
   private static void assertFieldAccess(RuntimeHints hints, Class<?> type, String fieldName) {
