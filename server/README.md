@@ -287,10 +287,43 @@ Connect to the PostgreSQL instance using any database client (such as DBeaver, p
   - The PostgreSQL database runs as a container (`postgres:17-alpine`) inside the same Docker Compose network.
   - Flyway migrations are run against the local container database.
 - **Production (Render + Neon)**:
-  - The backend runs as a single Docker container on **Render** (built using the same `Dockerfile`).
+  - GitHub Actions builds and verifies `server/Dockerfile` for `linux/amd64`, publishes the verified
+    image to GHCR, and Render runs an image-backed web service that pulls the prebuilt image.
+    Render does not compile the GraalVM native image.
   - The database is hosted on **Neon PostgreSQL** as a serverless instance.
   - The PostgreSQL service container is **not** deployed to Render.
   - Transitioning from local development to production requires **only configuration changes** (no code changes or Spring profile changes).
+
+### Production image deployment
+
+The canonical production image is:
+
+```text
+ghcr.io/krishna916/ai-chess-rivals-server:latest
+```
+
+The automated deployment sequence is:
+
+1. Relevant server or CI changes reach `master`.
+2. CI verifies the backend and native runtime.
+3. CI pushes the full-commit-SHA and `latest` tags to GHCR.
+4. CI invokes `RENDER_DEPLOY_HOOK_URL` with `imgURL` pointing to the full-commit-SHA tag.
+5. Render pulls the prebuilt image and starts it with runtime secrets and configuration supplied in Render.
+
+The GHCR package is intentionally public so Render can pull it without registry credentials. The
+Render deploy hook is stored only as the GitHub Actions repository secret
+`RENDER_DEPLOY_HOOK_URL`. Automated deploys use the immutable commit-SHA tag even though `latest`
+remains the configured image reference for manual deploys.
+
+The image contains no OpenRouter key or runtime model values; those remain in Render. Keep one
+backend instance because match state, cooldown state, and accepted-start counters are held in
+memory. Leave Render's HTTP health-check path unset and use its default TCP health check:
+`/actuator/health` is exposed on the separate management port `8081`, not the public application
+port.
+
+Keep the old Git-backed Render service active until the image-backed service passes REST and
+WebSocket acceptance and production traffic has been switched successfully. Suspend it before
+removing it so the existing frontend configuration can be rolled back if necessary.
 
 ### Native AI build/runtime contract
 
@@ -325,9 +358,11 @@ committed files:
 - `SPRING_FLYWAY_URL`: (Same as `SPRING_DATASOURCE_URL`)
 - `SPRING_FLYWAY_USER`: (Same as `SPRING_DATASOURCE_USERNAME`)
 - `SPRING_FLYWAY_PASSWORD`: (Same as `SPRING_DATASOURCE_PASSWORD`)
+- `SPRING_JPA_HIBERNATE_DDL_AUTO`: `validate` for production
 - `OWNER_CONTROL_TOKEN`: (A generated 32-byte hex token; store the same value in a password manager)
 - `MATCH_COOLDOWN`: `60s` (or the desired Spring duration)
 - `MATCH_DAILY_START_LIMIT`: `12` (or the desired positive limit)
+- `APP_WEBSOCKET_ALLOWED_ORIGIN`: (The production frontend origin)
 - `AI_ENABLED`: `true` for the production AI-enabled native image
 - `AI_OPENROUTER_API_KEY`: (OpenRouter API key stored as a Render secret)
 - `AI_OPENROUTER_BASE_URL`: `https://openrouter.ai/api/v1`
@@ -335,4 +370,8 @@ committed files:
 - `AI_OPENROUTER_FALLBACK_MODEL`: `~deepseek/deepseek-v4-flash-latest` or another approved low-cost model
 - `AI_OPENROUTER_PRIMARY_TIMEOUT`: `8s`
 - `AI_OPENROUTER_FALLBACK_TIMEOUT`: `12s`
+
+If the existing Render service explicitly sets `SERVER_PORT`, `STOCKFISH_PATH`, Stockfish tuning,
+or game pacing variables, copy those values unchanged to the image-backed service. Do not invent
+new production values merely because `.env.example` lists optional settings.
 

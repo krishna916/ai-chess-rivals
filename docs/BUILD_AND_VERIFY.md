@@ -47,8 +47,19 @@ PostgreSQL 17 on `localhost:55433` so Maven Failsafe executes the database integ
 remains disabled by default in tests, and provider tests use local stubs/fakes rather than real API
 calls.
 
-The native CI job is verification only. It does not publish an image, log into GHCR, or deploy to
-Render; image publication and deployment remain separate work.
+Pull requests remain verification-only: the native job builds and boots the production image but
+does not authenticate to a registry, publish an image, or call Render.
+
+For relevant pushes to `master`, the same native job first completes the existing build/runtime
+verification, then publishes that exact loaded image to:
+
+- `ghcr.io/krishna916/ai-chess-rivals-server:<full-commit-sha>`
+- `ghcr.io/krishna916/ai-chess-rivals-server:latest`
+
+After publication, the job calls the Render deploy hook stored in repository secret
+`RENDER_DEPLOY_HOOK_URL` and requests deployment of the immutable commit-SHA tag. A missing hook
+is a deployment configuration error and intentionally fails the `master` native job after the
+image has been published.
 
 ## Native AI topology verification
 
