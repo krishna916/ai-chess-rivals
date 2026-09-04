@@ -10,18 +10,21 @@ vi.mock("./pages/AdminPage", () => ({
 }));
 
 describe("App routes", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.location.hash = "";
+  });
 
-  it("routes the public root to the read-only viewer", () => {
-    window.history.pushState({}, "", "/");
+  it("routes the public hash root to the read-only viewer", () => {
+    window.location.hash = "#/";
     render(<App />);
     expect(
       screen.getByRole("heading", { name: "Read-only Match Viewer" }),
     ).toBeVisible();
   });
 
-  it("routes /admin to the locked owner page", () => {
-    window.history.pushState({}, "", "/admin");
+  it("routes #/admin to the locked owner page", () => {
+    window.location.hash = "#/admin";
     render(<App />);
     expect(
       screen.getByRole("heading", { name: "Locked Owner Controls" }),
