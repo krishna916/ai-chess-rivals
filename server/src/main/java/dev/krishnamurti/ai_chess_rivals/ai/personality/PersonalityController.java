@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/personalities")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}")
 class PersonalityController {
 
   private final PersonalityService personalityService;

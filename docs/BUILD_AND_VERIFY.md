@@ -142,6 +142,72 @@ npm run verify
 production build. It stops at the first failure and does not rely on shell-specific command
 chaining.
 
+## Frontend production deployment
+
+The frontend is a static Vite build deployed to GitHub Pages through
+`.github/workflows/pages.yml`. The canonical production URLs are:
+
+- Frontend: `https://ai-chess.krishnamurti.dev`
+- Backend: `https://ai-chess-api.krishnamurti.dev`
+
+Complete the one-time setup in this order:
+
+1. Render image-backed backend:
+   - add the custom domain `ai-chess-api.krishnamurti.dev`;
+   - create the DNS CNAME `ai-chess-api` pointing to `ai-chess-rivals.onrender.com`;
+   - set `APP_WEBSOCKET_ALLOWED_ORIGIN=https://ai-chess.krishnamurti.dev`;
+   - keep `ai-chess-rivals.onrender.com` available during verification.
+2. Cloudflare DNS:
+   - create the CNAME `ai-chess` pointing to `krishna916.github.io`;
+   - create the CNAME `ai-chess-api` pointing to `ai-chess-rivals.onrender.com`;
+   - if the currently-created record is `api-chess`, rename or remove it so the canonical backend hostname is `ai-chess-api.krishnamurti.dev`;
+   - use DNS-only mode while GitHub Pages and Render validate domains and certificates; Cloudflare proxying is not required for the MVP.
+3. GitHub repository settings:
+   - set Settings -> Pages -> Source to `GitHub Actions`;
+   - set the custom domain to `ai-chess.krishnamurti.dev`;
+   - enable Enforce HTTPS after GitHub verifies the domain and certificate;
+   - set Settings -> Secrets and variables -> Actions -> Variables -> `VITE_API_URL` to `https://ai-chess-api.krishnamurti.dev/api/v1`.
+4. Deploy or re-run `.github/workflows/pages.yml` after Pages settings, DNS, and the repository variable are ready.
+5. Verify both REST and WebSocket behavior before treating provider URLs as rollback-only paths.
+
+The workflow uses the official GitHub Pages Actions flow (`configure-pages`,
+`upload-pages-artifact`, and `deploy-pages`). It does not use a committed `CNAME` file,
+generated `dist/` files, or a `gh-pages` branch. The Pages build uses the custom host root and
+`HashRouter`, so the owner route is `https://ai-chess.krishnamurti.dev/#/admin`. The public
+Actions variable is build configuration, not a secret; never put credentials or the owner
+control token in the frontend bundle.
+
+### Production smoke checks
+
+REST CORS:
+
+```bash
+curl -i \
+  -H "Origin: https://ai-chess.krishnamurti.dev" \
+  https://ai-chess-api.krishnamurti.dev/api/v1/match
+```
+
+Acceptance:
+
+- the application returns its normal match response (`200` when state exists, or its normal not-found response when no match exists);
+- the response includes `Access-Control-Allow-Origin: https://ai-chess.krishnamurti.dev`.
+
+Frontend HTTPS:
+
+```bash
+curl -I https://ai-chess.krishnamurti.dev
+```
+
+Acceptance: the custom frontend hostname responds over HTTPS.
+
+Browser acceptance:
+
+- open `https://ai-chess.krishnamurti.dev/#/`;
+- confirm viewer REST state loads;
+- confirm the browser establishes `wss://ai-chess-api.krishnamurti.dev/ws/match`;
+- open `https://ai-chess.krishnamurti.dev/#/admin` directly and refresh;
+- confirm the admin route remains loaded after refresh.
+
 ## Phase 2 AI observability and resilience verification
 
 The Phase 2 automated tests are credential-safe. They use local provider stubs and deterministic
