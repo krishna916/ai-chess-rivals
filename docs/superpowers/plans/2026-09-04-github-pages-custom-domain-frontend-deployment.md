@@ -25,7 +25,7 @@
 - Do not hard-code the Render backend hostname in TypeScript. Supply `VITE_API_URL` through GitHub Actions configuration.
 - Do not use wildcard `*` CORS in production.
 - Reuse `APP_WEBSOCKET_ALLOWED_ORIGIN` as the single external production frontend-origin value for both WebSocket and REST controller CORS.
-- Keep the provider URLs (`krishna916.github.io` and the Render `*.onrender.com` URL) available during cutover/rollback.
+- Keep the provider URLs (`krishna916.github.io` and `ai-chess-rivals.onrender.com`) available during cutover/rollback.
 - No backend architecture changes, auth redesign, database changes, AI behavior changes, or deployment framework additions.
 - Execution is inline with `superpowers:executing-plans` only.
 
@@ -70,7 +70,7 @@
 
 - [ ] **Step 1: Change the route tests first so they express hash-based navigation**
 
-Replace the route setup in `client/src/App.test.tsx` with this shape:
+Replace `client/src/App.test.tsx` with:
 
 ```tsx
 import { cleanup, render, screen } from "@testing-library/react";
@@ -110,20 +110,18 @@ describe("App routes", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused frontend route tests and confirm the new admin test fails before the router change**
-
-From repository root:
+- [ ] **Step 2: Run the focused frontend route tests and confirm the admin hash route fails before implementation**
 
 ```bash
 cd client
-npm test -- --run src/App.test.tsx
+npm test -- src/App.test.tsx
 ```
 
 Expected before implementation: the `#/admin` test fails because `BrowserRouter` reads the pathname, not the hash route.
 
 - [ ] **Step 3: Switch `App` to `HashRouter`**
 
-Change `client/src/App.tsx` to:
+Replace `client/src/App.tsx` with:
 
 ```tsx
 import { HashRouter, Route, Routes } from "react-router-dom";
@@ -146,52 +144,47 @@ export default App;
 
 - [ ] **Step 4: Make the custom-domain Vite base explicit**
 
-Add `base: "/",` near the top of the object passed to `defineConfig` in `client/vite.config.ts`:
+Change `client/vite.config.ts` so the `defineConfig` object begins:
 
 ```ts
 export default defineConfig({
   base: "/",
   plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./vitest.setup.ts"],
-  },
-});
 ```
 
-Do not use `/ai-chess-rivals/`; the custom domain serves this application from its host root.
+Leave the existing aliases and Vitest configuration unchanged.
 
-- [ ] **Step 5: Re-run focused route tests**
+- [ ] **Step 5: Re-run the focused route tests**
 
 ```bash
 cd client
-npm test -- --run src/App.test.tsx
+npm test -- src/App.test.tsx
 ```
 
 Expected: both route tests pass.
 
-- [ ] **Step 6: Build once with the final production API URL and inspect the generated asset paths**
+- [ ] **Step 6: Build with the final production API URL and inspect generated asset paths**
+
+POSIX:
 
 ```bash
 cd client
 VITE_API_URL=https://ai-chess-api.krishnamurti.dev/api/v1 npm run build
-```
-
-Expected: build succeeds and `client/dist/index.html` references assets under `/assets/`, not `/ai-chess-rivals/assets/`.
-
-Check:
-
-```bash
 grep -F "/ai-chess-rivals/" dist/index.html && exit 1 || true
 grep -F "/assets/" dist/index.html
 ```
 
-Expected: first command prints nothing; second command finds generated asset references.
+PowerShell:
+
+```powershell
+cd client
+$env:VITE_API_URL = "https://ai-chess-api.krishnamurti.dev/api/v1"
+npm run build
+if (Select-String -Path "dist\index.html" -Pattern "/ai-chess-rivals/" -SimpleMatch) { exit 1 }
+Select-String -Path "dist\index.html" -Pattern "/assets/" -SimpleMatch
+```
+
+Expected: build succeeds; no `/ai-chess-rivals/` reference exists; `/assets/` references exist.
 
 - [ ] **Step 7: Commit Task 1**
 
@@ -214,9 +207,9 @@ git commit -m "feat: prepare frontend routing for GitHub Pages"
 - Consumes: external environment value `APP_WEBSOCKET_ALLOWED_ORIGIN`.
 - Produces: `Access-Control-Allow-Origin: https://ai-chess.krishnamurti.dev` for browser calls to `/api/v1/match` and `/api/v1/personalities` when Render is configured with that origin.
 
-- [ ] **Step 1: Configure controller slice tests with the production-like allowed origin**
+- [ ] **Step 1: Configure both controller slice tests with the production-like allowed origin**
 
-Change the `@TestPropertySource` declaration in both controller test classes from a single string to:
+Change the `@TestPropertySource` declaration in both controller test classes to:
 
 ```java
 @TestPropertySource(
@@ -226,7 +219,7 @@ Change the `@TestPropertySource` declaration in both controller test classes fro
     })
 ```
 
-- [ ] **Step 2: Add an allowed-origin CORS test to `MatchControllerTest`**
+- [ ] **Step 2: Add the configured-origin test to `MatchControllerTest`**
 
 Add:
 
@@ -249,17 +242,15 @@ void currentMatchAllowsConfiguredFrontendOrigin() throws Exception {
 }
 ```
 
-`MatchControllerTest` already imports the result matcher and `HttpHeaders` needed by this test.
+`MatchControllerTest` already imports `HttpHeaders` and result matchers through its existing imports.
 
-- [ ] **Step 3: Add an allowed-origin CORS test to `PersonalityControllerTest`**
+- [ ] **Step 3: Add the configured-origin test to `PersonalityControllerTest`**
 
-Add these static/result imports if not already present:
+Add these imports:
 
 ```java
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 ```
-
-Add the `HttpHeaders` import:
 
 ```java
 import org.springframework.http.HttpHeaders;
@@ -285,7 +276,7 @@ void listPersonalitiesAllowsConfiguredFrontendOrigin() throws Exception {
 }
 ```
 
-- [ ] **Step 4: Run only the two controller test classes and prove they fail against the hard-coded localhost annotations**
+- [ ] **Step 4: Run only the two controller tests and prove the new assertions fail against hard-coded localhost CORS**
 
 POSIX:
 
@@ -299,7 +290,7 @@ Windows PowerShell:
 server\mvnw.cmd -f server\pom.xml -Dtest=MatchControllerTest,PersonalityControllerTest test
 ```
 
-Expected before implementation: the configured production-origin assertions fail because both controllers currently hard-code `http://localhost:5173`.
+Expected before implementation: the new production-origin CORS assertions fail because both controllers currently hard-code `http://localhost:5173`.
 
 - [ ] **Step 5: Replace the hard-coded origin in `MatchController`**
 
@@ -325,7 +316,7 @@ Make the same annotation change:
 @CrossOrigin(origins = "${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}")
 ```
 
-This deliberately reuses the external variable already used by the WebSocket configuration instead of introducing another production-origin variable.
+This deliberately reuses the external variable already used by WebSocket configuration instead of adding another production-origin variable.
 
 - [ ] **Step 7: Re-run the focused backend tests**
 
@@ -343,9 +334,26 @@ server\mvnw.cmd -f server\pom.xml -Dtest=MatchControllerTest,PersonalityControll
 
 Expected: both controller test classes pass, including the production-origin CORS assertions.
 
-- [ ] **Step 8: Verify the localhost default still works without setting the production environment variable**
+- [ ] **Step 8: Verify the committed controller annotations retain the local default**
 
-Run the existing controller tests once with the test-level production override temporarily removed only if Step 7 reveals placeholder-resolution uncertainty. Do not commit any temporary edit. The committed annotation default must remain exactly `http://localhost:5173`.
+POSIX:
+
+```bash
+grep -F '${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}' \
+  server/src/main/java/dev/krishnamurti/ai_chess_rivals/game/web/MatchController.java \
+  server/src/main/java/dev/krishnamurti/ai_chess_rivals/ai/personality/PersonalityController.java
+```
+
+PowerShell:
+
+```powershell
+Select-String -Path \
+  "server\src\main\java\dev\krishnamurti\ai_chess_rivals\game\web\MatchController.java", \
+  "server\src\main\java\dev\krishnamurti\ai_chess_rivals\ai\personality\PersonalityController.java" \
+  -Pattern '${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}' -SimpleMatch
+```
+
+Expected: one match in each controller.
 
 - [ ] **Step 9: Commit Task 2**
 
@@ -367,11 +375,11 @@ git commit -m "fix: configure frontend REST origin"
 
 **Interfaces:**
 - Consumes: GitHub Actions repository variable `VITE_API_URL` with value `https://ai-chess-api.krishnamurti.dev/api/v1`.
-- Produces: GitHub Pages deployment artifact from `client/dist` and deployment to the `github-pages` environment.
+- Produces: verified `client/dist` GitHub Pages artifact and deployment to the `github-pages` environment.
 
-- [ ] **Step 1: Create `.github/workflows/pages.yml` with the official Pages flow**
+- [ ] **Step 1: Create `.github/workflows/pages.yml`**
 
-Create exactly this workflow:
+Create exactly:
 
 ```yaml
 name: Deploy frontend to GitHub Pages
@@ -423,9 +431,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Verify frontend
-        run: npm run verify
-
       - name: Validate production API URL
         shell: bash
         run: |
@@ -435,8 +440,8 @@ jobs:
             exit 1
           fi
 
-      - name: Build production frontend
-        run: npm run build
+      - name: Verify and build frontend
+        run: npm run verify
 
       - name: Reject localhost API fallback in production bundle
         shell: bash
@@ -457,36 +462,37 @@ jobs:
         uses: actions/deploy-pages@v5
 ```
 
-Rationale for versions as of 2026-09-04:
-- `actions/configure-pages`: current major v6.
-- `actions/upload-pages-artifact`: current major v5.
-- `actions/deploy-pages`: current major v5.
-- Repository CI already uses `actions/checkout@v7` and `actions/setup-node@v7`, so keep those conventions.
+`npm run verify` already runs format check, typecheck, lint, tests, and `npm run build`; do not add a second production-build step.
 
-- [ ] **Step 2: Verify the production build locally with the exact configured URL**
+Current official Pages action majors verified on 2026-09-04:
+- `actions/configure-pages@v6`
+- `actions/upload-pages-artifact@v5`
+- `actions/deploy-pages@v5`
+
+Keep repository conventions `actions/checkout@v7` and `actions/setup-node@v7`.
+
+- [ ] **Step 2: Reproduce the workflow's frontend verification locally with the exact production URL**
 
 POSIX:
 
 ```bash
 cd client
-VITE_API_URL=https://ai-chess-api.krishnamurti.dev/api/v1 npm ci
+npm ci
 VITE_API_URL=https://ai-chess-api.krishnamurti.dev/api/v1 npm run verify
-VITE_API_URL=https://ai-chess-api.krishnamurti.dev/api/v1 npm run build
 ```
 
 Windows PowerShell:
 
 ```powershell
 cd client
-$env:VITE_API_URL = "https://ai-chess-api.krishnamurti.dev/api/v1"
 npm ci
+$env:VITE_API_URL = "https://ai-chess-api.krishnamurti.dev/api/v1"
 npm run verify
-npm run build
 ```
 
-Expected: verification and build pass.
+Expected: all frontend checks pass and `dist/` is produced by the final build check.
 
-- [ ] **Step 3: Prove the generated bundle does not contain the localhost backend fallback**
+- [ ] **Step 3: Prove the generated bundle does not contain the localhost API fallback**
 
 POSIX:
 
@@ -499,19 +505,20 @@ PowerShell:
 
 ```powershell
 cd client
-if (Select-String -Path "dist\**\*" -Pattern "http://localhost:8082/api/v1" -SimpleMatch -ErrorAction SilentlyContinue) { exit 1 }
+$match = Get-ChildItem -Recurse -File dist | Select-String -Pattern "http://localhost:8082/api/v1" -SimpleMatch
+if ($match) { exit 1 }
 ```
 
 Expected: no match.
 
-- [ ] **Step 4: Check workflow whitespace and repository diff**
+- [ ] **Step 4: Check workflow whitespace and diff**
 
 ```bash
 git diff --check
 git diff -- .github/workflows/pages.yml
 ```
 
-Expected: `git diff --check` exits 0; workflow includes only the intended Pages deployment flow.
+Expected: `git diff --check` exits 0; workflow contains only the intended Pages flow.
 
 - [ ] **Step 5: Commit Task 3**
 
@@ -534,9 +541,9 @@ git commit -m "ci: deploy frontend to GitHub Pages"
 
 - [ ] **Step 1: Replace the Vite template `client/README.md` with project-specific frontend instructions**
 
-The new README must include these exact facts:
+Use this content:
 
-```markdown
+````markdown
 # AI Chess Rivals Client
 
 React/Vite frontend for the AI Chess Rivals showcase.
@@ -553,7 +560,7 @@ Local defaults:
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8082/api/v1`
 
-`VITE_API_URL` can override the backend API base for a build/runtime dev invocation.
+`VITE_API_URL` can override the backend API base for a build or local invocation.
 
 ## Verification
 
@@ -574,37 +581,35 @@ Canonical production URLs:
 GitHub Pages uses the custom host root, so Vite base is `/`. Routing uses `HashRouter`, therefore the owner page is `https://ai-chess.krishnamurti.dev/#/admin`.
 
 The GitHub Actions repository variable `VITE_API_URL` is public configuration, not a secret. Do not put credentials or the owner control token in Vite variables or the frontend bundle.
-```
-
-Keep the markdown fences valid when writing the actual file; do not nest an unclosed code block.
+````
 
 - [ ] **Step 2: Add a `Frontend production deployment` section to `docs/BUILD_AND_VERIFY.md`**
 
-Document this exact one-time configuration and cutover order:
+Document this exact setup and cutover order:
 
 1. Render image-backed backend:
    - add custom domain `ai-chess-api.krishnamurti.dev`;
    - DNS CNAME `ai-chess-api` -> `ai-chess-rivals.onrender.com`;
    - set `APP_WEBSOCKET_ALLOWED_ORIGIN=https://ai-chess.krishnamurti.dev`;
-   - keep the Render provider hostname available during verification.
+   - keep `ai-chess-rivals.onrender.com` available during verification.
 2. Cloudflare DNS:
    - CNAME `ai-chess` -> `krishna916.github.io`;
    - CNAME `ai-chess-api` -> `ai-chess-rivals.onrender.com`;
-   - if an older record named `api-chess` exists, rename/remove it so the canonical backend hostname is `ai-chess-api.krishnamurti.dev`;
-   - use DNS-only mode while GitHub Pages and Render validate certificates/domains; Cloudflare proxying is not required for the MVP.
+   - if the currently-created record is `api-chess`, rename/remove it so the canonical backend hostname is `ai-chess-api.krishnamurti.dev`;
+   - use DNS-only mode while GitHub Pages and Render validate domains/certificates; Cloudflare proxying is not required for the MVP.
 3. GitHub repository settings:
    - Settings -> Pages -> Source = GitHub Actions;
    - custom domain = `ai-chess.krishnamurti.dev`;
    - enable Enforce HTTPS after GitHub verifies the domain and certificate;
    - Settings -> Secrets and variables -> Actions -> Variables -> `VITE_API_URL=https://ai-chess-api.krishnamurti.dev/api/v1`.
-4. Deploy/re-run `.github/workflows/pages.yml` after the Pages setting, DNS, and repository variable are ready.
-5. Verify both REST and WebSocket behavior before considering provider URLs optional.
+4. Deploy/re-run `.github/workflows/pages.yml` after Pages settings, DNS, and the repository variable are ready.
+5. Verify both REST and WebSocket behavior before treating provider URLs as rollback-only paths.
 
-Also document that no committed `CNAME` file or `gh-pages` branch is used by this design.
+Also document that this design does not use a committed `CNAME` file, generated `dist/` files, or a `gh-pages` branch.
 
-- [ ] **Step 3: Add exact production smoke commands to `docs/BUILD_AND_VERIFY.md`**
+- [ ] **Step 3: Add exact production smoke checks to `docs/BUILD_AND_VERIFY.md`**
 
-Include:
+REST CORS:
 
 ```bash
 curl -i \
@@ -613,32 +618,32 @@ curl -i \
 ```
 
 Acceptance:
-- HTTP is `200` when a match snapshot exists or the application's normal `404` problem response when none exists.
-- Response includes `Access-Control-Allow-Origin: https://ai-chess.krishnamurti.dev` for the browser origin.
+- the application returns its normal match response (`200` when state exists, or its normal not-found response when no match exists);
+- response includes `Access-Control-Allow-Origin: https://ai-chess.krishnamurti.dev`.
 
-Include:
+Frontend HTTPS:
 
 ```bash
 curl -I https://ai-chess.krishnamurti.dev
 ```
 
-Acceptance: HTTPS responds successfully and does not redirect to a provider-domain page as the canonical user-facing URL.
+Acceptance: the custom frontend hostname responds over HTTPS.
 
 Browser acceptance:
 - open `https://ai-chess.krishnamurti.dev/#/`;
-- confirm the viewer loads and REST state appears;
+- confirm viewer REST state loads;
 - confirm the browser establishes `wss://ai-chess-api.krishnamurti.dev/ws/match`;
 - open `https://ai-chess.krishnamurti.dev/#/admin` directly and refresh;
 - confirm the admin route remains loaded after refresh.
 
-- [ ] **Step 4: Run markdown/repository diff checks**
+- [ ] **Step 4: Run documentation diff checks**
 
 ```bash
 git diff --check
 git diff -- client/README.md docs/BUILD_AND_VERIFY.md
 ```
 
-Expected: no whitespace errors and no provider secret/token values in documentation.
+Expected: no whitespace errors and no credential/token values in documentation.
 
 - [ ] **Step 5: Commit Task 4**
 
@@ -691,28 +696,9 @@ $env:VITE_API_URL = "https://ai-chess-api.krishnamurti.dev/api/v1"
 npm run verify
 ```
 
-Expected: typecheck, lint, tests, formatting/build checks configured by `client/scripts/verify.js` pass.
+Expected: format check, typecheck, lint, tests, and production build all pass.
 
-- [ ] **Step 3: Run the production frontend build explicitly**
-
-POSIX:
-
-```bash
-cd client
-VITE_API_URL=https://ai-chess-api.krishnamurti.dev/api/v1 npm run build
-```
-
-Windows PowerShell:
-
-```powershell
-cd client
-$env:VITE_API_URL = "https://ai-chess-api.krishnamurti.dev/api/v1"
-npm run build
-```
-
-Expected: production build succeeds.
-
-- [ ] **Step 4: Verify the intended diff only**
+- [ ] **Step 3: Verify the intended diff only**
 
 ```bash
 git status --short
@@ -721,7 +707,7 @@ git diff master...HEAD --stat
 git diff master...HEAD --name-only
 ```
 
-Expected changed paths are limited to:
+Expected implementation paths are limited to:
 
 ```text
 .github/workflows/pages.yml
@@ -736,9 +722,9 @@ server/src/test/java/dev/krishnamurti/ai_chess_rivals/ai/personality/Personality
 server/src/test/java/dev/krishnamurti/ai_chess_rivals/game/web/MatchControllerTest.java
 ```
 
-The plan document itself will also appear because it was created before implementation.
+The plan document itself is also expected because it was committed before implementation.
 
-- [ ] **Step 5: Open the PR against `master`**
+- [ ] **Step 4: Open the PR against `master`**
 
 Suggested title:
 
@@ -746,7 +732,7 @@ Suggested title:
 ci: deploy frontend to GitHub Pages
 ```
 
-Suggested PR body:
+Suggested body:
 
 ```markdown
 ## Summary
@@ -764,7 +750,7 @@ Suggested PR body:
 ## Verification
 
 - backend Maven verifier passes
-- frontend verifier and production build pass with the production API URL
+- frontend verifier passes with the production API URL
 - focused CORS tests prove the configured frontend origin is allowed
 
 Refs #65
@@ -775,17 +761,17 @@ Refs #65
 ### Task 6: Perform the one-time external production setup after implementation is ready
 
 **Files:**
-- No repository files unless documentation needs correction based on observed provider behavior.
+- No repository files unless observed provider behavior requires a documentation correction.
 
 **Interfaces:**
 - Consumes: merged implementation, GitHub Pages workflow, Render image-backed backend.
 - Produces: live custom frontend and backend domains.
 
-> **External-access checkpoint:** Luna must not claim these steps are complete unless it can actually observe/configure the relevant GitHub Pages, Render, and DNS settings. If those accounts are not available to the execution environment, stop here and hand the exact checklist to the user.
+> **External-access checkpoint:** Luna must not claim these steps are complete unless it can actually observe/configure the relevant GitHub Pages, Render, and DNS settings. If those accounts are not available to the execution environment, stop here and hand this exact checklist to the user.
 
-- [ ] **Step 1: Correct the backend DNS hostname if necessary**
+- [ ] **Step 1: Correct the backend DNS hostname**
 
-The canonical record is:
+Canonical record:
 
 ```text
 Type: CNAME
@@ -795,7 +781,7 @@ Proxy: DNS only during setup
 TTL: Auto
 ```
 
-If Cloudflare currently has `api-chess.krishnamurti.dev`, rename/remove that record. Do not keep two competing canonical backend names in application configuration.
+The screenshot/current setup showed `api-chess.krishnamurti.dev`; rename/remove that record so application configuration uses only `ai-chess-api.krishnamurti.dev` as the canonical backend hostname.
 
 - [ ] **Step 2: Add the frontend DNS record**
 
@@ -807,7 +793,7 @@ Proxy: DNS only during setup
 TTL: Auto
 ```
 
-The existing `krishnamurti.dev -> krishna916.github.io` portfolio record remains unchanged; DNS distinguishes requests by hostname.
+Leave the existing `krishnamurti.dev -> krishna916.github.io` portfolio record unchanged; the hostnames are distinct.
 
 - [ ] **Step 3: Configure the Render custom backend domain**
 
@@ -818,7 +804,7 @@ Custom domain: ai-chess-api.krishnamurti.dev
 APP_WEBSOCKET_ALLOWED_ORIGIN=https://ai-chess.krishnamurti.dev
 ```
 
-Wait until Render reports the custom domain/TLS as verified before cutting the frontend over to it.
+Wait until Render reports the custom domain/TLS as verified before production browser acceptance.
 
 - [ ] **Step 4: Configure GitHub Pages and the build variable**
 
@@ -831,11 +817,11 @@ Actions variable name: VITE_API_URL
 Actions variable value: https://ai-chess-api.krishnamurti.dev/api/v1
 ```
 
-Enable `Enforce HTTPS` after GitHub reports the custom domain certificate ready.
+Enable `Enforce HTTPS` after GitHub reports the custom-domain certificate ready.
 
 - [ ] **Step 5: Run or re-run the Pages deployment workflow**
 
-Use the manual `workflow_dispatch` entry if the merge-triggered deployment ran before the one-time Pages settings or `VITE_API_URL` variable were configured.
+Use `workflow_dispatch` if the merge-triggered deployment occurred before Pages settings or `VITE_API_URL` were configured.
 
 Expected: `Verify, build and deploy frontend` completes successfully.
 
@@ -855,7 +841,7 @@ Access-Control-Allow-Origin: https://ai-chess.krishnamurti.dev
 
 - [ ] **Step 7: Verify browser end to end**
 
-Check all four:
+Check all four endpoints/routes:
 
 ```text
 https://ai-chess.krishnamurti.dev/#/
@@ -866,17 +852,17 @@ wss://ai-chess-api.krishnamurti.dev/ws/match
 
 Acceptance:
 - frontend assets load without 404s;
-- frontend REST calls use the custom API domain, not localhost or `*.onrender.com`;
+- frontend REST calls use the custom API domain, not localhost or `ai-chess-rivals.onrender.com`;
 - browser shows no REST CORS error;
-- WebSocket connects through `wss://ai-chess-api.krishnamurti.dev/ws/match`;
+- WebSocket connects through the custom API domain;
 - `#/admin` survives direct navigation and refresh.
 
 - [ ] **Step 8: Keep rollback paths until the custom-domain flow is proven stable**
 
 Do not immediately disable:
 - the GitHub Pages provider hostname;
-- the Render `ai-chess-rivals.onrender.com` hostname;
-- the old Git-backed Render backend if it has not yet completed its separate retirement checklist.
+- `ai-chess-rivals.onrender.com`;
+- the old Git-backed Render backend if its separate retirement checklist is not complete.
 
 No additional infrastructure is required once the custom-domain flow is stable.
 
@@ -886,16 +872,16 @@ No additional infrastructure is required once the custom-domain flow is stable.
 
 - [ ] `HashRouter` is used and `/` plus `/admin` tests pass via hashes.
 - [ ] Vite base is `/`, not `/ai-chess-rivals/`.
-- [ ] `VITE_API_URL` is injected through GitHub Actions and the workflow fails if it is missing.
+- [ ] `VITE_API_URL` is injected through GitHub Actions and the workflow fails before verification if it is missing.
 - [ ] Production bundle does not contain `http://localhost:8082/api/v1`.
 - [ ] Both public REST controllers use the configured frontend origin instead of hard-coded localhost.
 - [ ] WebSocket origin handling still uses `APP_WEBSOCKET_ALLOWED_ORIGIN`.
 - [ ] GitHub Pages deployment uses official `configure-pages`, `upload-pages-artifact`, and `deploy-pages` actions.
-- [ ] No `gh-pages` branch or committed build output is introduced.
+- [ ] No `gh-pages` branch, committed `dist/`, or custom SPA 404 hack is introduced.
 - [ ] No wildcard CORS is introduced.
 - [ ] Local development defaults remain intact.
 - [ ] Backend full verification passes.
-- [ ] Frontend full verification and production build pass.
+- [ ] Frontend full verification passes with the production API URL.
 - [ ] DNS uses `ai-chess` and `ai-chess-api` as the canonical subdomains.
 - [ ] GitHub Pages serves `https://ai-chess.krishnamurti.dev` over HTTPS.
 - [ ] Render serves `https://ai-chess-api.krishnamurti.dev` over HTTPS.
