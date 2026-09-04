@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/match")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "${APP_WEBSOCKET_ALLOWED_ORIGIN:http://localhost:5173}")
 public class MatchController {
 
   private final MatchControlService matchControlService;

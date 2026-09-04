@@ -32,7 +32,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @WebMvcTest(controllers = MatchController.class)
 @Import(MatchControllerAdvice.class)
 @EnableConfigurationProperties(OwnerControlProperties.class)
-@TestPropertySource(properties = "app.owner.control-token=test-owner-token")
+@TestPropertySource(
+    properties = {
+      "app.owner.control-token=test-owner-token",
+      "APP_WEBSOCKET_ALLOWED_ORIGIN=https://ai-chess.krishnamurti.dev"
+    })
 class MatchControllerTest {
 
   @Autowired private MockMvc mockMvc;
@@ -89,6 +93,21 @@ class MatchControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.running").value(false));
+  }
+
+  @Test
+  void currentMatchAllowsConfiguredFrontendOrigin() throws Exception {
+    Match match = TestMatchFixtures.newMatch();
+    when(matchControlService.currentMatch()).thenReturn(new MatchSnapshot(match, false));
+
+    mockMvc
+        .perform(
+            get("/api/v1/match").header(HttpHeaders.ORIGIN, "https://ai-chess.krishnamurti.dev"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://ai-chess.krishnamurti.dev"));
   }
 
   @Test

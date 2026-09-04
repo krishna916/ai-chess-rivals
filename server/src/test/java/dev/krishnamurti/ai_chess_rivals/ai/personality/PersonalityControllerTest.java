@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -24,7 +26,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 @WebMvcTest(controllers = PersonalityController.class)
 @EnableConfigurationProperties(OwnerControlProperties.class)
-@TestPropertySource(properties = "app.owner.control-token=test-owner-token")
+@TestPropertySource(
+    properties = {
+      "app.owner.control-token=test-owner-token",
+      "APP_WEBSOCKET_ALLOWED_ORIGIN=https://ai-chess.krishnamurti.dev"
+    })
 class PersonalityControllerTest {
 
   @Autowired private MockMvc mockMvc;
@@ -70,6 +76,21 @@ class PersonalityControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(content().json("[]"));
+  }
+
+  @Test
+  void listPersonalitiesAllowsConfiguredFrontendOrigin() throws Exception {
+    when(personalityService.listSelectable()).thenReturn(List.of());
+
+    mockMvc
+        .perform(
+            get("/api/v1/personalities")
+                .header(HttpHeaders.ORIGIN, "https://ai-chess.krishnamurti.dev"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://ai-chess.krishnamurti.dev"));
   }
 
   @Test
