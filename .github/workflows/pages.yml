@@ -59,12 +59,12 @@ jobs:
       - name: Verify and build frontend
         run: npm run verify
 
-      - name: Reject localhost API fallback in production bundle
+      - name: Reject localhost backend references in production bundle
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R -F "http://localhost:8082/api/v1" dist; then
-            echo "Production bundle contains the localhost API fallback."
+          if grep -R -F "localhost:8082" dist; then
+            echo "Production bundle contains a localhost backend reference."
             exit 1
           fi
 
