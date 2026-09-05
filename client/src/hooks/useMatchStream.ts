@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { API_BASE_URL } from "../services/matchApi";
 import { createMatchSocket } from "../services/matchSocket";
 import { useMatchViewerStore } from "../store/matchViewerStore";
 import { parseMatchMessage } from "../services/matchViewer.messages";
@@ -6,7 +7,7 @@ import { parseMatchMessage } from "../services/matchViewer.messages";
 const INITIAL_RECONNECT_DELAY_MS = 3_000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-export function useMatchStream(baseUrl = "http://localhost:8082") {
+export function useMatchStream(baseUrl = API_BASE_URL) {
   const { setConnectionStatus, processMessage, setError } =
     useMatchViewerStore();
 

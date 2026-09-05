@@ -17,15 +17,44 @@ vi.mock("../services/matchSocket", () => ({
   }),
 }));
 
+vi.mock("../services/matchApi", () => ({
+  API_BASE_URL: "https://ai-chess-api.krishnamurti.dev/api/v1",
+}));
+
 describe("useMatchStream", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     socket.connect.mockClear();
     socket.close.mockClear();
+    vi.mocked(createMatchSocket).mockClear();
     useMatchViewerStore.setState({
       connectionStatus: "CONNECTING",
       error: undefined,
     });
+  });
+
+  it("uses the configured API base URL by default", () => {
+    const { unmount } = renderHook(() => useMatchStream());
+
+    expect(createMatchSocket).toHaveBeenCalledWith(
+      "https://ai-chess-api.krishnamurti.dev/api/v1",
+      expect.any(Object),
+    );
+
+    unmount();
+  });
+
+  it("preserves an explicit WebSocket backend base override", () => {
+    const { unmount } = renderHook(() =>
+      useMatchStream("http://localhost:9999/api/v1"),
+    );
+
+    expect(createMatchSocket).toHaveBeenCalledWith(
+      "http://localhost:9999/api/v1",
+      expect.any(Object),
+    );
+
+    unmount();
   });
 
   it("reconnects with exponential backoff and resets retries after connecting", () => {
