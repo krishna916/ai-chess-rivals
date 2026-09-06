@@ -160,6 +160,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Set up Node.js 22 for native WebSocket smoke
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
       - name: Build production native image
         uses: docker/build-push-action@v7
         with:
@@ -210,6 +215,7 @@ jobs:
           docker run -d \
             --name "$app" \
             --network "$network" \
+            -p 8080:8080 \
             -p 8081:8081 \
             -e SERVER_PORT=8080 \
             -e SPRING_DATASOURCE_URL=jdbc:postgresql://native-ai-postgres:5432/aichessrivals \
@@ -243,8 +249,74 @@ jobs:
             exit 1
           fi
 
+          if ! node --input-type=module <<'NODE'
+          const url = "ws://127.0.0.1:8080/ws/match";
+
+          await new Promise((resolve, reject) => {
+            let receivedInitialMessage = false;
+            const socket = new WebSocket(url);
+
+            const timeout = setTimeout(() => {
+              socket.close();
+              reject(new Error(`Timed out waiting for the initial WebSocket frame from ${url}`));
+            }, 10_000);
+
+            socket.addEventListener("message", (event) => {
+              try {
+                const message = JSON.parse(String(event.data));
+                if (message.type !== "NO_MATCH") {
+                  throw new Error(
+                    `Expected initial NO_MATCH frame from an empty CI database, received ${event.data}`,
+                  );
+                }
+                if (message.payload === null || typeof message.payload !== "object") {
+                  throw new Error(`Expected NO_MATCH payload object, received ${event.data}`);
+                }
+
+                receivedInitialMessage = true;
+                clearTimeout(timeout);
+                socket.close();
+                resolve();
+              } catch (error) {
+                clearTimeout(timeout);
+                socket.close();
+                reject(error);
+              }
+            });
+
+            socket.addEventListener("close", (event) => {
+              if (!receivedInitialMessage) {
+                clearTimeout(timeout);
+                reject(
+                  new Error(
+                    `WebSocket closed before its initial frame: code=${event.code} reason=${event.reason}`,
+                  ),
+                );
+              }
+            });
+
+            socket.addEventListener("error", () => {
+              clearTimeout(timeout);
+              reject(new Error(`WebSocket connection failed for ${url}`));
+            });
+          });
+
+          console.log("Native WebSocket initial NO_MATCH serialization verified");
+          NODE
+          then
+            echo "Native WebSocket serialization smoke failed"
+            docker logs "$app"
+            exit 1
+          fi
+
           log_file="/tmp/native-ai-app.log"
           docker logs "$app" > "$log_file" 2>&1
+
+          if grep -Fq "Record components not available for record class" "$log_file"; then
+            echo "Native application emitted a GraalVM record-component reflection failure"
+            grep -F "Record components not available for record class" "$log_file" || true
+            exit 1
+          fi
 
           enabled_marker="AI gateway topology: enabled (OpenRouter primary -> OpenRouter fallback -> deterministic fallback)"
           disabled_marker="AI gateway topology: disabled"
