@@ -1,5 +1,6 @@
 package dev.krishnamurti.ai_chess_rivals.observability;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,8 +9,11 @@ import dev.krishnamurti.ai_chess_rivals.ai.dialogue.DialogueRepositoryTestConfig
 import dev.krishnamurti.ai_chess_rivals.ai.personality.PersonalityRepositoryTestConfiguration;
 import dev.krishnamurti.ai_chess_rivals.chess.api.StockfishClient;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -27,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
     })
 @AutoConfigureMockMvc
 @Import({PersonalityRepositoryTestConfiguration.class, DialogueRepositoryTestConfiguration.class})
+@ExtendWith(OutputCaptureExtension.class)
 class RequestTracingFilterIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
@@ -34,10 +39,14 @@ class RequestTracingFilterIntegrationTest {
   @MockitoBean private StockfishClient stockfishClient;
 
   @Test
-  void registersRequestTracingFilterInApplicationContext() throws Exception {
+  void registersRequestTracingFilterInApplicationContext(CapturedOutput output) throws Exception {
     mockMvc
         .perform(get("/api/v1/personalities").header("X-Request-ID", "integration-trace-001"))
         .andExpect(status().isOk())
         .andExpect(header().string("X-Request-ID", "integration-trace-001"));
+
+    assertThat(output.getOut())
+        .contains("[requestId=integration-trace-001]")
+        .contains("HTTP request completed");
   }
 }

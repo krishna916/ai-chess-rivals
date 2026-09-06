@@ -47,8 +47,7 @@ public class RequestTracingFilter extends OncePerRequestFilter {
     } finally {
       long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
       log.info(
-          "HTTP request completed requestId={} method={} path={} status={} durationMs={}",
-          requestId,
+          "HTTP request completed method={} path={} status={} durationMs={}",
           request.getMethod(),
           request.getRequestURI(),
           response.getStatus(),

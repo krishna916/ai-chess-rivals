@@ -53,13 +53,15 @@ class RequestTracingFilterTest {
     assertThat(UUID.fromString(requestId)).isNotNull();
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(appender.list).hasSize(1);
-    assertThat(appender.list.get(0).getFormattedMessage())
+    ILoggingEvent completionEvent = appender.list.get(0);
+    assertThat(completionEvent.getMDCPropertyMap()).containsEntry("requestId", requestId);
+    assertThat(completionEvent.getFormattedMessage())
         .contains(
-            "requestId=" + requestId,
             "method=GET",
             "path=/api/v1/personalities",
             "status=200",
-            "durationMs=");
+            "durationMs=")
+        .doesNotContain("requestId=");
     assertThat(MDC.get("requestId")).isNull();
   }
 
@@ -79,8 +81,43 @@ class RequestTracingFilterTest {
 
     assertThat(response.getHeader("X-Request-ID")).isEqualTo("manual-trace-001");
     assertThat(appender.list).hasSize(1);
-    assertThat(appender.list.get(0).getFormattedMessage())
-        .contains("requestId=manual-trace-001", "method=GET", "path=/api/v1/personalities");
+    ILoggingEvent completionEvent = appender.list.get(0);
+    assertThat(completionEvent.getMDCPropertyMap())
+        .containsEntry("requestId", "manual-trace-001");
+    assertThat(completionEvent.getFormattedMessage())
+        .contains("method=GET", "path=/api/v1/personalities")
+        .doesNotContain("requestId=");
+  }
+
+  @Test
+  void propagatesRequestIdToDownstreamLogEvents() throws Exception {
+    Logger downstreamLogger =
+        (Logger) LoggerFactory.getLogger("request-tracing-downstream-test");
+    ListAppender<ILoggingEvent> downstreamAppender = new ListAppender<>();
+    downstreamAppender.start();
+    downstreamLogger.addAppender(downstreamAppender);
+
+    try {
+      MockHttpServletRequest request =
+          new MockHttpServletRequest("GET", "/api/v1/personalities");
+      request.addHeader("X-Request-ID", "downstream-trace-001");
+      MockHttpServletResponse response = new MockHttpServletResponse();
+
+      filter.doFilter(
+          request,
+          response,
+          (req, res) -> {
+            downstreamLogger.info("downstream work");
+            response.setStatus(200);
+          });
+
+      assertThat(downstreamAppender.list).hasSize(1);
+      assertThat(downstreamAppender.list.get(0).getMDCPropertyMap())
+          .containsEntry("requestId", "downstream-trace-001");
+    } finally {
+      downstreamLogger.detachAppender(downstreamAppender);
+      downstreamAppender.stop();
+    }
   }
 
   @Test
