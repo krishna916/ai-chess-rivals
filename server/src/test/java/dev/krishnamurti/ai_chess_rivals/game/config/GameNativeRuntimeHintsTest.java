@@ -2,11 +2,26 @@ package dev.krishnamurti.ai_chess_rivals.game.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.krishnamurti.ai_chess_rivals.game.web.DialogueResponse;
+import dev.krishnamurti.ai_chess_rivals.game.web.MatchPersonalityResponse;
+import java.lang.reflect.RecordComponent;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 
 class GameNativeRuntimeHintsTest {
+
+  private static final List<String> WEBSOCKET_SERIALIZATION_ROOT_TYPE_NAMES =
+      List.of(
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStreamMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStateMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.NoMatchMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStartedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MovePlayedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.DialoguePlayedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStoppedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchFinishedMessage");
 
   @Test
   void registersAllGameConfigurationFieldsForNativeValidation() throws ClassNotFoundException {
@@ -42,6 +57,34 @@ class GameNativeRuntimeHintsTest {
     assertMethodInvocation(hints, GameProperties.MoveDelay.class, "isMaximumNonNegative");
     assertMethodInvocation(hints, GameProperties.MoveDelay.class, "isValidRange");
     assertMethodInvocation(hints, MatchGuardProperties.class, "isCooldownNonNegative");
+  }
+
+  @Test
+  void registersWebSocketRecordBindingHintsForNativeSerialization() throws ClassNotFoundException {
+    RuntimeHints hints = new RuntimeHints();
+    ClassLoader classLoader = getClass().getClassLoader();
+    new GameNativeRuntimeHints().registerHints(hints, classLoader);
+
+    for (String typeName : WEBSOCKET_SERIALIZATION_ROOT_TYPE_NAMES) {
+      Class<?> type = Class.forName(typeName, false, classLoader);
+      assertRecordBindingHints(hints, type);
+    }
+
+    // MatchStateMessage reaches these DTOs transitively through record components.
+    assertRecordBindingHints(hints, MatchPersonalityResponse.class);
+    assertRecordBindingHints(hints, DialogueResponse.class);
+  }
+
+  private static void assertRecordBindingHints(RuntimeHints hints, Class<?> type) {
+    assertThat(type.isRecord()).as("expected %s to remain a Java record", type.getName()).isTrue();
+
+    assertThat(RuntimeHintsPredicates.reflection().onType(type).test(hints))
+        .as("expected native reflection registration for %s", type.getName())
+        .isTrue();
+
+    for (RecordComponent component : type.getRecordComponents()) {
+      assertMethodInvocation(hints, type, component.getAccessor().getName());
+    }
   }
 
   private static void assertFieldAccess(RuntimeHints hints, Class<?> type, String fieldName) {

@@ -1,15 +1,28 @@
 package dev.krishnamurti.ai_chess_rivals.game.config;
 
 import java.util.List;
+import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
+import org.springframework.util.ClassUtils;
 
 /**
  * Registers reflection hints required for validated game configuration properties in native mode.
  */
 public class GameNativeRuntimeHints implements RuntimeHintsRegistrar {
+
+  private static final List<String> WEBSOCKET_SERIALIZATION_ROOT_TYPE_NAMES =
+      List.of(
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStreamMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStateMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.NoMatchMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStartedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MovePlayedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.DialoguePlayedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchStoppedMessage",
+          "dev.krishnamurti.ai_chess_rivals.game.websocket.MatchFinishedMessage");
 
   @Override
   public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
@@ -77,7 +90,11 @@ public class GameNativeRuntimeHints implements RuntimeHintsRegistrar {
             MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
             MemberCategory.INVOKE_DECLARED_METHODS);
 
-    // Register Data models for JSON Serialization in Native Image
+    // Jackson 3 introspects Java record components while serializing WebSocket messages in native
+    // mode.
+    registerWebSocketSerializationHints(hints, classLoader);
+
+    // Register remaining data models for JSON serialization in Native Image.
     hints
         .reflection()
         .registerType(
@@ -95,13 +112,6 @@ public class GameNativeRuntimeHints implements RuntimeHintsRegistrar {
     hints
         .reflection()
         .registerType(
-            dev.krishnamurti.ai_chess_rivals.game.websocket.MovePlayedMessage.class,
-            MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
-            MemberCategory.INVOKE_DECLARED_METHODS);
-
-    hints
-        .reflection()
-        .registerType(
             dev.krishnamurti.ai_chess_rivals.game.domain.ChessPieceType.class,
             MemberCategory.INVOKE_DECLARED_METHODS);
 
@@ -110,5 +120,15 @@ public class GameNativeRuntimeHints implements RuntimeHintsRegistrar {
         .registerType(
             dev.krishnamurti.ai_chess_rivals.game.domain.CastlingSide.class,
             MemberCategory.INVOKE_DECLARED_METHODS);
+  }
+
+  private static void registerWebSocketSerializationHints(
+      RuntimeHints hints, ClassLoader classLoader) {
+    BindingReflectionHintsRegistrar bindingRegistrar = new BindingReflectionHintsRegistrar();
+
+    for (String typeName : WEBSOCKET_SERIALIZATION_ROOT_TYPE_NAMES) {
+      Class<?> type = ClassUtils.resolveClassName(typeName, classLoader);
+      bindingRegistrar.registerReflectionHints(hints.reflection(), type);
+    }
   }
 }
