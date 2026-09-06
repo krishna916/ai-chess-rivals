@@ -126,8 +126,7 @@ class RequestTracingFilterTest {
 
     assertThat(response.getHeader("X-Request-ID")).isNotNull();
     assertThat(appender.list).hasSize(1);
-    assertThat(appender.list.get(0).getFormattedMessage())
-        .contains("path=/ws/match", "status=101");
+    assertThat(appender.list.get(0).getFormattedMessage()).contains("path=/ws/match", "status=101");
   }
 
   @Test
