@@ -1,10 +1,12 @@
 package dev.krishnamurti.ai_chess_rivals.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.servlet.ServletException;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,11 +58,7 @@ class RequestTracingFilterTest {
     ILoggingEvent completionEvent = appender.list.get(0);
     assertThat(completionEvent.getMDCPropertyMap()).containsEntry("requestId", requestId);
     assertThat(completionEvent.getFormattedMessage())
-        .contains(
-            "method=GET",
-            "path=/api/v1/personalities",
-            "status=200",
-            "durationMs=")
+        .contains("method=GET", "path=/api/v1/personalities", "status=200", "durationMs=")
         .doesNotContain("requestId=");
     assertThat(MDC.get("requestId")).isNull();
   }
@@ -82,8 +80,7 @@ class RequestTracingFilterTest {
     assertThat(response.getHeader("X-Request-ID")).isEqualTo("manual-trace-001");
     assertThat(appender.list).hasSize(1);
     ILoggingEvent completionEvent = appender.list.get(0);
-    assertThat(completionEvent.getMDCPropertyMap())
-        .containsEntry("requestId", "manual-trace-001");
+    assertThat(completionEvent.getMDCPropertyMap()).containsEntry("requestId", "manual-trace-001");
     assertThat(completionEvent.getFormattedMessage())
         .contains("method=GET", "path=/api/v1/personalities")
         .doesNotContain("requestId=");
@@ -91,15 +88,13 @@ class RequestTracingFilterTest {
 
   @Test
   void propagatesRequestIdToDownstreamLogEvents() throws Exception {
-    Logger downstreamLogger =
-        (Logger) LoggerFactory.getLogger("request-tracing-downstream-test");
+    Logger downstreamLogger = (Logger) LoggerFactory.getLogger("request-tracing-downstream-test");
     ListAppender<ILoggingEvent> downstreamAppender = new ListAppender<>();
     downstreamAppender.start();
     downstreamLogger.addAppender(downstreamAppender);
 
     try {
-      MockHttpServletRequest request =
-          new MockHttpServletRequest("GET", "/api/v1/personalities");
+      MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/personalities");
       request.addHeader("X-Request-ID", "downstream-trace-001");
       MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -152,6 +147,59 @@ class RequestTracingFilterTest {
         });
 
     assertThat(MDC.get("requestId")).isEqualTo("outer-request");
+  }
+
+  @Test
+  void logsFailureStatusAndRestoresMdcWhenRequestEscapesException() {
+    MDC.put("requestId", "outer-request");
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/personalities");
+    request.addHeader("X-Request-ID", "exception-trace-001");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    ServletException failure = new ServletException("boom");
+
+    assertThatThrownBy(
+            () ->
+                filter.doFilter(
+                    request,
+                    response,
+                    (req, res) -> {
+                      assertThat(MDC.get("requestId")).isEqualTo("exception-trace-001");
+                      throw failure;
+                    }))
+        .isSameAs(failure);
+
+    assertThat(response.getHeader("X-Request-ID")).isEqualTo("exception-trace-001");
+    assertThat(appender.list).hasSize(1);
+
+    ILoggingEvent completionEvent = appender.list.get(0);
+    assertThat(completionEvent.getMDCPropertyMap())
+        .containsEntry("requestId", "exception-trace-001");
+    assertThat(completionEvent.getFormattedMessage())
+        .contains("method=GET", "path=/api/v1/personalities", "status=500", "durationMs=");
+
+    assertThat(MDC.get("requestId")).isEqualTo("outer-request");
+  }
+
+  @Test
+  void preservesExistingErrorStatusWhenRequestEscapesException() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/personalities");
+    request.addHeader("X-Request-ID", "exception-status-trace-001");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    ServletException failure = new ServletException("boom");
+
+    assertThatThrownBy(
+            () ->
+                filter.doFilter(
+                    request,
+                    response,
+                    (req, res) -> {
+                      response.setStatus(503);
+                      throw failure;
+                    }))
+        .isSameAs(failure);
+
+    assertThat(appender.list).hasSize(1);
+    assertThat(appender.list.get(0).getFormattedMessage()).contains("status=503");
   }
 
   @Test

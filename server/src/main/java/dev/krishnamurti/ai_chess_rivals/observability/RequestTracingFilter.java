@@ -42,15 +42,21 @@ public class RequestTracingFilter extends OncePerRequestFilter {
     response.setHeader(REQUEST_ID_HEADER, requestId);
     MDC.put(REQUEST_ID_MDC_KEY, requestId);
 
+    boolean completedNormally = false;
     try {
       filterChain.doFilter(request, response);
+      completedNormally = true;
     } finally {
+      int completionStatus = response.getStatus();
+      if (!completedNormally && completionStatus < 400) {
+        completionStatus = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+      }
       long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
       log.info(
           "HTTP request completed method={} path={} status={} durationMs={}",
           request.getMethod(),
           request.getRequestURI(),
-          response.getStatus(),
+          completionStatus,
           durationMs);
       restoreMdc(previousRequestId);
     }
