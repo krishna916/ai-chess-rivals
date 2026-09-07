@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8082}
 
+logging:
+  pattern:
+    level: "%5p [requestId=%X{requestId}]"
+
 spring:
   application:
     name: ai-chess-rivals

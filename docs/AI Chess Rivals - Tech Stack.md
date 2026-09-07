@@ -146,6 +146,7 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 ### Developer Tooling & Verification
 *   **Lombok**: Reduces boilerplate code (e.g., automatically generating getters/setters, constructors, and builders via annotations).
 *   **Spring Boot Actuator**: Exposes operational endpoints (health, environment, and metrics) and works with Spring Modulith to expose module diagrams. Micrometer provides the metrics facade used by the planned Phase 2 observability.
+*   **Request correlation**: A single Spring `OncePerRequestFilter` scopes validated `X-Request-ID` values to `/api/**` and `/ws/**`, propagates them through SLF4J MDC, and renders them in application log levels.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
 *   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
 *   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
