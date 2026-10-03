@@ -37,12 +37,12 @@ If a local connection fails with `password authentication failed` or connects to
 To preserve the simplicity and focus of this showcase project (as outlined in the [Constitution](../docs/AI%20Chess%20Rivals%20-%20Constitution.md), [Implementation Strategy](../docs/AI%20Chess%20Rivals%20-%20Implementation%20Strategy.md), and [Tech Stack Document](../docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md)):
 
 - **LLM Boundary**: LLMs must be used *exclusively* for entertainment (trash talk, match commentary, mocking, reactions). **Never** write code that attempts to calculate chess moves or validate rules via LLMs.
-- **Stockfish Boundary**: Stockfish is the sole engine responsible for move legality, candidate move generation, and positional evaluation. It must never handle personality traits, and personality code must never select, validate, or replace a chess move.
+- **Stockfish Boundary**: Stockfish selects moves and evaluates positions. Chesslib validates/applies moves, advances backend board state, and detects terminal outcomes. Neither chess library handles personality traits, and personality code must never select, validate, or replace a chess move.
 - **Phase 2 AI Boundary**: Phase 2 uses Spring AI through OpenRouter's OpenAI-compatible API. A specific configurable `:free` model is the remote primary, one configurable ultra-low-cost model is the single remote fallback, and deterministic personality-specific dialogue is the final fallback.
 - **Provider Configuration**: Provider and model names are environment-configurable.
 - **Phase 3 Deferrals**: Tools, chat memory, autonomous agents, and multi-step workflows are Phase 3 concerns.
 - **Out of Scope (MVP constraints)**: Do **not** implement vector databases, user registration/accounts, multiplayer matches, complex multi-agent orchestrators, or microservices. Keep code explicitly modular-monolithic (using Spring Modulith).
-- **Database Migrations**: In local development, `spring.jpa.hibernate.ddl-auto` defaults to `update` for rapid prototyping. For production (Render + Neon), all database schemas must be driven strictly through **Flyway migration scripts** under `server/src/main/resources/db/migration/`. Developers must set `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` in production environments.
+- **Database Migrations**: `spring.jpa.hibernate.ddl-auto` defaults to `validate` locally and in production, with Flyway enabled. Schema changes belong in **Flyway migration scripts** under `server/src/main/resources/db/migration/`; a local `update` override is only for explicit prototyping. Keep `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` in production.
 
 ---
 
@@ -77,5 +77,4 @@ See the [Build and Verify](../docs/BUILD_AND_VERIFY.md) document for the full wo
 
 - **Event Publication Table**: When `spring.jpa.hibernate.ddl-auto` is set to `validate` or `none` and Flyway is managing migrations, Modulith's internal `event_publication` table must be explicitly created via a Flyway migration script (e.g. under `server/src/main/resources/db/migration/`).
 - **DDL Extraction**: To extract the correct table columns for the Modulith version on the classpath, temporarily boot the application once with `ddl-auto=update` on a clean local database, extract the schema using pg_dump, and restore the validation mode.
-
 

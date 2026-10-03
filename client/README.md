@@ -4,6 +4,8 @@ React/Vite frontend for the AI Chess Rivals showcase.
 
 ## Local development
 
+Use Node.js 22.13+ within Node 22, or Node 24+, to satisfy the locked tooling engine ranges.
+
 ```bash
 npm ci
 npm run dev
@@ -11,7 +13,8 @@ npm run dev
 
 Local defaults:
 
-- Frontend: `http://localhost:5173`
+- Viewer: `http://localhost:5173/#/`
+- Owner controls: `http://localhost:5173/#/admin`
 - Backend API: `http://localhost:8082/api/v1`
 
 `VITE_API_URL` can override the backend API base for a build or local invocation.

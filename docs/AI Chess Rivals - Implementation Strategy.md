@@ -18,8 +18,10 @@ This strategy follows the [Constitution](AI%20Chess%20Rivals%20-%20Constitution.
 The chess layer owns legal moves, position state, move commitment, evaluation, result detection,
 and match progression.
 
-The AI layer observes committed game events and produces entertainment. It never selects,
-validates, or replaces a chess move.
+The AI layer receives committed game context and produces entertainment. It never selects,
+validates, or replaces a chess move. The game module calls exported `ai :: api` and `chess :: api`
+interfaces synchronously; Modulith verifies those declared dependencies. Match events are
+published through `MatchEventSink` to the WebSocket stream.
 
 ## Phase 1 — Chess Foundation
 
@@ -44,7 +46,7 @@ Phase 2 adds entertainment on top of the completed chess foundation:
 - Use OpenRouter as the remote provider through the OpenAI-compatible integration.
 - Use the configured OpenRouter fallback model as the only automatic remote fallback.
 - Keep provider and model names environment-configurable.
-- Generate dialogue only after a move is committed and classified.
+- Generate dialogue after match start, committed/classified moves, and match completion.
 - Persist accepted dialogue and restore it on refresh/reconnect.
 - Keep provider waits bounded and continue the match with deterministic fallback dialogue when both providers fail.
 - Use structured output with `text`, `emotion`, and `reactionType`.
@@ -52,7 +54,9 @@ Phase 2 adds entertainment on top of the completed chess foundation:
 
 ### Phase 2 Dialogue Flow
 
-The match remains authoritative and deterministic at every chess boundary:
+Start dialogue runs after match creation and its start broadcast, before the first move.
+End dialogue runs after the final result is committed and before `MATCH_FINISHED` is broadcast.
+For move dialogue, the match remains authoritative at every chess boundary:
 
 1. Stockfish selects a move.
 2. The backend commits and classifies the move.

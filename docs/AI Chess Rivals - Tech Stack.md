@@ -7,7 +7,7 @@ This document provides an inventory and explanation of all libraries, tools, and
 
 | Layer | Key Technologies | Version / Environment |
 |---|---|---|
-| **Language & Runtime** | Java (GraalVM AOT), Node.js, TypeScript | Java 25, Node.js 22+, TypeScript ~6.0.2 |
+| **Language & Runtime** | Java (GraalVM AOT), Node.js, TypeScript | Java 25, Node.js 22.13+ within Node 22, or 24+, TypeScript ~6.0.2 |
 | **Client-Side (Frontend)** | React, Vite, Tailwind CSS, shadcn/ui | React 19.2.7, Vite 8.1.0, Tailwind CSS 4.3.1 |
 | **Server-Side (Backend)** | Spring Boot, Spring Modulith, Spring AI, Hibernate | Spring Boot 4.1.0 (GraalVM Native Image), Spring Modulith 2.1.0, Spring AI 2.0.0 |
 | **Database** | PostgreSQL | PostgreSQL 17 (via Docker Compose / Neon in production) |
@@ -36,7 +36,7 @@ The frontend is built using **React** with **TypeScript** and bundled with **Vit
 *   **Axios** (`v1.18.1`): Promise-based HTTP client to make backend API calls.
 
 ### Chess Mechanics
-*   **chess.js** (`v1.4.0`): Chess rules library used to validate moves, generate legal moves, and track board state on the client side.
+*   **chess.js** (`v1.4.0`): Installed chess rules library; currently unused by the read-only viewer, which hydrates server FEN and move metadata.
 *   **react-chessboard** (`v5.10.0`): Customizable React chessboard UI component.
 
 ### Dependency Reference Table (`client/package.json`)
@@ -49,7 +49,7 @@ The frontend is built using **React** with **TypeScript** and bundled with **Vit
 | `react-router-dom` | `^7.18.0` | Frontend routing |
 | `zustand` | `^5.0.14` | Global state management |
 | `axios` | `^1.18.1` | HTTP API requests |
-| `chess.js` | `^1.4.0` | Move validation and board state rules |
+| `chess.js` | `^1.4.0` | Installed; currently unused by application code |
 | `react-chessboard` | `^5.10.0` | Chessboard UI component |
 | `radix-ui` | `^1.6.0` | Accessible headless component primitives |
 | `shadcn` | `^4.12.0` | UI component generator / CLI |
@@ -122,20 +122,20 @@ provider/gateway chain.
 
 The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemplate`, maps the required `text` / `emotion` / `reactionType` schema with `BeanOutputConverter`, and applies a lightweight `CallAdvisor` for shared entertainment/safety boundaries. A deterministic speaking policy decides whether a move event speaks and which personality speaks before the existing `AiChatGateway` performs OpenRouter primary → OpenRouter fallback → deterministic fallback.
 
-### Issue #43 Dialogue Persistence and Match Lifecycle
+### Dialogue Persistence and Match Lifecycle
 
 - Flyway V4 adds the `dialogue_line` table, including match UUID, trigger type/ply, personality, text, emotion, reaction, source, and creation time. The unique key is `(match_id, trigger_type, trigger_ply, personality_key)`.
 - A match UUID is an in-memory identity used to partition dialogue history; no persisted match aggregate is introduced.
 - Dialogue runs synchronously after a committed move and its broadcast, before result handling and pacing; end dialogue is persisted before `MATCH_FINISHED` is published.
 - Prompt context uses the last four persisted dialogue rows in chronological order. Deterministic provider fallbacks follow the same persistence path with source `DETERMINISTIC_FALLBACK`.
 - Stop increments an execution-generation guard. Late provider results from an invalidated generation are discarded, including when execution is resumed.
-- The temporary runtime personality pairing is Blaze/Vesper only until issue #44 supplies match personality selection.
-- REST snapshots, WebSocket state/live messages, and the frontend store hydrate and deduplicate persisted dialogue. Rendering dialogue in the activity feed remains issue #45 work.
+- New matches select two distinct active personalities from the four-character roster; the admin UI also supports random rivalry. Stopped matches resume with their original pairing.
+- REST snapshots, WebSocket state/live messages, and the frontend store hydrate and deduplicate persisted dialogue. The unified activity feed renders dialogue alongside moves and lifecycle events.
 
 ### Web & API Communication
 *   **Spring Boot Starter WebMVC**: Configures REST APIs and synchronous web endpoints.
 *   **Spring Boot Starter WebSocket**: Handles real-time, bi-directional communication between client and server (crucial for streaming chess matches, live evaluations, and real-time trash talk).
-*   **Spring Boot Starter RestClient**: Lightweight, synchronous generic HTTP-client support. It is not the planned Phase 2 LLM integration path; Spring AI owns that boundary.
+*   **Spring Boot Starter RestClient**: Lightweight, synchronous generic HTTP-client support. It is not the Phase 2 LLM integration path; Spring AI owns that boundary.
 
 ### Persistence & Database
 *   **Spring Boot Starter Data JPA**: Database access layer powered by Spring Data and Hibernate ORM.
@@ -145,7 +145,7 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 
 ### Developer Tooling & Verification
 *   **Lombok**: Reduces boilerplate code (e.g., automatically generating getters/setters, constructors, and builders via annotations).
-*   **Spring Boot Actuator**: Exposes operational endpoints (health, environment, and metrics) and works with Spring Modulith to expose module diagrams. Micrometer provides the metrics facade used by the planned Phase 2 observability.
+*   **Spring Boot Actuator**: Exposes operational endpoints (health, info, and metrics on management port `8081`). Micrometer provides the metrics facade used by Phase 2 provider observability.
 *   **Request correlation**: A single Spring `OncePerRequestFilter` scopes validated `X-Request-ID` values to `/api/**` and `/ws/**`, propagates them through SLF4J MDC, and renders them in application log levels.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
 *   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
@@ -197,7 +197,7 @@ Orchestrated locally via Docker Compose (`server/docker-compose.yml`) and connec
 *   **Image**: `postgres:17-alpine`
 *   **Port Mapping**: `5433:5432`
 *   **Configured Database**: `aichessrivals`
-*   **Developer Credentials**: `postgres` / `secretpassword`
+*   **Credentials**: Compose requires `POSTGRES_USER`/`POSTGRES_PASSWORD`; direct Spring defaults are `postgres`/`secretpassword`. Configure matching values explicitly. Compose backend URLs hardcode `aichessrivals`, so changing `POSTGRES_DB` also requires changing those URLs.
 
 ### 2. Stockfish Chess Engine
 Stockfish is used as a local executable process communicating over UCI (stdin/stdout) via the `StockfishClient`.
@@ -205,7 +205,7 @@ Stockfish is used as a local executable process communicating over UCI (stdin/st
 *   **Binary Management**: Binaries are downloaded dynamically based on target build profiles rather than being committed directly to git:
     *   **Windows Profile (`-Pwindows`)**: Downloads `stockfish-windows-x86-64-avx2.zip`, extracts it, and moves the exe to `server/stockfish/stockfish.exe`.
     *   **Linux Profile (`-Plinux`)**: Downloads `stockfish-ubuntu-x86-64-avx2.tar`, extracts it, moves the binary to `server/stockfish/stockfish`, and applies execution permissions (`chmod 755`).
-*   **Process Client**: The `StockfishClient` runs `ProcessBuilder` on this native executable, starting the process, sending UCI configuration, and verifying readiness via `isready`/`readyok` sequence.
+*   **Process Client**: `StockfishEngine`, implementing the `StockfishClient` interface, runs `ProcessBuilder` on this native executable, starting the process, sending UCI configuration, and verifying readiness via `isready`/`readyok` sequence.
 *   **Position Evaluation**: The match engine requests a shallow, bounded evaluation for each committed position using the configured depth and move-time limits (defaults: depth `8`, `50ms`). Scores are normalized to the moving player's perspective and classified as `STABLE`, `MAJOR_GAIN`, or `MAJOR_MISTAKE` using inclusive `200cp` swing thresholds. Evaluation is best effort and does not invalidate a legal move when Stockfish is unavailable.
 
 ### 3. Match Runtime Pacing
@@ -218,7 +218,7 @@ Backend move pacing is configured through Spring `Duration` properties and envir
 ### 4. Owner Match-Control Guard
 Protected Start/Stop operations use a backend-only bearer token and an in-memory, single-instance lifecycle guard.
 *   **Environment Variables**: `OWNER_CONTROL_TOKEN`, `MATCH_COOLDOWN`, and `MATCH_DAILY_START_LIMIT`.
-*   **Frontend Retention**: The manually entered token is kept only in `sessionStorage` on `/admin`; it is not a frontend build variable.
+*   **Frontend Retention**: The manually entered token is kept only in `sessionStorage` on `/#/admin`; it is not a frontend build variable.
 *   **Runtime Limits**: One active match, a `60s` default cooldown, and `12` accepted starts per UTC day by default.
 *   **Deployment Constraint**: Guard state is process-local, so production uses one backend instance.
 

@@ -2,6 +2,10 @@
 
 Spring Boot backend for the AI Chess Rivals application.
 
+Before launching, configure the local database credentials and required `OWNER_CONTROL_TOKEN`
+using the [root setup guide](../README.md#getting-started). The application defaults to port
+`8082`, with Actuator on the separate management port `8081`.
+
 ---
 
 ## Stockfish Engine Setup
@@ -82,6 +86,9 @@ your deployment environment variables.
 STOCKFISH_PATH=stockfish/stockfish mvn spring-boot:run
 ```
 
+The download profiles supply Windows/Linux x86-64 AVX2 binaries. On macOS or another
+architecture, provide a compatible executable separately and configure `STOCKFISH_PATH`.
+
 The application contains **no OS detection** — it simply executes whatever path
 is configured.
 
@@ -96,8 +103,9 @@ The wider pacing gives viewers enough time to read and react to dialogue, while
 keeping normal gameplay comfortably below OpenRouter's 20 RPM free-model limit
 and reducing fallback spend. Set both to `0s` for fast local runs and
 integration-style verification only.
-Stopping a match interrupts an active wait; the latest in-progress position
-remains available for the existing resume flow.
+Stopping a match sets a stop flag and invalidates pending dialogue authority without
+interrupting the worker (`cancel(false)`). An active pacing sleep or provider/engine operation
+may finish before the worker exits. The latest in-progress position remains available for resume.
 
 ## Owner match controls
 
@@ -129,7 +137,7 @@ openssl rand -hex 32
 
 Store the generated value in a password manager and in the Render web service's
 `OWNER_CONTROL_TOKEN` environment setting. Never add it to a frontend environment
-variable. Open `/admin`, enter it manually, and use Start/Stop there. The browser
+variable. Open `http://localhost:5173/#/admin`, enter it manually, and use Start/Stop there. The browser
 keeps it only in `sessionStorage`; **Lock Controls** removes it.
 
 Cooldown and accepted-start counters are in memory. The daily counter resets at
@@ -216,7 +224,9 @@ delete the contents of `server/stockfish/` (except `.gitkeep`) and re-run
 
 ## Docker Compose Development Workflow
 
-The recommended development workflow utilizes Docker Compose to orchestrate both the backend application and the PostgreSQL database.
+For normal development, run PostgreSQL with `docker compose up -d postgres`, Spring Boot
+through Maven or the IDE, and the frontend through Vite. See the root README for local setup.
+The optional workflow below runs both PostgreSQL and the native backend in Compose.
 
 ### 1. Prerequisites
 
@@ -228,7 +238,12 @@ Before launching, copy the `.env.example` template into a `.env` file in the sam
 ```bash
 cp .env.example .env
 ```
-Ensure the environment variables are set correctly for your local development environment.
+Replace the template placeholders with local values and generate `OWNER_CONTROL_TOKEN` before
+starting the backend. Set `POSTGRES_DB=aichessrivals`: Compose's backend datasource and Flyway
+URLs currently hardcode that name. Changing the database name also requires changing both URLs
+in `docker-compose.yml`. Set `POSTGRES_USER` and `POSTGRES_PASSWORD` explicitly; Compose has
+no credential defaults. For direct JVM execution, also configure the datasource/Flyway entries
+for `localhost:5433` with matching credentials.
 
 ### 3. Build & Run
 
@@ -273,10 +288,10 @@ docker compose up -d --build
 
 Connect to the PostgreSQL instance using any database client (such as DBeaver, pgAdmin, or IntelliJ Database Tools):
 - **Host**: `localhost`
-- **Port**: `5432` (mapped from standard container port)
-- **Database**: `aichessrivals` (or value of `POSTGRES_DB` in `.env`)
-- **Username**: `postgres` (or value of `POSTGRES_USER` in `.env`)
-- **Password**: `secretpassword` (or value of `POSTGRES_PASSWORD` in `.env`)
+- **Port**: `5433` (mapped to container port `5432`)
+- **Database**: `aichessrivals` for the supplied backend Compose URLs
+- **Username**: the configured `POSTGRES_USER` in `.env`
+- **Password**: the configured `POSTGRES_PASSWORD` in `.env`
 
 ---
 
@@ -374,4 +389,3 @@ committed files:
 If the existing Render service explicitly sets `SERVER_PORT`, `STOCKFISH_PATH`, Stockfish tuning,
 or game pacing variables, copy those values unchanged to the image-backed service. Do not invent
 new production values merely because `.env.example` lists optional settings.
-

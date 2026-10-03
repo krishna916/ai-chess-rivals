@@ -114,7 +114,7 @@ If a simpler solution provides similar value, always choose it.
 | shadcn/ui                | 4 (Radix-based components)             |
 | Zustand                  | 5 (state management)                   |
 | React Router DOM         | 7 (routing)                            |
-| chess.js                 | 1.4 (client-side move validation)      |
+| chess.js                 | 1.4 (installed; currently unused)      |
 | react-chessboard         | 5 (board UI)                           |
 | Axios                    | 1 (HTTP client)                        |
 
@@ -132,9 +132,11 @@ Avoid introducing new top-level packages or folders unless there is a strong rea
 
 ```
 server/src/main/java/dev/krishnamurti/ai_chess_rivals/
-    config/          # Cross-cutting configuration (e.g., GraalVM hints)
     chess/           # Chess module (Stockfish integration)
         config/      # Module-specific config (e.g., Stockfish properties)
+    game/            # Match domain, execution, REST, WebSocket, configuration
+    ai/              # Personality roster, dialogue, persistence, provider integration
+    observability/   # Request correlation
 ```
 
 Spring Modulith enforces module boundaries at the top-level package level. Each top-level package under `ai_chess_rivals/` is a Modulith module.
@@ -180,18 +182,18 @@ Guidelines:
 - Avoid creating interfaces unless multiple implementations are expected.
 - Use constructor injection (Lombok's `@RequiredArgsConstructor` is acceptable).
 - Use Jakarta Bean Validation for input validation.
-- Use Spring Modulith's event system for cross-module communication rather than direct service calls.
+- Use declared Spring Modulith dependencies and exported APIs for synchronous cross-module calls. The game module consumes `chess :: api` and `ai :: api`; match events reach the WebSocket stream through `MatchEventSink`.
 
 ### Database Migrations
 
-- **Local development**: `spring.jpa.hibernate.ddl-auto` defaults to `update` for rapid prototyping.
+- **Local development**: `spring.jpa.hibernate.ddl-auto` defaults to `validate`, with Flyway migrations enabled. Schema changes require migrations unless explicitly prototyping with a local override.
 - **Production**: All schemas must be driven through **Flyway migration scripts** under `server/src/main/resources/db/migration/`.
 - Production environments must set `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`.
 
 ### Stockfish Integration
 
 - Stockfish runs as a native process via `ProcessBuilder`, communicating over the UCI protocol (stdin/stdout).
-- The `StockfishClient` manages the process lifecycle.
+- `StockfishEngine` implements the public `StockfishClient` interface and manages the process lifecycle.
 - Stockfish binary is downloaded at build time via Maven profiles (`-Pwindows` or `-Plinux`), not committed to git.
 - Binary location: `server/stockfish/stockfish.exe` (Windows) or `server/stockfish/stockfish` (Linux).
 
@@ -221,13 +223,13 @@ Stockfish is the source of truth for chess.
 
 Stockfish is responsible for:
 
-- Legal move generation
+- Move selection
 - Position evaluation
 - Candidate moves
 
-Do not implement custom chess logic that duplicates Stockfish unless absolutely necessary.
+Chesslib validates and applies Stockfish moves, advances backend board state, and detects terminal outcomes. Do not introduce custom chess logic that duplicates these libraries unless absolutely necessary.
 
-`chess.js` on the client provides client-side move validation and board state tracking for the UI.
+`chess.js` is installed but currently unused by application code. The read-only viewer hydrates server FEN and move metadata and disables piece dragging.
 
 ---
 
@@ -258,6 +260,8 @@ environment-configurable.
 # Phase Awareness
 
 The project is implemented in phases.
+
+The repository currently implements Phase 1 foundations and Phase 2 personality/dialogue features. The phase boundaries below define responsibility; they do not imply that the frontend or AI layer is still a scaffold.
 
 ## Phase 1
 
@@ -308,8 +312,12 @@ Complexity should only be added when it directly improves the viewer experience.
 
 - **Backend**: Run Spring Boot directly from the IDE, or via `./mvnw spring-boot:run` from `server/`.
 - **Frontend**: Run `npm run dev` from `client/` (Vite dev server).
-- **Database**: Run `docker compose up -d` from `server/` to start PostgreSQL.
+- **Database**: Configure `server/.env` from the template, then run `docker compose up -d postgres` from `server/` to start only PostgreSQL.
 - **Stockfish**: Downloaded automatically by Maven during build. Ensure the correct profile is active (`-Pwindows` or `-Plinux`).
+
+The download profiles supply Windows/Linux x86-64 AVX2 executables. Other platforms require a separately supplied compatible executable and `STOCKFISH_PATH`. Direct backend execution defaults to app port `8082` and management port `8081`; startup requires a non-blank `OWNER_CONTROL_TOKEN`.
+
+Use Node.js 22.13+ within Node 22, or Node 24+, for the frontend tooling. Browser routes use hashes locally and in production: `http://localhost:5173/#/` for the viewer and `http://localhost:5173/#/admin` for owner controls.
 
 ## Port Mappings
 

@@ -7,11 +7,11 @@ root verifier before opening a pull request.
 
 - JDK 25
 - Maven 3.9 or newer (the Maven wrapper is included)
-- Node.js 22 or newer and npm
+- Node.js 22.13+ within Node 22, or Node 24+, and npm
 
 ## Whole repository
 
-From any working directory, use the script appropriate for your shell:
+From the repository root, use the script appropriate for your shell:
 
 ```powershell
 .\scripts\verify.ps1
@@ -90,12 +90,20 @@ skipped/successful instead of omitting the workflow entirely.
 Run Maven verification from the repository root:
 
 ```powershell
+$env:STOCKFISH_PATH = (Join-Path $PWD "server/stockfish/stockfish.exe")
+$env:AI_ENABLED = "false"
 server\mvnw.cmd -f server\pom.xml verify
 ```
 
 ```sh
+export STOCKFISH_PATH="$PWD/server/stockfish/stockfish"
+export AI_ENABLED=false
 ./server/mvnw -f server/pom.xml verify
 ```
+
+Download the matching Stockfish binary first. Export the same variables before invoking the
+root verifier. The engine integration-test helper reads the process environment directly and
+defaults to the Windows `.exe` path; the application `.env` import does not configure that helper.
 
 The verify lifecycle enforces Java 25 and Maven 3.9+, checks Java formatting, compiles with
 Error Prone, runs unit tests (including Spring Modulith structure verification), runs the `*IT`
@@ -372,7 +380,9 @@ but they do not count as browser or real-provider observations.
 ## Phase 1 end-to-end acceptance
 
 Use the normal local-development topology so the management and application ports remain
-separate:
+separate. First configure `server/.env` and download a platform-compatible Stockfish binary as
+shown in the root README; the template placeholders must be replaced with matching local
+database credentials. Then run:
 
 ```powershell
 cd server
@@ -393,7 +403,7 @@ npm.cmd run dev
 ```
 
 Open `http://localhost:5173` to confirm the viewer is read-only. Then open
-`http://localhost:5173/admin`, enter the value generated for `OWNER_CONTROL_TOKEN`, and use
+`http://localhost:5173/#/admin`, enter the value generated for `OWNER_CONTROL_TOKEN`, and use
 that route for Start/Stop. The application API and WebSocket use port `8082`; the local
 Actuator health endpoint is `http://localhost:8081/actuator/health`. The Docker backend does not
 publish its separate management port to the host, so run the backend locally when the host needs

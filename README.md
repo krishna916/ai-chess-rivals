@@ -4,11 +4,12 @@ Two AI personalities. One chessboard. Infinite trash talk.
 
 AI Chess Rivals is a hobby showcase project for building an entertaining AI-vs-AI chess experience. The goal is not to build the strongest chess engine. The goal is to showcase practical AI engineering through personalities, reactions, match drama, and a complete product built end to end.
 
-The current repository is still in the foundation phase:
+The repository contains the chess foundation and the Phase 2 entertainment layer:
 
-- The backend already contains the Stockfish integration and a small `game` domain model.
-- The frontend is scaffolded with the intended app structure and base UI tooling.
-- The personality and LLM-driven entertainment layer is planned, but it is not implemented on `master` yet.
+- Autonomous Stockfish matches with owner-only Start/Stop and resume controls.
+- Four selectable personalities, random rivalry setup, and contextual dialogue.
+- Spring AI integration with OpenRouter primary/fallback models and deterministic fallback.
+- A read-only live viewer with board state, move annotations, and a unified dialogue/activity feed.
 
 ## Principles
 
@@ -24,21 +25,18 @@ Today the codebase is a modular monolith with a React client:
 - `server/`: Spring Boot 4 backend using Spring Modulith.
 - `client/`: React 19 + Vite 8 frontend.
 - `server/src/main/java/.../chess`: Stockfish process management and UCI integration.
-- `server/src/main/java/.../game/domain`: early chess match domain objects.
+- `server/src/main/java/.../game`: match lifecycle, Chesslib board progression, REST controls, and WebSocket streaming.
+- `server/src/main/java/.../ai`: personality roster, dialogue generation/persistence, and provider fallback.
+- `server/src/main/java/.../observability`: request correlation.
 
-What exists now:
+Stockfish selects moves and evaluates positions; Chesslib validates/applies moves and detects
+terminal outcomes. LLMs generate entertainment only. PostgreSQL/Flyway persist personalities
+and dialogue; the active match, cooldown, and daily-start counters remain in memory.
 
-- Stockfish is the source of truth for chess operations.
-- PostgreSQL and Flyway are configured for persistence and schema management.
-- WebMVC, WebSocket, and RestClient dependencies are present in the backend stack.
-- The frontend has Tailwind CSS v4 and shadcn/ui primitives wired in.
-
-What does not exist yet on `master`:
-
-- No implemented AI personality module.
-- No LLM provider integration.
-- No completed match orchestration UI.
-- No production gameplay flow in the frontend yet.
+The frontend uses hash routing: `/#/` is the public viewer and `/#/admin` contains owner controls.
+Refresh/reconnect hydrate board and dialogue state from the backend. Production uses a static
+GitHub Pages frontend and a GraalVM native backend image deployed through GHCR to Render.
+Phase 3 tools, chat memory, and autonomous workflows remain deferred.
 
 ## Tech Stack
 
@@ -66,7 +64,7 @@ What does not exist yet on `master`:
 | shadcn/ui | 4.12.x | UI primitives |
 | Zustand | 5.0.x | State management |
 | React Router DOM | 7.18.x | Routing |
-| chess.js | 1.4.x | Client-side chess state helpers |
+| chess.js | 1.4.x | Installed; currently unused by the read-only viewer |
 | react-chessboard | 5.10.x | Board UI |
 | Axios | 1.18.x | HTTP client |
 
@@ -74,7 +72,7 @@ See [docs/AI Chess Rivals - Tech Stack.md](docs/AI%20Chess%20Rivals%20-%20Tech%2
 
 ## Project Structure
 
-The previous structure summary was stale. This reflects the current repository layout on `master`.
+The main source and development-tool directories are:
 
 ```text
 ai-chess-rivals/
@@ -84,14 +82,14 @@ ai-chess-rivals/
 |   |-- src/
 |   |   |-- assets/                 # Images and bundled assets
 |   |   |-- components/ui/          # Shared UI primitives
-|   |   |-- features/               # Feature area placeholders
+|   |   |-- features/               # Admin controls and match viewer
 |   |   |-- hooks/                  # Custom React hooks
 |   |   |-- lib/                    # Utilities such as cn()
-|   |   |-- pages/                  # Route-level page placeholders
-|   |   |-- services/               # Client API layer placeholders
-|   |   |-- store/                  # Zustand store placeholders
+|   |   |-- pages/                  # Admin and viewer route pages
+|   |   |-- services/               # REST and WebSocket clients
+|   |   |-- store/                  # Match viewer state and hydration
 |   |   |-- types/                  # Shared TypeScript types
-|   |   |-- App.tsx                 # Current scaffold UI
+|   |   |-- App.tsx                 # Hash-based viewer/admin routes
 |   |   `-- main.tsx                # Frontend entrypoint
 |   |-- components.json             # shadcn/ui config
 |   |-- package.json
@@ -100,7 +98,16 @@ ai-chess-rivals/
 |   |-- AI Chess Context.md
 |   |-- AI Chess Rivals - Constitution.md
 |   |-- AI Chess Rivals - Tech Stack.md
+|   |-- AI Chess Rivals - Implementation Strategy.md
+|   |-- Code Formatting Guidelines.md
+|   |-- PERSONALITIES.md
 |   `-- BUILD_AND_VERIFY.md
+|-- run-client.ps1                  # Start frontend from Windows PowerShell
+|-- run-client.sh                   # Start frontend from Linux/macOS shells
+|-- run-db.ps1                      # Start PostgreSQL from Windows PowerShell
+|-- run-db.sh                       # Start PostgreSQL from Linux/macOS shells
+|-- run-server.ps1                  # Start backend from Windows PowerShell
+|-- run-server.sh                   # Start backend from Linux/macOS shells
 |-- scripts/
 |   |-- verify.ps1                  # Root verification script for Windows
 |   `-- verify.sh                   # Root verification script for POSIX shells
@@ -109,13 +116,17 @@ ai-chess-rivals/
 |   |   |-- main/
 |   |   |   |-- java/dev/krishnamurti/ai_chess_rivals/
 |   |   |   |   |-- chess/          # Stockfish client, engine, UCI support
-|   |   |   |   `-- game/domain/    # Match, move, board position domain model
+|   |   |   |   |-- game/           # Domain, execution, REST, WebSocket, config
+|   |   |   |   |-- ai/             # Personalities, dialogue, provider integration
+|   |   |   |   `-- observability/  # Request tracing
 |   |   |   `-- resources/
 |   |   |       |-- application.yaml
 |   |   |       `-- db/migration/   # Flyway SQL migrations
 |   |   `-- test/java/...           # Modulith, Stockfish, and domain tests
 |   |-- stockfish/                  # Download target for local Stockfish binaries
 |   |-- docker-compose.yml          # Local Postgres and backend containers
+|   |-- run-local.ps1               # Start locally configured backend on Windows
+|   |-- run-local.sh                # Start locally configured backend on Linux/macOS
 |   |-- Dockerfile
 |   |-- pom.xml
 |   `-- README.md
@@ -131,7 +142,7 @@ ai-chess-rivals/
 | --- | --- |
 | JDK | 25 |
 | Maven | 3.9+ |
-| Node.js | 22+ |
+| Node.js | 22.13+ within Node 22, or Node 24+ |
 | Docker Desktop | Recent |
 
 ### 1. Clone
@@ -141,9 +152,21 @@ git clone https://github.com/krishna916/ai-chess-rivals.git
 cd ai-chess-rivals
 ```
 
-### 2. Start PostgreSQL
+### 2. Configure local environment and start PostgreSQL
 
-From `server/`:
+From `server/`, copy `.env.example` to `.env` if you do not already have a local file
+(PowerShell: `Copy-Item .env.example .env`; POSIX: `cp .env.example .env`). Replace the
+placeholders before starting either service:
+
+- Set `POSTGRES_DB=aichessrivals` and `POSTGRES_USER=postgres`, and choose `POSTGRES_PASSWORD`.
+- Set `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/aichessrivals`,
+  `SPRING_DATASOURCE_USERNAME=postgres`, and `SPRING_DATASOURCE_PASSWORD` to the same password.
+- Set the Flyway URL/user/password to the same local database values.
+- Generate and set `OWNER_CONTROL_TOKEN` using the commands in [Configuration](#configuration).
+- Keep `AI_ENABLED=false` for a first run; deterministic personality dialogue needs no provider key.
+
+Compose loads `.env` for database settings. Spring imports it when launched from `server/`.
+The template contains placeholders, not ready-to-run credentials. Then start PostgreSQL:
 
 ```bash
 docker compose up -d postgres
@@ -170,13 +193,16 @@ Then run the app:
 $env:STOCKFISH_PATH = "stockfish/stockfish.exe"
 .\mvnw.cmd spring-boot:run
 
-# Linux / macOS
+# Linux
 STOCKFISH_PATH=stockfish/stockfish ./mvnw spring-boot:run
 ```
 
+The provided download profiles target Windows/Linux x86-64 AVX2. On macOS or another
+architecture, supply a compatible Stockfish executable separately and set `STOCKFISH_PATH`.
+
 Backend defaults:
 
-- App: `http://localhost:8080`
+- App: `http://localhost:8082`
 - Actuator: `http://localhost:8081`
 - Docker-mapped backend port: `http://localhost:8082`
 
@@ -189,7 +215,28 @@ npm install
 npm run dev
 ```
 
-Frontend dev server: `http://localhost:5173`
+Frontend viewer: `http://localhost:5173/#/`; owner controls: `http://localhost:5173/#/admin`.
+Enter the backend's owner token to unlock Start/Stop. Select two distinct personalities or
+randomize the rivalry before starting a new match.
+
+### Convenience scripts
+
+From the repository root, run each command in its own terminal:
+
+```bash
+./run-db.sh
+./server/run-local.sh
+./run-client.sh
+```
+
+`./run-server.sh` starts the backend with its normal environment defaults. Use
+`./server/run-local.sh` to explicitly export local settings. It connects to PostgreSQL on port
+`5433`, listens on port `8082`, and requires `SPRING_DATASOURCE_PASSWORD` or
+`SPRING_FLYWAY_PASSWORD` to be set in the shell. All POSIX scripts can be started from the
+repository root; they locate their working directories automatically. The local launcher
+activates `dev`, but there is no profile-specific application configuration; its environment
+exports supply the settings. These backend scripts still require the configured owner token
+and a platform-compatible Stockfish binary.
 
 ## Configuration
 
@@ -205,6 +252,7 @@ Frontend dev server: `http://localhost:5173`
 
 | Variable | Default |
 | --- | --- |
+| `SERVER_PORT` | `8082` (Compose overrides it to `8080` inside the container) |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5433/aichessrivals` |
 | `SPRING_DATASOURCE_USERNAME` | `postgres` |
 | `SPRING_DATASOURCE_PASSWORD` | `secretpassword` |
@@ -233,14 +281,15 @@ openssl rand -hex 32
 ```
 
 Configure the same token in the backend/Render environment and your password
-manager. Enter it manually at `http://localhost:5173/admin`; it is retained only
-in that tab's `sessionStorage`. The public `/` route is read-only. Cooldown and
-daily quota state are in memory, reset on restart, and require a single backend
+manager. Enter it manually at `http://localhost:5173/#/admin`; it is retained only
+in that tab's `sessionStorage`. Routing uses URL hashes locally and in production;
+use `/#/admin` to open the owner controls. The public `/#/` route is read-only.
+Cooldown and daily quota state are in memory, reset on restart, and require a single backend
 instance.
 
 ## Live Match Stream
 
-- Endpoint: `ws://localhost:8080/ws/match` when the backend runs directly, or `ws://localhost:8082/ws/match` through Docker
+- Default endpoint: `ws://localhost:8082/ws/match` for direct backend execution and Docker
 - Messages use a stable envelope: `{ "type": "...", "payload": ... }`
 - The first server message is `MATCH_STATE` when a match exists, otherwise `NO_MATCH`
 - The backend currently supports exactly one active match stream
@@ -257,6 +306,9 @@ Run the repository-level verifier before opening a PR:
 ./scripts/verify.sh
 ```
 
+Prepare Stockfish and the isolated integration-test database on port `55433` first, as described
+in [Build and Verify](docs/BUILD_AND_VERIFY.md#postgresql-integration-tests).
+
 This runs:
 
 - Backend Maven `verify`
@@ -269,15 +321,15 @@ See [docs/BUILD_AND_VERIFY.md](docs/BUILD_AND_VERIFY.md) for the full verificati
 - [AGENTS.md](AGENTS.md): contributor and agent rules
 - [docs/AI Chess Rivals - Constitution.md](docs/AI%20Chess%20Rivals%20-%20Constitution.md): project principles
 - [docs/AI Chess Rivals - Tech Stack.md](docs/AI%20Chess%20Rivals%20-%20Tech%20Stack.md): dependency inventory
+- [docs/AI Chess Rivals - Implementation Strategy.md](docs/AI%20Chess%20Rivals%20-%20Implementation%20Strategy.md): phase boundaries and dialogue flow
+- [docs/PERSONALITIES.md](docs/PERSONALITIES.md): four system character designs
 - [server/README.md](server/README.md): backend-specific notes
+- [client/README.md](client/README.md): frontend development and deployment
 
 ## Status
 
-`master` currently represents an early implementation baseline:
-
-- Backend chess engine integration is in place.
-- Core `game` domain types are in place.
-- Verification and code quality gates are configured.
-- Frontend foundation is set up, but product features are still mostly ahead.
-
-That is intentional. This project is being built in phases, with chess foundations first and AI entertainment layers added later.
+Phase 1 chess foundations and Phase 2 personality/dialogue features are implemented.
+Verification covers module boundaries, match lifecycle, provider resilience, database migrations,
+and frontend state/UI behavior. Dated acceptance records in
+[Build and Verify](docs/BUILD_AND_VERIFY.md) distinguish automated checks from manual observations.
+Phase 3 agentic capabilities remain out of scope for the current implementation.
