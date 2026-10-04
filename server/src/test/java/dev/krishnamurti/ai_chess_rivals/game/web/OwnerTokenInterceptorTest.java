@@ -1,9 +1,13 @@
 package dev.krishnamurti.ai_chess_rivals.game.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchSnapshot;
@@ -11,6 +15,7 @@ import dev.krishnamurti.ai_chess_rivals.game.config.OwnerControlProperties;
 import dev.krishnamurti.ai_chess_rivals.game.domain.Match;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -57,6 +62,31 @@ class OwnerTokenInterceptorTest {
     assertUnauthorized(
         post("/api/v1/match/start").header(HttpHeaders.AUTHORIZATION, "Bearer wrong-token"));
     verifyNoInteractions(matchControlService);
+  }
+
+  @Test
+  void logsAuthorizationRejectionWithoutSuppliedToken() throws Exception {
+    Logger logger = (Logger) LoggerFactory.getLogger(OwnerTokenInterceptor.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      assertUnauthorized(
+          post("/api/v1/match/start")
+              .header(HttpHeaders.AUTHORIZATION, "Bearer sensitive-test-token"));
+
+      assertThat(appender.list)
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .anySatisfy(
+              message ->
+                  assertThat(message)
+                      .contains(
+                          "event=owner_authorization", "outcome=rejected", "operation=match_start")
+                      .doesNotContain("sensitive-test-token"));
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
   }
 
   @Test

@@ -3,6 +3,7 @@ package dev.krishnamurti.ai_chess_rivals.ai.personality;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -14,6 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dev.krishnamurti.ai_chess_rivals.game.config.OwnerControlProperties;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -32,6 +35,60 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
       "APP_WEBSOCKET_ALLOWED_ORIGIN=https://ai-chess.krishnamurti.dev"
     })
 class PersonalityControllerTest {
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "http://localhost",
+        "http://localhost:3000",
+        "https://localhost",
+        "https://localhost:9443",
+        "http://preview.krishnamurti.dev",
+        "https://ai-chess.krishnamurti.dev",
+        "http://nested.preview.krishnamurti.dev:3000",
+        "https://preview.krishnamurti.dev:9443"
+      })
+  void preflightAllowsLocalhostAndOwnedSubdomains(String origin) throws Exception {
+    mockMvc
+        .perform(
+            options("/api/v1/personalities")
+                .with(
+                    request -> {
+                      request.setServerName("backend.internal");
+                      return request;
+                    })
+                .header(HttpHeaders.ORIGIN, origin)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization,content-type"))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "https://example.com",
+        "http://localhost.evil.com:3000",
+        "https://evilkrishnamurti.dev",
+        "https://preview.krishnamurti.dev.evil.com",
+        "https://krishnamurti.dev",
+        "http://127.0.0.1:5173",
+        "null"
+      })
+  void preflightRejectsUntrustedOrigins(String origin) throws Exception {
+    mockMvc
+        .perform(
+            options("/api/v1/personalities")
+                .with(
+                    request -> {
+                      request.setServerName("backend.internal");
+                      return request;
+                    })
+                .header(HttpHeaders.ORIGIN, origin)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+  }
 
   @Autowired private MockMvc mockMvc;
 
@@ -78,19 +135,21 @@ class PersonalityControllerTest {
         .andExpect(content().json("[]"));
   }
 
-  @Test
-  void listPersonalitiesAllowsConfiguredFrontendOrigin() throws Exception {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "http://localhost:3000",
+        "https://localhost",
+        "https://preview.krishnamurti.dev:9443",
+        "https://ai-chess.krishnamurti.dev"
+      })
+  void listPersonalitiesAllowsConfiguredFrontendOrigin(String origin) throws Exception {
     when(personalityService.listSelectable()).thenReturn(List.of());
 
     mockMvc
-        .perform(
-            get("/api/v1/personalities")
-                .header(HttpHeaders.ORIGIN, "https://ai-chess.krishnamurti.dev"))
+        .perform(get("/api/v1/personalities").header(HttpHeaders.ORIGIN, origin))
         .andExpect(status().isOk())
-        .andExpect(
-            header()
-                .string(
-                    HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://ai-chess.krishnamurti.dev"));
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin));
   }
 
   @Test

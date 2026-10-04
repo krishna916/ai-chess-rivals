@@ -47,6 +47,22 @@ class RequestTracingFilterIntegrationTest {
 
     assertThat(output.getOut())
         .contains("[requestId=integration-trace-001]")
-        .contains("HTTP request completed");
+        .contains("event=http.started", "event=controller.entered operation=personalities_list")
+        .contains("event=controller.completed operation=personalities_list")
+        .contains("event=http.completed");
+  }
+
+  @Test
+  void noMatchRequestTracesNotFoundWithoutClaimingHistoryQuery(CapturedOutput output)
+      throws Exception {
+    mockMvc
+        .perform(get("/api/v1/match").header("X-Request-ID", "no-match-trace-001"))
+        .andExpect(status().isNotFound());
+
+    assertThat(output.getOut())
+        .contains("[requestId=no-match-trace-001]")
+        .contains("event=controller.entered operation=match_current")
+        .contains("event=controller.rejected operation=match_current outcome=match_not_found")
+        .doesNotContain("operation=dialogue_history");
   }
 }

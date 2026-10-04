@@ -6,6 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import dev.krishnamurti.ai_chess_rivals.ai.api.SelectablePersonality;
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 @ExtendWith(MockitoExtension.class)
 class PersonalityServiceTest {
@@ -107,6 +112,42 @@ class PersonalityServiceTest {
 
     assertThat(service.findSelectable(" ")).isEmpty();
     verifyNoInteractions(personalityRepository);
+  }
+
+  @Test
+  void logsRosterQueryMetadataWithoutEntityContent() {
+    PersonalityEntity entity = personality("blaze", "Blaze", 1, true, true);
+    when(personalityRepository
+            .findAllBySystemTrueAndActiveTrueOrderByDisplayOrderAscPersonalityKeyAsc())
+        .thenReturn(List.of(entity));
+    Logger logger = (Logger) LoggerFactory.getLogger(PersonalityService.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    MDC.put("requestId", "roster-trace-001");
+    try {
+      new PersonalityService(personalityRepository).listSelectable();
+
+      assertThat(appender.list)
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .anySatisfy(
+              message ->
+                  assertThat(message).contains("event=db.started", "operation=personality_roster"))
+          .anySatisfy(
+              message ->
+                  assertThat(message)
+                      .contains("event=db.completed", "resultCount=1", "durationMs=")
+                      .doesNotContain("Competitive", "PG-13"));
+      assertThat(appender.list)
+          .allSatisfy(
+              event ->
+                  assertThat(event.getMDCPropertyMap())
+                      .containsEntry("requestId", "roster-trace-001"));
+    } finally {
+      MDC.clear();
+      logger.detachAppender(appender);
+      appender.stop();
+    }
   }
 
   private static PersonalityEntity personality(

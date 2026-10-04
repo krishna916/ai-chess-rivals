@@ -54,8 +54,12 @@ class RequestTracingFilterTest {
     assertThat(requestId).isNotNull();
     assertThat(UUID.fromString(requestId)).isNotNull();
     assertThat(response.getStatus()).isEqualTo(200);
-    assertThat(appender.list).hasSize(1);
-    ILoggingEvent completionEvent = appender.list.get(0);
+    assertThat(appender.list).hasSize(2);
+    ILoggingEvent startEvent = appender.list.get(0);
+    ILoggingEvent completionEvent = appender.list.get(1);
+    assertThat(startEvent.getFormattedMessage()).contains("event=http.started", "method=GET");
+    assertThat(startEvent.getLevel().toString()).isEqualTo("INFO");
+    assertThat(startEvent.getMDCPropertyMap()).containsEntry("requestId", requestId);
     assertThat(completionEvent.getMDCPropertyMap()).containsEntry("requestId", requestId);
     assertThat(completionEvent.getFormattedMessage())
         .contains("method=GET", "path=/api/v1/personalities", "status=200", "durationMs=")
@@ -78,8 +82,10 @@ class RequestTracingFilterTest {
         });
 
     assertThat(response.getHeader("X-Request-ID")).isEqualTo("manual-trace-001");
-    assertThat(appender.list).hasSize(1);
-    ILoggingEvent completionEvent = appender.list.get(0);
+    assertThat(appender.list).hasSize(2);
+    ILoggingEvent startEvent = appender.list.get(0);
+    ILoggingEvent completionEvent = appender.list.get(1);
+    assertThat(startEvent.getMDCPropertyMap()).containsEntry("requestId", "manual-trace-001");
     assertThat(completionEvent.getMDCPropertyMap()).containsEntry("requestId", "manual-trace-001");
     assertThat(completionEvent.getFormattedMessage())
         .contains("method=GET", "path=/api/v1/personalities")
@@ -127,7 +133,7 @@ class RequestTracingFilterTest {
     String requestId = response.getHeader("X-Request-ID");
     assertThat(requestId).isNotEqualTo(unsafeRequestId);
     assertThat(UUID.fromString(requestId)).isNotNull();
-    assertThat(appender.list).hasSize(1);
+    assertThat(appender.list).hasSize(2);
     assertThat(appender.list.get(0).getFormattedMessage())
         .doesNotContain("unsafe", "forged-log-line");
   }
@@ -169,9 +175,9 @@ class RequestTracingFilterTest {
         .isSameAs(failure);
 
     assertThat(response.getHeader("X-Request-ID")).isEqualTo("exception-trace-001");
-    assertThat(appender.list).hasSize(1);
+    assertThat(appender.list).hasSize(2);
 
-    ILoggingEvent completionEvent = appender.list.get(0);
+    ILoggingEvent completionEvent = appender.list.get(1);
     assertThat(completionEvent.getMDCPropertyMap())
         .containsEntry("requestId", "exception-trace-001");
     assertThat(completionEvent.getFormattedMessage())
@@ -198,8 +204,8 @@ class RequestTracingFilterTest {
                     }))
         .isSameAs(failure);
 
-    assertThat(appender.list).hasSize(1);
-    assertThat(appender.list.get(0).getFormattedMessage()).contains("status=503");
+    assertThat(appender.list).hasSize(2);
+    assertThat(appender.list.get(1).getFormattedMessage()).contains("status=503");
   }
 
   @Test
@@ -210,8 +216,8 @@ class RequestTracingFilterTest {
     filter.doFilter(request, response, (req, res) -> response.setStatus(101));
 
     assertThat(response.getHeader("X-Request-ID")).isNotNull();
-    assertThat(appender.list).hasSize(1);
-    assertThat(appender.list.get(0).getFormattedMessage()).contains("path=/ws/match", "status=101");
+    assertThat(appender.list).hasSize(2);
+    assertThat(appender.list.get(1).getFormattedMessage()).contains("path=/ws/match", "status=101");
   }
 
   @Test
@@ -235,8 +241,8 @@ class RequestTracingFilterTest {
 
     filter.doFilter(request, response, (req, res) -> response.setStatus(200));
 
-    assertThat(appender.list).hasSize(1);
-    assertThat(appender.list.get(0).getFormattedMessage())
+    assertThat(appender.list).hasSize(2);
+    assertThat(appender.list.get(1).getFormattedMessage())
         .contains("path=/api/v1/match")
         .doesNotContain("super-secret", "secret-auth", "secret-cookie");
   }

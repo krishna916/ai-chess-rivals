@@ -183,11 +183,27 @@ class MatchDialogueCoordinatorTest {
       appender.stop();
     }
 
-    ILoggingEvent event = assertThat(appender.list).singleElement().actual();
-    assertThat(event.getFormattedMessage())
-        .contains("exceptionType=IllegalStateException")
-        .doesNotContain("provider response secret");
-    assertThat(event.getThrowableProxy()).isNull();
+    assertThat(appender.list)
+        .extracting(ILoggingEvent::getFormattedMessage)
+        .anySatisfy(
+            message ->
+                assertThat(message)
+                    .contains("event=dialogue.trigger_started", "triggerType=MOVE", "triggerPly=1"))
+        .anySatisfy(
+            message ->
+                assertThat(message)
+                    .contains(
+                        "event=dialogue.trigger_completed",
+                        "triggerType=MOVE",
+                        "triggerPly=1",
+                        "outcome=failed",
+                        "durationMs="))
+        .anySatisfy(
+            message ->
+                assertThat(message)
+                    .contains("exceptionType=IllegalStateException")
+                    .doesNotContain("provider response secret"));
+    assertThat(appender.list).allSatisfy(event -> assertThat(event.getThrowableProxy()).isNull());
   }
 
   @Test

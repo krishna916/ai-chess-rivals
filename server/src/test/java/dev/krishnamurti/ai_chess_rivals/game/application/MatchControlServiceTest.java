@@ -15,14 +15,18 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.slf4j.MDC;
 
 class MatchControlServiceTest {
 
@@ -49,6 +53,11 @@ class MatchControlServiceTest {
         new MatchControlService(
             matchEngine, matchDialogueCoordinator, personalityCatalog, executorService, guard);
     match = TestMatchFixtures.newMatch();
+  }
+
+  @AfterEach
+  void clearMdc() {
+    MDC.clear();
   }
 
   @Test
@@ -271,6 +280,8 @@ class MatchControlServiceTest {
 
   @Test
   void runningStateResetsOnBackgroundException() {
+    MDC.put("requestId", "outer-request");
+    MDC.put("matchId", "outer-match");
     when(matchEngine.currentMatch()).thenReturn(match);
     service.startMatch("white-test", "black-test");
 
@@ -281,6 +292,9 @@ class MatchControlServiceTest {
 
     Runnable task = runnableCaptor.getValue();
     task.run(); // execute background task
+
+    assertEquals("outer-request", MDC.get("requestId"));
+    assertEquals("outer-match", MDC.get("matchId"));
 
     // Service should reset running flag despite exception
     MatchSnapshot snapshot = service.currentMatch();
@@ -366,6 +380,91 @@ class MatchControlServiceTest {
     assertFalse(stop.get(2, TimeUnit.SECONDS).running());
     verify(matchEngine).stopCurrentMatch();
     verify(activeTask).cancel(false);
+  }
+
+  @Test
+  void propagatesStartTraceToWorkerAndRestoresWorkerMdc() throws Exception {
+    ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+    CountDownLatch workerEntered = new CountDownLatch(1);
+    CountDownLatch releaseWorker = new CountDownLatch(1);
+    AtomicReference<String> workerRequestId = new AtomicReference<>();
+    AtomicReference<String> workerMatchId = new AtomicReference<>();
+    try {
+      service =
+          new MatchControlService(
+              matchEngine,
+              matchDialogueCoordinator,
+              personalityCatalog,
+              singleThreadExecutor,
+              guard);
+      when(matchEngine.currentMatch()).thenThrow(new IllegalStateException("No match"));
+      when(matchEngine.startNewMatch(any())).thenReturn(match);
+      when(matchEngine.playUntilFinished())
+          .thenAnswer(
+              invocation -> {
+                workerRequestId.set(MDC.get("requestId"));
+                workerMatchId.set(MDC.get("matchId"));
+                workerEntered.countDown();
+                assertTrue(releaseWorker.await(2, TimeUnit.SECONDS));
+                return match;
+              });
+
+      MDC.put("requestId", "start-trace-001");
+      service.startMatch("white-test", "black-test");
+      assertTrue(workerEntered.await(2, TimeUnit.SECONDS));
+      assertEquals("start-trace-001", workerRequestId.get());
+      assertEquals(match.id().toString(), workerMatchId.get());
+      releaseWorker.countDown();
+      Future<?> nextTask =
+          singleThreadExecutor.submit(
+              () -> {
+                assertNull(MDC.get("requestId"));
+                assertNull(MDC.get("matchId"));
+              });
+      nextTask.get(2, TimeUnit.SECONDS);
+    } finally {
+      releaseWorker.countDown();
+      MDC.clear();
+      singleThreadExecutor.shutdownNow();
+    }
+  }
+
+  @Test
+  void resumeUsesNewRequestIdAndSameMatchId() {
+    when(matchEngine.currentMatch())
+        .thenThrow(new IllegalStateException("No match"))
+        .thenReturn(match);
+    when(matchEngine.startNewMatch(any())).thenReturn(match);
+    java.util.List<String> observedTraces = new java.util.ArrayList<>();
+    java.util.List<Runnable> submittedTasks = new java.util.ArrayList<>();
+    doAnswer(
+            invocation -> {
+              submittedTasks.add(invocation.getArgument(0));
+              return activeTask;
+            })
+        .when(executorService)
+        .submit(any(Runnable.class));
+    doAnswer(
+            invocation -> {
+              observedTraces.add(MDC.get("requestId") + ":" + MDC.get("matchId"));
+              return match;
+            })
+        .when(matchEngine)
+        .playUntilFinished();
+
+    MDC.put("requestId", "first-start-request");
+    service.startMatch("white-test", "black-test");
+    submittedTasks.getFirst().run();
+
+    MDC.put("requestId", "resume-start-request");
+    service.startMatch("white-test", "black-test");
+    submittedTasks.get(1).run();
+
+    assertEquals(
+        java.util.List.of(
+            "first-start-request:" + match.id(), "resume-start-request:" + match.id()),
+        observedTraces);
+    MDC.clear();
   }
 
   private static Clock fixedClock() {

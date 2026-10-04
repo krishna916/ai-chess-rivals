@@ -135,6 +135,7 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 ### Web & API Communication
 *   **Spring Boot Starter WebMVC**: Configures REST APIs and synchronous web endpoints.
 *   **Spring Boot Starter WebSocket**: Handles real-time, bi-directional communication between client and server (crucial for streaming chess matches, live evaluations, and real-time trash talk).
+    REST CORS and WebSocket handshakes allow HTTP/HTTPS `localhost` and `*.krishnamurti.dev` origins on any port, plus the additional exact origin configured by `APP_WEBSOCKET_ALLOWED_ORIGIN`. The built-in patterns share `AllowedOriginPatterns` string constants; WebSocket configuration collects them in an immutable list.
 *   **Spring Boot Starter RestClient**: Lightweight, synchronous generic HTTP-client support. It is not the Phase 2 LLM integration path; Spring AI owns that boundary.
 
 ### Persistence & Database
@@ -148,6 +149,16 @@ The AI module builds contextual chess-rivalry prompts with Spring AI `PromptTemp
 *   **Spring Boot Actuator**: Exposes operational endpoints (health, info, and metrics on management port `8081`). Micrometer provides the metrics facade used by Phase 2 provider observability.
 *   **Request correlation**: A single Spring `OncePerRequestFilter` scopes validated `X-Request-ID` values to `/api/**` and `/ws/**`, propagates them through SLF4J MDC, and renders them in application log levels.
 *   **Spring Boot DevTools**: Enables hot-swapping classes and automatically restarting the local dev server.
+
+### Request Tracing
+
+The application filter assigns or validates `X-Request-ID` for REST and WebSocket handshakes and
+places it in SLF4J MDC. INFO events trace controller decisions, service-level repository operations,
+match worker execution, and WebSocket session delivery without logging request bodies, credentials,
+provider prompts, or dialogue text. Accepted match work carries the request ID and `matchId` into
+the executor; WebSocket lifecycle events use a handshake ID and `sessionId`, while broadcasts keep
+the originating match trace. Repository save logs mean `save_returned`, not transaction commit.
+Actuator remains on the separate management port and outside application request tracing.
 *   **Spotless Maven Plugin** (`v3.8.0`): Applies and verifies Google Java Format.
 *   **Error Prone** (`v2.50.0`): Runs compile-time Java bug checks through `javac`.
 *   **SpotBugs Maven Plugin** (`v4.10.2.0`): Runs medium-and-higher confidence bytecode analysis during `verify`, with `server/spotbugs-exclude.xml` limited to Hibernate-generated accessors on the personality and dialogue entities plus the persistence service's defensive constructor validation.

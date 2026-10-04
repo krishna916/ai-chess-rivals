@@ -216,6 +216,36 @@ Browser acceptance:
 - open `https://ai-chess.krishnamurti.dev/#/admin` directly and refresh;
 - confirm the admin route remains loaded after refresh.
 
+### Local request trace smoke checks
+
+Each REST response includes an `X-Request-ID`. A safe incoming ID is reused; otherwise the
+server generates one. The ID appears in `http.started`/`http.completed` and controller, service,
+repository, and accepted-match worker logs. Match workers add `matchId`; WebSocket lifecycle logs
+use the handshake request ID and `sessionId`, while broadcasts retain the ID of the match event's
+origin. A `dialogue_save` event with `outcome=save_returned` records that the repository returned a
+row; it does not claim the surrounding transaction committed.
+
+With the local backend running, follow one request ID through the INFO log stream:
+
+```bash
+curl -i -H 'X-Request-ID: trace-smoke-001' http://localhost:8082/api/v1/personalities
+```
+
+For a controlled match start, provide the local owner token through an environment variable and
+use valid roster keys. Do not put the token or request body in recorded log evidence:
+
+```bash
+curl -i -H "Authorization: Bearer $OWNER_CONTROL_TOKEN" \
+  -H 'Content-Type: application/json' -H 'X-Request-ID: trace-start-001' \
+  -d '{"whitePersonalityKey":"blaze","blackPersonalityKey":"sage"}' \
+  http://localhost:8082/api/v1/match/start
+```
+
+Confirm that the `202` response's request ID appears in the worker logs after the HTTP completion,
+and that the same worker events carry the returned `matchId`. A WebSocket viewer receives an
+initial snapshot (including the database-backed dialogue history) and gets a distinct
+`sessionId`; subsequent broadcast summaries retain the worker's originating request and match IDs.
+
 ## Phase 2 AI observability and resilience verification
 
 The Phase 2 automated tests are credential-safe. They use local provider stubs and deterministic

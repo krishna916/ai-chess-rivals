@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.security.MessageDigest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectWriter;
 
 /** Authenticates owner controls after Spring MVC has matched the request path. */
+@Slf4j
 public final class OwnerTokenInterceptor implements HandlerInterceptor {
 
   private static final String BEARER_PREFIX = "Bearer ";
@@ -38,8 +40,13 @@ public final class OwnerTokenInterceptor implements HandlerInterceptor {
     }
     String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
     if (hasValidToken(authorization)) {
+      log.info("event=owner_authorization outcome=accepted operation={}", operation(request));
       return true;
     }
+
+    log.info(
+        "event=owner_authorization outcome=rejected reason=invalid_or_missing_token operation={}",
+        operation(request));
 
     ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, AUTH_MESSAGE);
     detail.setTitle("Owner Authorization Required");
@@ -49,6 +56,10 @@ public final class OwnerTokenInterceptor implements HandlerInterceptor {
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     problemWriter.writeValue(response.getOutputStream(), detail);
     return false;
+  }
+
+  private static String operation(HttpServletRequest request) {
+    return "/api/v1/match/start".equals(request.getRequestURI()) ? "match_start" : "match_stop";
   }
 
   private boolean hasValidToken(String authorization) {

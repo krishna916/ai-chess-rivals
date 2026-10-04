@@ -261,10 +261,16 @@ and a platform-compatible Stockfish binary.
 | `STOCKFISH_PATH` | `stockfish/stockfish` |
 | `STOCKFISH_THREADS` | `1` |
 | `STOCKFISH_HASH_MB` | `16` |
-| `APP_WEBSOCKET_ALLOWED_ORIGIN` | `http://localhost:5173` |
+| `APP_WEBSOCKET_ALLOWED_ORIGIN` | Additional exact REST/WebSocket origin; defaults to `http://localhost:5173` |
 | `OWNER_CONTROL_TOKEN` | Required; generate a random 32-byte token |
 | `MATCH_COOLDOWN` | `60s` |
 | `MATCH_DAILY_START_LIMIT` | `12` accepted starts per UTC day |
+
+REST CORS and the match WebSocket always accept HTTP and HTTPS origins from `localhost` and
+subdomains of `krishnamurti.dev`, with or without an explicit port. The bare domain
+`krishnamurti.dev`, loopback IP addresses, and unrelated hosts are not included in these patterns.
+`APP_WEBSOCKET_ALLOWED_ORIGIN` can add one exact origin alongside this built-in policy. Owner
+Start/Stop requests still require the bearer token.
 
 Generate `OWNER_CONTROL_TOKEN` with PowerShell:
 

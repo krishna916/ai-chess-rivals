@@ -12,10 +12,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 class DialoguePersistenceService implements DialogueHistoryStore {
 
   private final DialogueLineRepository repository;
@@ -39,10 +41,37 @@ class DialoguePersistenceService implements DialogueHistoryStore {
       throw new IllegalArgumentException("triggerPly must not be negative");
     }
 
-    if (repository
-        .findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
-            matchId, triggerType, triggerPly, dialogue.personalityKey())
-        .isPresent()) {
+    long duplicateLookupStartedAt = System.nanoTime();
+    log.info(
+        "event=db.started operation=dialogue_duplicate_lookup matchId={} triggerType={} triggerPly={}",
+        matchId,
+        triggerType,
+        triggerPly);
+    boolean duplicate;
+    try {
+      duplicate =
+          repository
+              .findByMatchIdAndTriggerTypeAndTriggerPlyAndPersonalityKey(
+                  matchId, triggerType, triggerPly, dialogue.personalityKey())
+              .isPresent();
+    } catch (RuntimeException exception) {
+      log.info(
+          "event=db.failed operation=dialogue_duplicate_lookup matchId={} triggerType={} triggerPly={} exceptionType={} durationMs={}",
+          matchId,
+          triggerType,
+          triggerPly,
+          exception.getClass().getSimpleName(),
+          elapsedMillis(duplicateLookupStartedAt));
+      throw exception;
+    }
+    log.info(
+        "event=db.completed operation=dialogue_duplicate_lookup matchId={} triggerType={} triggerPly={} outcome={} durationMs={}",
+        matchId,
+        triggerType,
+        triggerPly,
+        duplicate ? "duplicate" : "absent",
+        elapsedMillis(duplicateLookupStartedAt));
+    if (duplicate) {
       return Optional.empty();
     }
 
@@ -60,23 +89,78 @@ class DialoguePersistenceService implements DialogueHistoryStore {
             dialogue.reactionType(),
             dialogue.source(),
             Instant.now());
-    return Optional.of(toApi(repository.save(entity)));
+    long saveStartedAt = System.nanoTime();
+    log.info(
+        "event=db.started operation=dialogue_save matchId={} triggerType={} triggerPly={}",
+        matchId,
+        triggerType,
+        triggerPly);
+    try {
+      PersistedDialogue persisted = toApi(repository.save(entity));
+      log.info(
+          "event=db.completed operation=dialogue_save outcome=save_returned id={} matchId={} triggerType={} triggerPly={} durationMs={}",
+          persisted.id(),
+          matchId,
+          triggerType,
+          triggerPly,
+          elapsedMillis(saveStartedAt));
+      return Optional.of(persisted);
+    } catch (RuntimeException exception) {
+      log.info(
+          "event=db.failed operation=dialogue_save matchId={} triggerType={} triggerPly={} exceptionType={} durationMs={}",
+          matchId,
+          triggerType,
+          triggerPly,
+          exception.getClass().getSimpleName(),
+          elapsedMillis(saveStartedAt));
+      throw exception;
+    }
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<PersistedDialogue> findAll(UUID matchId) {
     Objects.requireNonNull(matchId, "matchId must not be null");
-    return repository.findAllByMatchIdOrderByIdAsc(matchId).stream()
-        .map(DialoguePersistenceService::toApi)
-        .toList();
+    long startedAtNanos = System.nanoTime();
+    log.info("event=db.started operation=dialogue_history matchId={}", matchId);
+    try {
+      List<PersistedDialogue> lines =
+          repository.findAllByMatchIdOrderByIdAsc(matchId).stream()
+              .map(DialoguePersistenceService::toApi)
+              .toList();
+      log.info(
+          "event=db.completed operation=dialogue_history matchId={} outcome=success resultCount={} durationMs={}",
+          matchId,
+          lines.size(),
+          elapsedMillis(startedAtNanos));
+      return lines;
+    } catch (RuntimeException exception) {
+      log.info(
+          "event=db.failed operation=dialogue_history matchId={} exceptionType={} durationMs={}",
+          matchId,
+          exception.getClass().getSimpleName(),
+          elapsedMillis(startedAtNanos));
+      throw exception;
+    }
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<DialogueHistoryLine> lastFour(UUID matchId) {
     Objects.requireNonNull(matchId, "matchId must not be null");
-    List<DialogueLineEntity> newestFirst = repository.findTop4ByMatchIdOrderByIdDesc(matchId);
+    long startedAtNanos = System.nanoTime();
+    log.info("event=db.started operation=dialogue_recent_history matchId={}", matchId);
+    List<DialogueLineEntity> newestFirst;
+    try {
+      newestFirst = repository.findTop4ByMatchIdOrderByIdDesc(matchId);
+    } catch (RuntimeException exception) {
+      log.info(
+          "event=db.failed operation=dialogue_recent_history matchId={} exceptionType={} durationMs={}",
+          matchId,
+          exception.getClass().getSimpleName(),
+          elapsedMillis(startedAtNanos));
+      throw exception;
+    }
     List<DialogueHistoryLine> chronological = new ArrayList<>(newestFirst.size());
     for (int i = newestFirst.size() - 1; i >= 0; i--) {
       DialogueLineEntity row = newestFirst.get(i);
@@ -84,7 +168,17 @@ class DialoguePersistenceService implements DialogueHistoryStore {
           new DialogueHistoryLine(
               row.triggerPly(), row.personalityKey(), row.personalityDisplayName(), row.text()));
     }
-    return List.copyOf(chronological);
+    List<DialogueHistoryLine> result = List.copyOf(chronological);
+    log.info(
+        "event=db.completed operation=dialogue_recent_history matchId={} outcome=success resultCount={} durationMs={}",
+        matchId,
+        result.size(),
+        elapsedMillis(startedAtNanos));
+    return result;
+  }
+
+  private static long elapsedMillis(long startedAtNanos) {
+    return (System.nanoTime() - startedAtNanos) / 1_000_000L;
   }
 
   private static PersistedDialogue toApi(DialogueLineEntity entity) {

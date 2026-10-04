@@ -1,8 +1,12 @@
 package dev.krishnamurti.ai_chess_rivals.game.websocket;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import dev.krishnamurti.ai_chess_rivals.game.TestMatchFixtures;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchControlService;
 import dev.krishnamurti.ai_chess_rivals.game.application.MatchNotFoundException;
@@ -14,6 +18,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -22,6 +27,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.socket.CloseStatus;
@@ -202,10 +209,64 @@ class MatchWebSocketHandlerTest {
     assertEquals(1, session.getBroadcastMessageCount());
   }
 
+  @Test
+  void sessionCallbacksRestoreMdcAndBroadcastKeepsOriginTrace() throws Exception {
+    when(matchControlService.currentMatch()).thenThrow(new MatchNotFoundException("No match"));
+    Logger logger = (Logger) LoggerFactory.getLogger(MatchWebSocketHandler.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    StubWebSocketSession first = new StubWebSocketSession("viewer-one");
+    first.getAttributes().put("traceRequestId", "handshake-one");
+    StubWebSocketSession second = new StubWebSocketSession("viewer-two");
+    second.getAttributes().put("traceRequestId", "handshake-two");
+    try {
+      MDC.put("requestId", "outer-request");
+      handler.afterConnectionEstablished(first);
+      assertEquals("outer-request", MDC.get("requestId"));
+      handler.afterConnectionEstablished(second);
+      assertEquals("outer-request", MDC.get("requestId"));
+
+      MDC.put("requestId", "worker-request");
+      MDC.put("matchId", "worker-match");
+      handler.broadcast(
+          new MatchStreamMessage<>(MatchStreamMessageType.NO_MATCH, new NoMatchMessage()));
+
+      assertEquals("worker-request", MDC.get("requestId"));
+      assertThat(appender.list)
+          .anySatisfy(
+              event ->
+                  assertThat(event.getMDCPropertyMap())
+                      .containsEntry("requestId", "worker-request")
+                      .containsEntry("matchId", "worker-match"));
+      assertThat(appender.list)
+          .anySatisfy(
+              event ->
+                  assertThat(event.getFormattedMessage())
+                      .contains("event=websocket.initial_message", "messageType=NO_MATCH"));
+    } finally {
+      MDC.clear();
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
+  @Test
+  void transportErrorRemovesAndClosesSession() throws Exception {
+    when(matchControlService.currentMatch()).thenThrow(new MatchNotFoundException("No match"));
+    StubWebSocketSession session = new StubWebSocketSession("transport-error");
+    handler.afterConnectionEstablished(session);
+
+    handler.handleTransportError(session, new IOException("transport failure"));
+
+    assertFalse(session.isOpen());
+  }
+
   private static class StubWebSocketSession implements WebSocketSession {
 
     private final String id;
     private final List<TextMessage> sentMessages = new ArrayList<>();
+    private final Map<String, Object> attributes = new HashMap<>();
     private boolean open = true;
     private int textMessageSizeLimit;
     private int binaryMessageSizeLimit;
@@ -235,7 +296,7 @@ class MatchWebSocketHandlerTest {
 
     @Override
     public Map<String, Object> getAttributes() {
-      return Map.of();
+      return attributes;
     }
 
     @Override

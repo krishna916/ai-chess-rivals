@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -89,13 +90,17 @@ public final class MatchEngine {
             evaluation ->
                 evaluationBaseline.set(new EvaluationBaseline(0, startingFen, evaluation)));
     try {
-      matchEventSink.publish(
-          new MatchStarted(
-              match.id(), match.sideToMove(), match.currentPosition(), match.rivalry()));
+      withMatchId(
+          match.id(),
+          () ->
+              matchEventSink.publish(
+                  new MatchStarted(
+                      match.id(), match.sideToMove(), match.currentPosition(), match.rivalry())));
     } catch (RuntimeException e) {
       throw new MatchEngineException("Failed to publish match start event", e);
     }
     currentMatch.set(match);
+    withMatchId(match.id(), () -> log.info("event=engine.match_started matchId={}", match.id()));
     return match;
   }
 
@@ -137,6 +142,10 @@ public final class MatchEngine {
         Move recordedMove = nextMatch.moves().getLast();
         match = nextMatch;
         currentMatch.set(match);
+        log.info(
+            "event=engine.ply_committed matchId={} ply={}",
+            match.id(),
+            recordedMove.sequenceNumber());
         String committedFen = match.currentPosition().fen();
         Optional<PositionEvaluation> afterEvaluation =
             safeEvaluate(recordedMove.sequenceNumber(), committedFen);
@@ -196,11 +205,25 @@ public final class MatchEngine {
 
   public void stopCurrentMatch() {
     executionGeneration.incrementAndGet();
+    Match matchForTrace = currentMatch.get();
+    if (matchForTrace != null) {
+      withMatchId(
+          matchForTrace.id(),
+          () ->
+              log.info(
+                  "event=engine.stop_requested matchId={} ply={}",
+                  matchForTrace.id(),
+                  matchForTrace.moveCount()));
+    }
     if (stopRequested.compareAndSet(false, true)) {
       Match match = currentMatch.get();
       if (match != null && match.isInProgress()) {
-        matchEventSink.publish(
-            new MatchStopped(match.sideToMove(), match.currentPosition(), match.moveCount()));
+        withMatchId(
+            match.id(),
+            () ->
+                matchEventSink.publish(
+                    new MatchStopped(
+                        match.sideToMove(), match.currentPosition(), match.moveCount())));
       }
     }
   }
@@ -222,6 +245,11 @@ public final class MatchEngine {
   private Match finishMatch(Match match, GameResult result, long generation) {
     Match finishedMatch = match.finish(result);
     currentMatch.set(finishedMatch);
+    log.info(
+        "event=engine.match_finished matchId={} result={} ply={}",
+        match.id(),
+        result,
+        match.moveCount());
     safeDialogue(
         () ->
             matchDialogueCoordinator.onGameEnd(
@@ -235,6 +263,20 @@ public final class MatchEngine {
     matchEventSink.publish(
         new MatchFinished(result, finishedMatch.currentPosition(), finishedMatch.moveCount()));
     return finishedMatch;
+  }
+
+  private static void withMatchId(UUID matchId, Runnable action) {
+    String previousMatchId = MDC.get("matchId");
+    MDC.put("matchId", matchId.toString());
+    try {
+      action.run();
+    } finally {
+      if (previousMatchId == null) {
+        MDC.remove("matchId");
+      } else {
+        MDC.put("matchId", previousMatchId);
+      }
+    }
   }
 
   private boolean isDialogueAuthorityCurrent(long generation, UUID matchId, int expectedPly) {

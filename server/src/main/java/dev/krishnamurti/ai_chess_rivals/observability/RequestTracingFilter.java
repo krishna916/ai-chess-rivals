@@ -41,6 +41,7 @@ public class RequestTracingFilter extends OncePerRequestFilter {
 
     response.setHeader(REQUEST_ID_HEADER, requestId);
     MDC.put(REQUEST_ID_MDC_KEY, requestId);
+    log.info("event=http.started method={} path={}", request.getMethod(), request.getRequestURI());
 
     boolean completedNormally = false;
     try {
@@ -53,7 +54,7 @@ public class RequestTracingFilter extends OncePerRequestFilter {
       }
       long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
       log.info(
-          "HTTP request completed method={} path={} status={} durationMs={}",
+          "event=http.completed method={} path={} status={} durationMs={}",
           request.getMethod(),
           request.getRequestURI(),
           completionStatus,

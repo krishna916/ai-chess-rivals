@@ -126,8 +126,15 @@ final class MatchDialogueCoordinator {
   }
 
   List<PersistedDialogue> history(UUID matchId) {
+    long startedAtNanos = System.nanoTime();
     try {
-      return historyStore.findAll(matchId);
+      List<PersistedDialogue> lines = historyStore.findAll(matchId);
+      log.info(
+          "event=dialogue.history_completed matchId={} resultCount={} durationMs={}",
+          matchId,
+          lines.size(),
+          elapsedMillis(startedAtNanos));
+      return lines;
     } catch (RuntimeException exception) {
       log.warn(
           "Dialogue history unavailable matchId={} triggerType={} triggerPly={}",
@@ -147,8 +154,8 @@ final class MatchDialogueCoordinator {
       BooleanSupplier authoritative) {
     for (GeneratedDialogue line : generated) {
       if (!authoritative.getAsBoolean()) {
-        log.debug(
-            "Discarding stale dialogue matchId={} triggerType={} triggerPly={}",
+        log.info(
+            "event=dialogue.stale_result_discarded matchId={} triggerType={} triggerPly={}",
             matchId,
             triggerType,
             triggerPly);
@@ -168,22 +175,41 @@ final class MatchDialogueCoordinator {
     MDC.put("matchId", matchId.toString());
     MDC.put("triggerType", triggerType.name());
     MDC.put("triggerPly", Integer.toString(triggerPly));
+    long startedAtNanos = System.nanoTime();
+    boolean succeeded = true;
+    log.info(
+        "event=dialogue.trigger_started matchId={} triggerType={} triggerPly={}",
+        matchId,
+        triggerType,
+        triggerPly);
     try {
       try {
         action.run();
       } catch (RuntimeException exception) {
+        succeeded = false;
         log.warn(
-            "Dialogue unavailable matchId={} triggerType={} triggerPly={} exceptionType={}",
+            "event=dialogue.unavailable matchId={} triggerType={} triggerPly={} exceptionType={}",
             matchId,
             triggerType,
             triggerPly,
             exception.getClass().getSimpleName());
       }
+      log.info(
+          "event=dialogue.trigger_completed matchId={} triggerType={} triggerPly={} outcome={} durationMs={}",
+          matchId,
+          triggerType,
+          triggerPly,
+          succeeded ? "success" : "failed",
+          elapsedMillis(startedAtNanos));
     } finally {
       restoreMdc("matchId", previousMatchId);
       restoreMdc("triggerType", previousTriggerType);
       restoreMdc("triggerPly", previousTriggerPly);
     }
+  }
+
+  private static long elapsedMillis(long startedAtNanos) {
+    return (System.nanoTime() - startedAtNanos) / 1_000_000L;
   }
 
   private static void restoreMdc(String key, String previousValue) {

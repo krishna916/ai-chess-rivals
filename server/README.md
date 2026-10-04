@@ -224,6 +224,21 @@ delete the contents of `server/stockfish/` (except `.gitkeep`) and re-run
 
 ## Docker Compose Development Workflow
 
+### Following request traces
+
+Application REST responses return `X-Request-ID`. Supply a safe ID to correlate the request across
+the controller and database-operation INFO logs:
+
+```bash
+curl -i -H 'X-Request-ID: local-trace-001' http://localhost:8082/api/v1/personalities
+```
+
+Starting a match carries that request ID into its background worker, which also logs the `matchId`.
+WebSocket connect/close/error events include a `sessionId` and the handshake request ID; broadcast
+summaries retain the worker's originating request ID. A database `save_returned` event means the
+repository returned a row, not that the transaction committed. Logs contain operation metadata,
+not authorization values, request bodies, prompts, or dialogue text.
+
 For normal development, run PostgreSQL with `docker compose up -d postgres`, Spring Boot
 through Maven or the IDE, and the frontend through Vite. See the root README for local setup.
 The optional workflow below runs both PostgreSQL and the native backend in Compose.
@@ -377,7 +392,8 @@ committed files:
 - `OWNER_CONTROL_TOKEN`: (A generated 32-byte hex token; store the same value in a password manager)
 - `MATCH_COOLDOWN`: `60s` (or the desired Spring duration)
 - `MATCH_DAILY_START_LIMIT`: `12` (or the desired positive limit)
-- `APP_WEBSOCKET_ALLOWED_ORIGIN`: (The production frontend origin)
+- `APP_WEBSOCKET_ALLOWED_ORIGIN`: (Optional additional exact REST/WebSocket origin; HTTP/HTTPS
+  `localhost` and `*.krishnamurti.dev` origins on any port are always accepted)
 - `AI_ENABLED`: `true` for the production AI-enabled native image
 - `AI_OPENROUTER_API_KEY`: (OpenRouter API key stored as a Render secret)
 - `AI_OPENROUTER_BASE_URL`: `https://openrouter.ai/api/v1`
